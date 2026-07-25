@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     legiscan_api_key: str = ""
     legiscan_state: str = "FL"
 
-    legistar_clients: str = "miami,jacksonville"
+    legistar_clients: str = "miamifl,jaxcityc"
 
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"

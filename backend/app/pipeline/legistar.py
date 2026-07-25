@@ -23,10 +23,13 @@ logger = logging.getLogger(__name__)
 
 LEGISTAR_BASE_URL = "https://webapi.legistar.com/v1/{client}"
 
-# Legistar client token -> (jurisdiction display name, public site slug for detail links).
+# Legistar client tokens confirmed against the live API (not guessable from
+# city name -- e.g. Miami's is "miamifl", not "miami"; Jacksonville's is
+# "jaxcityc", not "jacksonville"). Also doubles as the public site subdomain
+# (https://{client}.legistar.com).
 CLIENT_JURISDICTIONS = {
-    "miami": "Miami",
-    "jacksonville": "Jacksonville",
+    "miamifl": {"jurisdiction": "Miami", "county": "Miami-Dade County"},
+    "jaxcityc": {"jurisdiction": "Jacksonville", "county": "Duval County"},
 }
 
 
@@ -89,7 +92,8 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
     if client_name not in CLIENT_JURISDICTIONS:
         raise ValueError(f"Unsupported Legistar client '{client_name}'; MVP supports {list(CLIENT_JURISDICTIONS)}")
 
-    jurisdiction = CLIENT_JURISDICTIONS[client_name]
+    info = CLIENT_JURISDICTIONS[client_name]
+    jurisdiction = info["jurisdiction"]
     client = LegistarClient(client_name)
     matters = client.get_matters(top=limit)
 
@@ -100,12 +104,19 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         matter_id = matter["MatterId"]
         detail_url = f"https://{client_name}.legistar.com/LegislationDetail.aspx?ID={matter_id}"
 
+        # MatterName is null in practice for both confirmed clients -- MatterTitle
+        # carries the actual legislative title (full legal text, sometimes
+        # several paragraphs). entities.name is capped at 500 chars, so
+        # truncate here; the full text is kept in bill.description below.
+        full_title = matter.get("MatterName") or matter.get("MatterTitle") or f"Matter {matter_id}"
+        title = full_title if len(full_title) <= 490 else full_title[:489] + "…"
+
         entity = _get_or_create_bill_entity(db, client_name=client_name, matter_id=matter_id)
         if entity is None:
-            entity = Entity(entity_type="bill", name=matter.get("MatterName", ""), external_ids={})
+            entity = Entity(entity_type="bill", name=title, external_ids={})
             db.add(entity)
 
-        entity.name = matter.get("MatterName", "") or entity.name
+        entity.name = title
         entity.jurisdiction_level = "city"
         entity.jurisdiction_name = jurisdiction
         entity.external_ids = {
@@ -140,8 +151,9 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         bill.last_action = matter.get("MatterStatusName")
         bill.full_text_url = detail_url
         bill.source_system = "legistar"
+        bill.description = matter.get("MatterTitle")
         bill.geo_scope_type = "city"
-        bill.geo_scope_names = [f"{jurisdiction} City" if jurisdiction != "Miami" else "Miami-Dade County"]
+        bill.geo_scope_names = [info["county"]]
         db.flush()
 
         try:
