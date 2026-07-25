@@ -122,7 +122,7 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
 
         entity = _get_or_create_bill_entity(db, legiscan_bill_id=legiscan_bill_id)
         if entity is None:
-            entity = Entity(entity_type="bill", name=detail.get("title", row.get("title", "")))
+            entity = Entity(entity_type="bill", name=detail.get("title", row.get("title", "")), external_ids={})
             db.add(entity)
 
         entity.name = detail.get("title") or row.get("title", "")

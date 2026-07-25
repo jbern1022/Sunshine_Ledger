@@ -102,7 +102,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
         entity = _get_or_create_bill_entity(db, client_name=client_name, matter_id=matter_id)
         if entity is None:
-            entity = Entity(entity_type="bill", name=matter.get("MatterName", ""))
+            entity = Entity(entity_type="bill", name=matter.get("MatterName", ""), external_ids={})
             db.add(entity)
 
         entity.name = matter.get("MatterName", "") or entity.name
