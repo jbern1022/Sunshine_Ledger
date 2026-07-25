@@ -85,13 +85,46 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
         <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(bill.status)}`}>{bill.status}</span>
       </div>
 
-      {bill.what_it_does && <p className="mt-3 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>}
-
-      {bill.geo_scope_names.length > 0 && (
-        <p className="mt-2 text-xs text-slate-400">
-          Geographic scope: {bill.geo_scope_type} — {bill.geo_scope_names.join(", ")}
+      {bill.what_it_does ? (
+        <p className="mt-3 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
+      ) : (
+        <p className="mt-3 text-sm italic text-slate-400">
+          No plain-language summary generated yet.
+          {bill.full_text_url && (
+            <>
+              {" "}
+              <a
+                href={bill.full_text_url}
+                target="_blank"
+                rel="noreferrer"
+                className="not-italic text-sunshine-600 underline hover:text-sunshine-500"
+              >
+                Read the original bill text
+              </a>
+              .
+            </>
+          )}
         </p>
       )}
+
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+        {bill.primary_sponsor && <span>Sponsored by {bill.primary_sponsor}</span>}
+        {bill.geo_scope_names.length > 0 && (
+          <span>
+            {bill.geo_scope_type} — {bill.geo_scope_names.join(", ")}
+          </span>
+        )}
+        {bill.full_text_url && (
+          <a
+            href={bill.full_text_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sunshine-600 underline hover:text-sunshine-500"
+          >
+            View original bill ↗
+          </a>
+        )}
+      </p>
 
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
         <div className="flex items-center gap-4">
@@ -125,6 +158,14 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               {whoItAffects}
             </p>
           )}
+          {!loading && detail && detail.sponsors.length > 0 && (
+            <p className="mb-2 text-slate-600">
+              <span className="font-semibold">Sponsors: </span>
+              {detail.sponsors
+                .map((s) => (s.relationship_type === "co_sponsor" ? `${s.name} (co-sponsor)` : s.name))
+                .join(", ")}
+            </p>
+          )}
           {!loading && uniqueSources.length > 0 && (
             <ul className="space-y-1">
               {uniqueSources.map((s) => (
@@ -142,7 +183,12 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               ))}
             </ul>
           )}
-          {!loading && detail && uniqueSources.length === 0 && <p className="text-slate-400">No sources on file.</p>}
+          {!loading && detail && uniqueSources.length === 0 && (
+            <p className="text-slate-400">
+              No summary sources yet (no plain-language summary has been generated for this bill) — see
+              &quot;View original bill&quot; above for where this data came from.
+            </p>
+          )}
         </div>
       )}
 

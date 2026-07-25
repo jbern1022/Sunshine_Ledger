@@ -59,11 +59,12 @@ class BillListItem(BaseModel):
     last_action_date: date | None
     what_it_does: str | None
     source_count: int
+    full_text_url: str | None
+    primary_sponsor: str | None
 
 
 class BillDetail(BillListItem):
     last_action: str | None
-    full_text_url: str | None
     sponsors: list[SponsorOut]
     claims: list[ClaimOut]
     news: list[NewsItemOut]

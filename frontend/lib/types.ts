@@ -35,11 +35,12 @@ export interface BillListItem {
   last_action_date: string | null;
   what_it_does: string | null;
   source_count: number;
+  full_text_url: string | null;
+  primary_sponsor: string | null;
 }
 
 export interface BillDetail extends BillListItem {
   last_action: string | null;
-  full_text_url: string | null;
   sponsors: SponsorOut[];
   claims: ClaimOut[];
   news: NewsItemOut[];
