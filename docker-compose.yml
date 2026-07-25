@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sunshine}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sunshine_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-sunshine_ledger}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sunshine} -d ${POSTGRES_DB:-sunshine_ledger}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://sunshine:sunshine_dev_only@db:5432/sunshine_ledger}
+    ports:
+      - "${API_PORT:-8010}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8010}
+      DEV_ORIGIN_HOST: ${DEV_ORIGIN_HOST:-}
+    ports:
+      - "${FRONTEND_PORT:-3010}:3000"
+    depends_on:
+      - backend
+    command: npm run dev
+
+volumes:
+  db_data:

@@ -1,0 +1,18 @@
+# Auto-applied by `docker compose up` when running against a LOCAL docker
+# context (e.g. Docker Desktop) — adds bind mounts + hot reload for dev.
+#
+# Bind mounts only make sense when the daemon and this repo are on the same
+# filesystem. For a remote host (e.g. `docker context use sunshine-vm`),
+# deploy with `docker compose -f docker-compose.yml up -d --build` to skip
+# this file — code is baked into the image instead.
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next

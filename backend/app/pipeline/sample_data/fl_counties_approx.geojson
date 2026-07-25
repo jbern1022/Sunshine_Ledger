@@ -1,0 +1,68 @@
+{
+  "type": "FeatureCollection",
+  "_comment": "APPROXIMATE placeholder polygons for local dev/demo map shading only. NOT survey-accurate. Replace with real U.S. Census TIGER/Line county shapefiles via load_boundaries.load_tiger_shapefile before any real deployment (BRD 5.3 requires TIGER/Line boundary geometry).",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "scope_type": "county", "scope_name": "Miami-Dade County", "jurisdiction_name": "FL" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-80.87, 25.32],
+          [-80.75, 25.13],
+          [-80.45, 25.14],
+          [-80.31, 25.20],
+          [-80.13, 25.47],
+          [-80.09, 25.62],
+          [-80.14, 25.78],
+          [-80.31, 25.88],
+          [-80.55, 25.98],
+          [-80.75, 25.90],
+          [-80.87, 25.70],
+          [-80.87, 25.32]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "scope_type": "county", "scope_name": "Duval County", "jurisdiction_name": "FL" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-81.87, 30.24],
+          [-81.75, 30.10],
+          [-81.55, 30.12],
+          [-81.42, 30.22],
+          [-81.38, 30.36],
+          [-81.45, 30.48],
+          [-81.60, 30.52],
+          [-81.75, 30.46],
+          [-81.85, 30.36],
+          [-81.87, 30.24]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "scope_type": "statewide", "scope_name": "FL", "jurisdiction_name": "FL" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-87.63, 30.99],
+          [-85.00, 31.00],
+          [-82.20, 30.75],
+          [-80.03, 30.71],
+          [-80.53, 27.02],
+          [-80.13, 25.78],
+          [-80.87, 25.13],
+          [-81.72, 25.83],
+          [-82.70, 27.50],
+          [-82.85, 28.90],
+          [-84.88, 29.70],
+          [-87.40, 30.40],
+          [-87.63, 30.99]
+        ]]
+      }
+    }
+  ]
+}

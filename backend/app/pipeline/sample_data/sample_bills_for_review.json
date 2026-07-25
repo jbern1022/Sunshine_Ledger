@@ -1,0 +1,17 @@
+[
+  {
+    "bill_number": "SB-0001 (SAMPLE)",
+    "title": "An Act Relating to Residential Water Heater Efficiency Standards",
+    "bill_text": "Section 1. Effective July 1 of the year following enactment, no residential water heater manufactured or sold for installation within the state may have an energy factor rating below the minimum established by the most recent U.S. Department of Energy efficiency standard in effect at time of sale. Section 2. The Department of Business and Professional Regulation shall enforce this section through the existing building permit inspection process; no new inspection regime is created. Section 3. Water heaters installed prior to the effective date are exempt and may remain in service until replacement. Section 4. Licensed plumbing contractors found in violation of Section 1 are subject to the existing disciplinary schedule under Chapter 489, Florida Statutes, and are not subject to any new penalty created by this act."
+  },
+  {
+    "bill_number": "HB-0002 (SAMPLE)",
+    "title": "An Act Relating to Local Government Short-Term Rental Registration",
+    "bill_text": "Section 1. Any county with a population greater than 500,000 may require owners of short-term rental properties, defined as residential dwellings rented for fewer than 30 consecutive days, to register the property with the county tax collector prior to advertising the property for rent. Section 2. Counties adopting a registration requirement under this section may charge a registration fee not to exceed $150 per property per year, to be used solely to offset the administrative cost of maintaining the registry. Section 3. This section does not authorize a county to cap the total number of registered short-term rental properties, restrict short-term rentals to specific zoning districts, or impose occupancy limits beyond those already set by the Florida Building Code. Section 4. A county ordinance adopted under this section must provide property owners at least 90 days' notice before the registration requirement takes effect."
+  },
+  {
+    "bill_number": "SB-0003 (SAMPLE)",
+    "title": "An Act Relating to School Bus Route Transparency",
+    "bill_text": "Section 1. Each district school board shall publish current school bus route maps and stop-level estimated pickup and drop-off times on the district's public website, updated no later than five business days after any route change. Section 2. Districts already publishing this information through a third-party transportation platform are considered in compliance and are not required to duplicate the information on the district's own website. Section 3. This act does not require a district to disclose the home address of any individual student, nor does it require real-time GPS tracking of buses to be made public. Section 4. The Department of Education shall include compliance with this section as part of its existing annual transportation report; no new reporting requirement or penalty is created."
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "_comment": "State-agnostic-by-design (BRD 6): this is Florida's jurisdiction list as *data*, not hardcoded pipeline logic. A future state adds a sibling file, not new code.",
+  "state": "FL",
+  "counties": [
+    "Miami-Dade County", "Broward County", "Palm Beach County", "Duval County",
+    "Hillsborough County", "Orange County", "Pinellas County", "Lee County",
+    "Polk County", "Brevard County", "Volusia County", "Pasco County",
+    "Seminole County", "Sarasota County", "Manatee County", "Collier County",
+    "Marion County", "Lake County", "Osceola County", "Escambia County",
+    "St. Lucie County", "Leon County", "Alachua County", "Clay County",
+    "St. Johns County"
+  ],
+  "cities": [
+    "Miami", "Jacksonville", "Tampa", "Orlando", "Fort Lauderdale",
+    "St. Petersburg", "Tallahassee", "Hialeah", "Port St. Lucie", "Cape Coral"
+  ]
+}
