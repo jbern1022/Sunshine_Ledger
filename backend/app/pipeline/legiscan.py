@@ -157,6 +157,7 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
         bill.last_action = detail.get("last_action") or row.get("last_action")
         bill.full_text_url = detail.get("state_link") or row.get("url")
         bill.source_system = "legiscan"
+        bill.description = detail.get("description")
         bill.geo_scope_type = "statewide"
         bill.geo_scope_names = [state]
         db.flush()

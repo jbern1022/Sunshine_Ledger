@@ -37,6 +37,12 @@ class Bill(TimestampMixin, Base):
     full_text_url: Mapped[str | None] = mapped_column(Text)
     source_system: Mapped[str] = mapped_column(String(50), nullable=False)  # legiscan | legistar
 
+    # Short official description from the source system (e.g. LegiScan's own
+    # one-line blurb). Not the full bill text, but real/authoritative and
+    # cheap to fetch -- used as the LLM summarization input until full PDF
+    # bill-text ingestion exists.
+    description: Mapped[str | None] = mapped_column(Text)
+
     # Geographic scope tagging per BRD 5.3, e.g. scope_type="county", scope_names=["Miami-Dade County"]
     geo_scope_type: Mapped[str | None] = mapped_column(String(20))  # statewide | county | city
     geo_scope_names: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)

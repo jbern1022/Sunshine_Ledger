@@ -43,6 +43,26 @@ Write a 2-4 sentence plain-language summary of what this bill actually does. Rul
 
 WHO_IT_AFFECTS_PROMPT = """You are identifying who is affected by a piece of legislation, for a general public audience.
 
+Your default assumption should be that the text DOES name or imply a specific affected group -- most bills regulate, fund, penalize, license, or benefit some named category of people, profession, or institution, even briefly. Read closely for nouns like officers, teachers, contractors, spouses and children of X, licensees, counties, students, employees, tenants, etc. -- these all count as a specific group, even if the phrase is short.
+
+Only use the fallback below if the text is truly generic (e.g. naming a state symbol, renaming a road, a purely ceremonial/procedural act with no named beneficiary or regulated party at all).
+
+Examples:
+
+Text: "Designates the tulip as the official state flower."
+Answer: The available text does not specify a particular affected group beyond the general public.
+
+Text: "Requires licensed roofing contractors to complete 4 hours of hurricane-mitigation training annually."
+Answer: Licensed roofing contractors in Florida, who must now complete annual hurricane-mitigation training.
+
+Text: "Increases penalties for battery committed against law enforcement officers."
+Answer: Law enforcement officers, who gain stronger legal protection, and anyone charged with battery against them, who now faces increased penalties.
+
+Text: "Sets aside tuition assistance funds for spouses and children of active members of the Florida National Guard."
+Answer: Spouses and children of active Florida National Guard members, who become eligible for tuition assistance.
+
+Now identify who this bill affects, in 1-2 plain sentences using only what the text below supports. Do not add agencies, institutions, or industries the text doesn't mention just because they sound plausible for this topic. Write plain prose -- no bullet points, no lists, no headers. If the text truly has no named affected group per the rule above, respond with exactly: "The available text does not specify a particular affected group beyond the general public."
+
 Bill: {bill_number} — {title}
 
 Bill text or official summary:
@@ -50,11 +70,7 @@ Bill text or official summary:
 {bill_text}
 \"\"\"
 
-Identify the specific groups, industries, or geographies affected by this bill, based only on the text above. Rules:
-- Name concrete groups (e.g. "renters in Miami-Dade County", "licensed electricians", "public school teachers"), not vague categories like "the public" unless the bill text truly has no narrower scope.
-- Only state what is supported by the text above. Do not speculate.
-- 1-3 sentences. Output only the summary text, no preamble.
-"""
+Answer:"""
 
 
 class OllamaError(RuntimeError):
