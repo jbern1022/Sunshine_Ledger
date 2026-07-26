@@ -85,15 +85,24 @@ db = SessionLocal()
 ingest_state_bills(db, limit=20)
 "
 
-# Real Miami / Jacksonville local bills (no key needed, public Legistar API)
+# Real Jacksonville local bills (public Legistar API, no key needed)
 docker compose exec backend python -c "
 from app.db import SessionLocal
 from app.pipeline.legistar import ingest_local_bills
 db = SessionLocal()
-ingest_local_bills(db, client_name='miami', limit=20)
-ingest_local_bills(db, client_name='jacksonville', limit=20)
+ingest_local_bills(db, client_name='jaxcityc', limit=20)
 "
+
+# Real Miami local bills -- Miami's Legistar client ('miamifl') turned out
+# to hold only a handful of legacy records with no sponsor data. The city's
+# actual active legislative record lives on a different Granicus product
+# (iQM2, miamifl.iqm2.com) with no public API, so this scrapes it instead:
+docker compose exec backend python -m app.pipeline.miami_iqm2
 ```
+
+Note on Legistar client tokens: they aren't guessable from the city name.
+Miami's is `miamifl`, Jacksonville's is `jaxcityc` -- found by probing the
+live API / searching the city's public portal, not from any documentation.
 
 ## Steps 8–10
 
@@ -147,6 +156,7 @@ backend/
   app/models/       Entity/Relationship/Event/Source/SpatialContext + Bill/Claim/Flag
   app/api/          FastAPI routers: /bills, /map, /flags
   app/pipeline/      legiscan.py, legistar.py — ingestion
+                      miami_iqm2.py — Miami-specific scraper (see note above)
                       summarize.py, review_summaries.py — LLM + Step 2 gate
                       geotag.py, load_boundaries.py — BRD 5.3 geo-tagging
                       one_bill_by_hand.py — Step 3 proof
