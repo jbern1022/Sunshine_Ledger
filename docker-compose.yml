@@ -42,5 +42,13 @@ services:
       - backend
     command: npm run dev
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+      - backend
+
 volumes:
   db_data:

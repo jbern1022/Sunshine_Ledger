@@ -201,6 +201,19 @@ and backend services.** Do not add Postgres (`POSTGRES_PORT`, default
 5433) to the tunnel config — it has no auth hardening applied and was
 never intended to be internet-reachable.
 
+**Keep every public hostname a single subdomain label** (e.g.
+`sunshineledger-api.example.com`, not `api.sunshineledger.example.com`).
+Learned this the hard way: Cloudflare's free Universal SSL only
+auto-issues a certificate for one level of wildcard (`*.example.com`), so
+a double-nested hostname fails the TLS handshake outright — `curl` reports
+it as `TLS alert, handshake failure`, which looks like a connectivity
+problem but is actually a missing certificate. Fixed by renaming to a
+single-label hostname rather than paying for Advanced Certificate Manager.
+Live setup: `sunshineledger.josephbernal.com` (frontend) +
+`sunshineledger-api.josephbernal.com` (backend), one Cloudflare Tunnel
+container routing to each by Docker Compose service name
+(`frontend:3000` / `backend:8000`) — no host ports involved in that path.
+
 Still open, worth deciding before going fully public: there's no
 authentication anywhere (matches the BRD's public-read, no-accounts MVP
 scope) and no CAPTCHA-equivalent on `/flags` beyond the rate limit — low
