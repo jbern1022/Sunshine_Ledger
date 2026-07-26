@@ -66,18 +66,30 @@ fully browsable without any API keys. All seed bill numbers are tagged
 placeholders — replace them before any real deployment:
 
 ```bash
-# Real county boundaries (BRD 5.3 requires actual TIGER/Line geometry)
+# Real county boundaries (BRD 5.3 requires actual TIGER/Line geometry).
+# Nationwide county file -- filter to Florida via state_fips="12".
+# Use NAMELSAD, not NAME -- it includes the "County" suffix already used
+# everywhere else (bill geo_scope_names, seed data), so scope_name matches
+# with zero transformation.
 docker compose exec backend python -c "
+import httpx, zipfile
+from pathlib import Path
 from app.db import SessionLocal
 from app.pipeline.load_boundaries import load_tiger_shapefile
-from pathlib import Path
+
+url = 'https://www2.census.gov/geo/tiger/TIGER2024/COUNTY/tl_2024_us_county.zip'
+resp = httpx.get(url, timeout=120, follow_redirects=True)
+open('/tmp/tl_county.zip', 'wb').write(resp.content)
+zipfile.ZipFile('/tmp/tl_county.zip').extractall('/tmp/tiger_county')
+
 db = SessionLocal()
-load_tiger_shapefile(db, Path('/path/to/tl_2024_12_county.shp'),
-    scope_type='county', name_field='NAME', state_fips='12',
-    name_filter=['Miami-Dade', 'Duval'])
+load_tiger_shapefile(db, Path('/tmp/tiger_county/tl_2024_us_county.shp'),
+    scope_type='county', name_field='NAMELSAD', state_fips='12',
+    name_filter=['Miami-Dade County', 'Duval County'])
 "
 
-# Real Florida state bills (needs LEGISCAN_API_KEY in .env)
+# Real Florida state bills (needs LEGISCAN_API_KEY in .env). Omit `limit`
+# for the full session (~1,900 bills, ~3 min at observed throughput).
 docker compose exec backend python -c "
 from app.db import SessionLocal
 from app.pipeline.legiscan import ingest_state_bills

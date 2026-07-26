@@ -71,16 +71,35 @@ def load_tiger_shapefile(
     state_fips_field: str = "STATEFP",
     jurisdiction_name: str = "FL",
     name_filter: list[str] | None = None,
+    replace: bool = True,
 ) -> int:
     """Load county/place boundaries from a real TIGER/Line shapefile.
 
-    `name_field` / `state_fips_field` match TIGER/Line's own column names
-    (e.g. "NAME" + "COUNTYFP" for county shapefiles). Filter to Florida via
-    `state_fips="12"`, and optionally to specific counties/cities via
-    `name_filter` (MVP only needs Miami-Dade and Duval).
+    `name_field` / `state_fips_field` match TIGER/Line's own column names.
+    Use "NAMELSAD" (not "NAME") for counties -- it includes the "County"
+    suffix already used everywhere else in this codebase (bill
+    geo_scope_names, seed data), so scope_name matches with zero
+    transformation. Filter to Florida via `state_fips="12"`, and optionally
+    to specific counties/cities via `name_filter` (MVP only needs
+    Miami-Dade and Duval).
+
+    `replace` clears any existing reference boundary rows (entity_id and
+    event_id both null) with a matching scope_type + scope_name first, so
+    re-running this (or running it after `load_sample_boundaries`) doesn't
+    leave stale/duplicate polygons for the same county.
     """
     reader = shapefile.Reader(str(shapefile_path))
     fields = [f[0] for f in reader.fields[1:]]  # skip deletion flag field
+
+    if replace and name_filter:
+        db.execute(
+            delete(SpatialContext).where(
+                SpatialContext.entity_id.is_(None),
+                SpatialContext.event_id.is_(None),
+                SpatialContext.scope_type == scope_type,
+                SpatialContext.scope_name.in_(name_filter),
+            )
+        )
 
     count = 0
     for sr in reader.shapeRecords():
