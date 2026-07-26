@@ -182,6 +182,30 @@ frontend/
 docs/                 Source BRD / Charter / Roadmap
 ```
 
+## Security notes for public exposure
+
+Hardened ahead of exposing this beyond the LAN via Cloudflare Tunnel:
+
+- **CORS** is a config-driven allowlist (`CORS_ALLOWED_ORIGINS`), not a
+  wildcard. Add the public domain there before it's live.
+- **Rate limiting** (`slowapi`): 120/min per IP globally, 5/min per IP on
+  `POST /flags` specifically (the one public write endpoint).
+- **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy` set on every response.
+- **Error responses** are plain Pydantic validation errors — no
+  tracebacks; confirmed no `--reload`/debug mode in the production compose
+  file (only `docker-compose.override.yml`, used for local dev, adds it).
+
+**When wiring up the Cloudflare Tunnel ingress, only route the frontend
+and backend services.** Do not add Postgres (`POSTGRES_PORT`, default
+5433) to the tunnel config — it has no auth hardening applied and was
+never intended to be internet-reachable.
+
+Still open, worth deciding before going fully public: there's no
+authentication anywhere (matches the BRD's public-read, no-accounts MVP
+scope) and no CAPTCHA-equivalent on `/flags` beyond the rate limit — low
+risk at current traffic levels, worth revisiting if abuse shows up.
+
 ## Not yet built (out of this session's scope)
 
 - BRD 5.8: Florida election calendar surfacing

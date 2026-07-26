@@ -1,18 +1,18 @@
-from __future__ import annotations
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Claim, Entity, Flag
+from app.rate_limit import limiter
 from app.schemas.flag import FlagCreate, FlagOut
 
 router = APIRouter(prefix="/flags", tags=["flags"])
 
 
 @router.post("", response_model=FlagOut, status_code=201)
-def create_flag(payload: FlagCreate, db: Session = Depends(get_db)) -> Flag:
+@limiter.limit("5/minute")
+def create_flag(request: Request, payload: FlagCreate, db: Session = Depends(get_db)) -> Flag:
     """Report a suspected inaccuracy (BRD 5.5). Routes to manual review only —
     there is no public listing endpoint, matching the no-open-editing MVP scope.
     """

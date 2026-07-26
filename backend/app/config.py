@@ -23,9 +23,19 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
+    # Comma-separated list of origins allowed to call this API from a
+    # browser. Defaults to local dev only -- production deployments must
+    # set this explicitly (e.g. https://sunshineledger.josephbernal.com)
+    # rather than relying on a wildcard.
+    cors_allowed_origins: str = "http://localhost:3000,http://localhost:3010"
+
     @property
     def legistar_client_list(self) -> list[str]:
         return [c.strip() for c in self.legistar_clients.split(",") if c.strip()]
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
 
 
 settings = Settings()
