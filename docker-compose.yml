@@ -42,7 +42,19 @@ services:
       - backend
     command: npm run dev
 
+  # Two replicas of the same tunnel (same token) register as separate
+  # connectors with Cloudflare's edge, which load-balances/fails over
+  # between them automatically -- one container dying doesn't take the
+  # public site down with it.
   cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+      - backend
+
+  cloudflared2:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
     command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
