@@ -184,6 +184,25 @@ host**, only the resolved container env vars are sent over the Docker API.
   `department` field longer than the column). Truncate before storing IDs
   that don't have a controlled max length.
 
+## Running tests
+
+```bash
+./scripts/run-tests.sh
+```
+
+Spins up an ephemeral Postgres/PostGIS container (tmpfs data, distinct db
+name, port never exposed to the host) on the **local Docker Desktop
+context**, runs the backend pytest suite against it, then tears the whole
+stack down -- pass or fail. It never touches the `sunshine-vm` remote
+context or any real data; that's why the script hardcodes
+`--context desktop-linux` rather than using whatever context happens to be
+active.
+
+Coverage so far: pure-function pipeline parsing/mapping (`legiscan.py`,
+`gdelt.py`) and the bills/flags API routes (including the admin auth
+gate), using FastAPI's `TestClient` with a real DB per test rolled back
+via a savepoint. No frontend tests yet.
+
 ## Reviewing flags
 
 `GET /flags/admin` (HTTP Basic Auth, credentials in `.env` as

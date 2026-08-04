@@ -1,0 +1,33 @@
+# Ephemeral test stack -- only used by scripts/run-tests.sh, never by the
+# deployed app. Separate file so `docker compose up` (dev) and remote
+# deploys never pick this up by accident, and so it's obvious this never
+# touches production data (tmpfs, distinct port/db name, torn down after
+# every run).
+services:
+  db-test:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: sunshine
+      POSTGRES_PASSWORD: sunshine_test_only
+      POSTGRES_DB: sunshine_ledger_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sunshine -d sunshine_ledger_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend-test:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://sunshine:sunshine_test_only@db-test:5432/sunshine_ledger_test
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: testpass
+      CORS_ALLOWED_ORIGINS: http://testserver
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db-test:
+        condition: service_healthy
+    command: sh -c "pip install -q -r requirements-dev.txt && pytest -v"
