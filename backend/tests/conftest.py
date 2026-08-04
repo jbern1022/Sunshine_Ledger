@@ -69,7 +69,13 @@ def client(db_session):
 def bill_factory(db_session):
     """Insert a minimal bill Entity + Bill row, return the Entity."""
 
-    def _factory(*, bill_number: str = "HB 123", name: str = "Test Bill", status: str = "Introduced") -> Entity:
+    def _factory(
+        *,
+        bill_number: str = "HB 123",
+        name: str = "Test Bill",
+        status: str = "Introduced",
+        geo_scope_names: list[str] | None = None,
+    ) -> Entity:
         entity = Entity(
             entity_type="bill",
             name=name,
@@ -92,7 +98,7 @@ def bill_factory(db_session):
             full_text_url="https://example.com/bill",
             source_system="legiscan",
             geo_scope_type="statewide",
-            geo_scope_names=["FL"],
+            geo_scope_names=geo_scope_names if geo_scope_names is not None else ["FL"],
         )
         db_session.add(bill)
         db_session.commit()

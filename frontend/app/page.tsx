@@ -39,14 +39,17 @@ function BrowsePageInner() {
     setLoading(true);
     setError(null);
 
-    fetchBills({ q: q || undefined, jurisdiction_name: jurisdiction || undefined, limit: PAGE_SIZE, offset })
+    fetchBills({
+      q: q || undefined,
+      jurisdiction_name: jurisdiction || undefined,
+      geo_scope_name: geoFilter || undefined,
+      limit: PAGE_SIZE,
+      offset,
+    })
       .then((res) => {
         if (cancelled) return;
-        const items = geoFilter
-          ? res.items.filter((b) => b.geo_scope_names.some((n) => n.toLowerCase().includes(geoFilter.toLowerCase())))
-          : res.items;
-        setBills(items);
-        setTotal(geoFilter ? items.length : res.total);
+        setBills(res.items);
+        setTotal(res.total);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message ?? "Failed to load bills. Is the API running?");
@@ -63,7 +66,7 @@ function BrowsePageInner() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
   const hasPrev = offset > 0;
-  const hasNext = !geoFilter && offset + PAGE_SIZE < total;
+  const hasNext = offset + PAGE_SIZE < total;
 
   return (
     <div>
@@ -138,7 +141,7 @@ function BrowsePageInner() {
         <>
           <p className="mb-3 text-xs text-slate-400">
             {total} bill{total === 1 ? "" : "s"}
-            {!geoFilter && totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
+            {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
           </p>
           <div className="space-y-4">
             {bills.map((bill) => (
@@ -146,7 +149,7 @@ function BrowsePageInner() {
             ))}
           </div>
 
-          {!geoFilter && (hasPrev || hasNext) && (
+          {(hasPrev || hasNext) && (
             <div className="mt-6 flex items-center justify-between">
               <button
                 onClick={() => setOffset((o) => Math.max(o - PAGE_SIZE, 0))}

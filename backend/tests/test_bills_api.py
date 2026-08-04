@@ -38,6 +38,16 @@ def test_list_bills_search_matches_bill_number(client, bill_factory):
     assert body["total"] == 1
 
 
+def test_list_bills_filters_by_geo_scope_name(client, bill_factory):
+    bill_factory(bill_number="HB 1", geo_scope_names=["Miami-Dade County"])
+    bill_factory(bill_number="HB 2", geo_scope_names=["Duval County"])
+
+    resp = client.get("/bills", params={"geo_scope_name": "Miami-Dade County"})
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["bill_number"] == "HB 1"
+
+
 def test_get_bill_detail(client, bill_factory):
     entity = bill_factory()
 

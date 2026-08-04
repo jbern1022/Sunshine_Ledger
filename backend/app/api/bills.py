@@ -72,6 +72,7 @@ def list_bills(
     jurisdiction_name: str | None = Query(None, description="e.g. FL, Miami, Jacksonville"),
     jurisdiction_level: str | None = Query(None, description="state | city"),
     status: str | None = Query(None),
+    geo_scope_name: str | None = Query(None, description="e.g. 'Miami-Dade County' -- matches Bill.geo_scope_names"),
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -89,6 +90,8 @@ def list_bills(
         stmt = stmt.where(Entity.jurisdiction_level == jurisdiction_level)
     if status:
         stmt = stmt.where(Bill.status == status)
+    if geo_scope_name:
+        stmt = stmt.where(Bill.geo_scope_names.any(geo_scope_name))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Entity.name.ilike(like), Bill.bill_number.ilike(like)))

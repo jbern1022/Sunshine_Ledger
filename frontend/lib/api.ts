@@ -7,6 +7,7 @@ export interface BillSearchParams {
   jurisdiction_name?: string;
   jurisdiction_level?: string;
   status?: string;
+  geo_scope_name?: string;
   limit?: number;
   offset?: number;
 }
