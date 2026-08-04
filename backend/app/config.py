@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     # rather than relying on a wildcard.
     cors_allowed_origins: str = "http://localhost:3000,http://localhost:3010"
 
+    # HTTP Basic Auth for admin-only endpoints (currently: flag review).
+    # Empty password means those endpoints reject everything -- see
+    # app/auth.py's fail-closed behavior.
+    admin_username: str = "admin"
+    admin_password: str = ""
+
     @property
     def legistar_client_list(self) -> list[str]:
         return [c.strip() for c in self.legistar_clients.split(",") if c.strip()]

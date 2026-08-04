@@ -153,6 +153,27 @@ host**, only the resolved container env vars are sent over the Docker API.
   `department` field longer than the column). Truncate before storing IDs
   that don't have a controlled max length.
 
+## Reviewing flags
+
+`GET /flags/admin` (HTTP Basic Auth, credentials in `.env` as
+`ADMIN_USERNAME`/`ADMIN_PASSWORD`) lists submitted "flag this" reports,
+newest first, defaulting to `status=pending`. Each includes the bill
+number/name, the reporter's text, and their email if they gave one.
+
+```bash
+curl -u admin:<password> "https://sunshineledger-api.josephbernal.com/flags/admin"
+
+# after acting on one:
+curl -X PATCH -u admin:<password> -H "Content-Type: application/json" \
+  -d '{"status": "reviewed"}' \
+  "https://sunshineledger-api.josephbernal.com/flags/admin/<flag-id>"
+```
+
+Valid statuses: `pending` (default filter), `reviewed`, `dismissed`, or
+pass `?status=all` to see everything. If `ADMIN_PASSWORD` isn't set, these
+endpoints reject every request rather than falling back to a guessable
+default.
+
 ## Monitoring
 
 None yet — see the "add uptime monitoring" ticket. In the meantime, a
