@@ -1,0 +1,49 @@
+# Woodpecker CI pipeline: auto-build/test on push.
+#
+# This repo isn't registered with the Woodpecker server yet -- that's a
+# one-time step in the Woodpecker web UI (Settings -> Add Repository),
+# which needs an authenticated click through the GitHub/Gitea OAuth flow
+# and isn't something that can be done headlessly. Once enabled, this file
+# runs automatically; nothing else needs to change.
+#
+# Scope: build/test verification only, no auto-deploy. Deploys to the
+# live app still go through the manual process in docs/RUNBOOK.md --
+# auto-deploy is a separate decision for later, not bundled in here.
+
+steps:
+  - name: backend-tests
+    image: python:3.12-slim
+    commands:
+      - cd backend
+      - pip install --no-cache-dir -q -r requirements-dev.txt
+      - pytest -v
+    environment:
+      DATABASE_URL: postgresql+psycopg://sunshine:sunshine_test_only@postgres:5432/sunshine_ledger_test
+      ADMIN_USERNAME: testadmin
+      ADMIN_PASSWORD: testpass
+      CORS_ALLOWED_ORIGINS: http://testserver
+    when:
+      - event: push
+      - event: pull_request
+
+  - name: frontend-build
+    image: node:20-slim
+    commands:
+      - cd frontend
+      - npm ci
+      - npm run build
+    environment:
+      # Build-time only -- no live API needed just to verify the build
+      # compiles and type-checks cleanly.
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    when:
+      - event: push
+      - event: pull_request
+
+services:
+  - name: postgres
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: sunshine
+      POSTGRES_PASSWORD: sunshine_test_only
+      POSTGRES_DB: sunshine_ledger_test
