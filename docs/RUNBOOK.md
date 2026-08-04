@@ -165,6 +165,39 @@ curl -s -o /dev/null -w "%{http_code}\n" https://sunshineledger.josephbernal.com
 
 ## Backups
 
-**As of this writing, there are none.** See the (p1, URGENT) Todoist
-ticket. Until that's resolved, the entire dataset exists only on the Omen
-host's disk.
+Automated, off-box, and restore-tested as of 2026-08-04.
+
+- **What**: `pg_dump -F c` (custom format, compressed) of the full
+  database, run against the live `sunshineledger-db-1` container.
+- **Where**: `/home/joe/scripts/backup-db.sh` on the Omen host, cron'd
+  daily at 03:00 (`crontab -l` on Omen to confirm). Local copies land in
+  `/home/joe/sunshineledger-backups/` on Omen.
+- **Off-box destination**: rsynced to the Pi (`192.168.4.2`,
+  `/home/joe/backups/sunshineledger/`) — a separate physical device, so an
+  Omen disk failure doesn't take the backups with it. The rsync uses a
+  dedicated key (`~/.ssh/sunshineledger_backup_key` on Omen) restricted via
+  `rrsync -wo` in the Pi's `authorized_keys` — that key can only write into
+  that one directory, nothing else on the Pi is reachable with it.
+- **Retention**: 14 days, pruned automatically both on Omen (by the backup
+  script itself) and on the Pi (separate cron job there, since the
+  restricted key can't run arbitrary prune commands remotely).
+
+### Restoring
+
+```bash
+# Get a dump onto the box you're restoring to (from Omen or the Pi copy),
+# then, against a target Postgres/PostGIS instance:
+docker cp sunshineledger-<timestamp>.dump <target-container>:/tmp/restore.dump
+docker exec <target-container> pg_restore -U sunshine -d sunshine_ledger --no-owner /tmp/restore.dump
+```
+
+Expect three harmless `schema "tiger"/"tiger_data"/"topology" already
+exists` errors if restoring into a fresh `postgis/postgis` image (it
+creates those schemas itself on init; pg_dump also captures them since the
+extension owns them). Everything else should restore cleanly.
+
+**This was verified end-to-end on 2026-08-04**: restored a real production
+dump into a disposable throwaway container and confirmed `entities` (bill
+count) and `claims` counts matched production exactly (2,311 bills, 4,240
+claims), with real bill numbers present. The disposable container was
+removed after verification — this wasn't left running.
