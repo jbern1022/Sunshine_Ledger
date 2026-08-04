@@ -118,9 +118,23 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
 
     for row in master_list:
         legiscan_bill_id = int(row["bill_id"])
-        detail = client.get_bill(legiscan_bill_id)
+        row_change_hash = row.get("change_hash")
 
         entity = _get_or_create_bill_entity(db, legiscan_bill_id=legiscan_bill_id)
+        if (
+            entity is not None
+            and row_change_hash
+            and entity.external_ids.get("legiscan_change_hash") == row_change_hash
+        ):
+            # Unchanged since our last pull -- skip the getBill call entirely.
+            # Matters for a daily scheduled run: LegiScan's free tier is
+            # 30,000 queries/month, and re-fetching detail for ~1,900
+            # already-stable bills every day would blow through that in
+            # under a week.
+            continue
+
+        detail = client.get_bill(legiscan_bill_id)
+
         if entity is None:
             entity = Entity(entity_type="bill", name=detail.get("title", row.get("title", "")), external_ids={})
             db.add(entity)
@@ -128,7 +142,11 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
         entity.name = detail.get("title") or row.get("title", "")
         entity.jurisdiction_level = "state"
         entity.jurisdiction_name = state
-        entity.external_ids = {**entity.external_ids, "legiscan_id": str(legiscan_bill_id)}
+        entity.external_ids = {
+            **entity.external_ids,
+            "legiscan_id": str(legiscan_bill_id),
+            "legiscan_change_hash": row_change_hash,
+        }
         db.flush()
 
         source = Source(
