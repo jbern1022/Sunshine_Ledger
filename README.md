@@ -8,6 +8,8 @@ Full requirements: [`docs/Sunshine_Ledger_BRD.docx`](docs/Sunshine_Ledger_BRD.do
 [`docs/Sunshine_Ledger_Project_Charter.docx`](docs/Sunshine_Ledger_Project_Charter.docx),
 [`docs/Sunshine_Ledger_Phased_Roadmap.docx`](docs/Sunshine_Ledger_Phased_Roadmap.docx).
 
+Running/debugging the live app day-to-day: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+
 This repo implements the full **Roadmap MVP build order, Steps 1–10**:
 schema → summarization-quality gate tooling → one-bill-by-hand proof →
 automated LegiScan/Legistar ingestion → browse/search frontend → map view →

@@ -13,6 +13,8 @@ const JURISDICTIONS = [
   { label: "Jacksonville", value: "Jacksonville" },
 ];
 
+const PAGE_SIZE = 50;
+
 function BrowsePageInner() {
   const searchParams = useSearchParams();
   const geoFilter = searchParams.get("geo") ?? "";
@@ -20,17 +22,24 @@ function BrowsePageInner() {
   const [q, setQ] = useState("");
   const [jurisdiction, setJurisdiction] = useState(() => searchParams.get("jurisdiction") ?? "");
   const [autoDetected, setAutoDetected] = useState(() => searchParams.get("auto") === "1");
+  const [offset, setOffset] = useState(0);
   const [bills, setBills] = useState<BillListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Any filter change starts back at page 1 -- otherwise you could land on
+  // an offset past the end of a newly-narrowed result set.
+  useEffect(() => {
+    setOffset(0);
+  }, [q, jurisdiction, geoFilter]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
 
-    fetchBills({ q: q || undefined, jurisdiction_name: jurisdiction || undefined, limit: 50 })
+    fetchBills({ q: q || undefined, jurisdiction_name: jurisdiction || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
         if (cancelled) return;
         const items = geoFilter
@@ -49,7 +58,12 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, jurisdiction, geoFilter]);
+  }, [q, jurisdiction, geoFilter, offset]);
+
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const hasPrev = offset > 0;
+  const hasNext = !geoFilter && offset + PAGE_SIZE < total;
 
   return (
     <div>
@@ -124,12 +138,35 @@ function BrowsePageInner() {
         <>
           <p className="mb-3 text-xs text-slate-400">
             {total} bill{total === 1 ? "" : "s"}
+            {!geoFilter && totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
           </p>
           <div className="space-y-4">
             {bills.map((bill) => (
               <BillCard key={bill.entity_id} bill={bill} />
             ))}
           </div>
+
+          {!geoFilter && (hasPrev || hasNext) && (
+            <div className="mt-6 flex items-center justify-between">
+              <button
+                onClick={() => setOffset((o) => Math.max(o - PAGE_SIZE, 0))}
+                disabled={!hasPrev}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Previous
+              </button>
+              <span className="text-xs text-slate-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+                disabled={!hasNext}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
