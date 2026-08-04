@@ -53,10 +53,35 @@ container before using the file, it's gone. Do the download and the work
 that needs it in the same `docker compose exec` session, or write to a
 mounted volume instead.
 
+## Scheduled ingestion
+
+`/home/joe/scripts/run-ingestion.sh` runs on Omen itself (not from the Mac)
+via cron, operating directly on the live `sunshineledger-backend-1`
+container with `docker exec` -- no repo checkout needed on that host.
+
+```
+0 4 * * *   /home/joe/scripts/run-ingestion.sh              # daily: LegiScan, Legistar, Miami iQM2, summarize
+0 5 * * 0   /home/joe/scripts/run-ingestion.sh --with-gdelt # weekly (Sunday): adds GDELT headline refresh
+```
+
+GDELT is deliberately weekly, not daily -- it re-checks every bill in the
+database against GDELT's free DOC API with an 8s/bill minimum throttle,
+so a full pass takes multiple hours even before 429 retries. Daily would
+hammer a free third-party API for no real benefit.
+
+LegiScan ingestion skips bills whose `change_hash` hasn't changed since
+the last pull (see `legiscan.py`), so daily reruns only spend API quota on
+bills that actually changed -- important given the 30,000 query/month
+free-tier cap. Legistar and Miami iQM2 don't have the same metering
+concern and just upsert every run.
+
+Logs land in `/home/joe/scripts/ingestion.log` on Omen (uncapped --
+worth an eye on size over time, no rotation configured yet).
+
 ## Running pipeline jobs manually
 
-No scheduler exists yet (see the "scheduled ingestion pipeline" ticket) --
-everything below is run by hand via `docker compose exec`:
+For one-off/ad-hoc runs (backfills, testing changes) from the Mac against
+the remote docker context, rather than the scheduled job above:
 
 ```bash
 # Real FL state bills (needs LEGISCAN_API_KEY in .env)
