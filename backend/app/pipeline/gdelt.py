@@ -150,7 +150,7 @@ def pull_headlines_for_all_bills(db: Session, *, max_records: int = 5) -> int:
     for entity in entities:
         try:
             total += len(pull_headlines_for_bill(db, entity, client=client))
-        except GDELTError as exc:
+        except (GDELTError, httpx.HTTPError) as exc:
             logger.warning("Skipping bill %s: %s", entity.id, exc)
     return total
 
