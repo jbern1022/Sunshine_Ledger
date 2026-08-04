@@ -103,12 +103,14 @@ function BrowsePageInner() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <input
           type="search"
+          aria-label="Search bill number or title"
           placeholder="Search bill number or title…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         />
         <select
+          aria-label="Filter by jurisdiction"
           value={jurisdiction}
           onChange={(e) => {
             setJurisdiction(e.target.value);
