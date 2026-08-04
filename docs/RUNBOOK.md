@@ -101,13 +101,19 @@ host**, only the resolved container env vars are sent over the Docker API.
 
 ## Known gotchas (learned the hard way during the build)
 
-- **Powerstation IP drift.** The Ollama host's DHCP-leased IP has changed
-  at least once (`192.168.4.48` → `192.168.4.50`) across a sleep/wake
-  cycle, silently breaking `OLLAMA_HOST` with no clear error until you
-  actually try to summarize something. If summarization suddenly stops
-  working, check the Powerstation's *current* IP before assuming Ollama
-  itself is down. A DHCP reservation would fix this permanently (see
-  Todoist ticket).
+- **Powerstation IP drift — real cause found.** Not simple DHCP lease
+  renewal as first assumed: the Powerstation has **two network interfaces
+  live on the same LAN at once** -- wired Ethernet via a Hyper-V virtual
+  switch ("LabSwitch", MAC `34-5A-60-C5-B5-3D`) and Wi-Fi (MAC
+  `AC-F2-3C-CB-BC-B7`) -- each with its own DHCP-assigned IP (`.50` and
+  `.48` respectively at time of writing). Ollama binds `0.0.0.0` so it's
+  reachable on whichever is current; `OLLAMA_HOST` breaks silently
+  whenever the "live" one isn't the one it's pointed at. If summarization
+  stops working, check the Powerstation's current IP (`ipconfig` over
+  SSH: `ssh powerstation "ipconfig | findstr IPv4"`) before assuming
+  Ollama itself is down. Real fix: DHCP-reserve the wired MAC, or just
+  disable Wi-Fi on a machine that's always plugged in anyway (see Todoist
+  ticket).
 - **Legistar client tokens aren't guessable from the city name.** Miami's
   is `miamifl`, Jacksonville's is `jaxcityc`, Fort Lauderdale's is
   `fortlauderdale`. Wrong guesses 500 with `LegistarConnectionString
