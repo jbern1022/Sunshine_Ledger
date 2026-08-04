@@ -1,3 +1,5 @@
+"use client";
+
 import dynamic from "next/dynamic";
 
 // Leaflet touches `window` at import time, so the map must be client-only

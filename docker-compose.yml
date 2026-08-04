@@ -40,7 +40,10 @@ services:
       - "${FRONTEND_PORT:-3010}:3000"
     depends_on:
       - backend
-    command: npm run dev
+    # A real production build, not the dev server -- NEXT_PUBLIC_* vars are
+    # inlined at build time, so building here (not baked into the image)
+    # keeps them driven by the runtime environment like everything else.
+    command: sh -c "npm run build && npm run start"
 
   # Two replicas of the same tunnel (same token) register as separate
   # connectors with Cloudflare's edge, which load-balances/fails over

@@ -52,7 +52,7 @@ async function lookupJurisdiction(ip: string): Promise<string | null> {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (request.cookies.has(GEO_RESOLVED_COOKIE) || request.nextUrl.searchParams.has("jurisdiction")) {
     return NextResponse.next();
   }
