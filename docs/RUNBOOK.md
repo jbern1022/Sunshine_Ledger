@@ -201,7 +201,19 @@ active.
 Coverage so far: pure-function pipeline parsing/mapping (`legiscan.py`,
 `gdelt.py`) and the bills/flags API routes (including the admin auth
 gate), using FastAPI's `TestClient` with a real DB per test rolled back
-via a savepoint. No frontend tests yet.
+via a savepoint.
+
+Frontend tests run separately (Vitest + React Testing Library, no
+container needed -- everything's mocked at the `lib/api` boundary):
+
+```bash
+cd frontend && npm test
+```
+
+Covers `BillCard` (expand-to-fetch-sources, flag submission success/error)
+and the browse page (`geo`-filter passthrough to the API, pagination).
+No component/integration tests for the map view yet (Leaflet + jsdom is
+more friction than it's worth right now).
 
 ## Reviewing flags
 

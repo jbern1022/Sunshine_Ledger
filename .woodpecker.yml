@@ -31,6 +31,7 @@ steps:
     commands:
       - cd frontend
       - npm ci
+      - npm test
       - npm run build
     environment:
       # Build-time only -- no live API needed just to verify the build
