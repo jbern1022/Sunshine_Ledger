@@ -80,7 +80,13 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               </>
             )}
           </div>
-          <h2 className="mt-1 text-lg font-semibold text-ledger-900">{bill.bill_number.replace(" (DEMO)", "")}</h2>
+          {/* Render the bill number verbatim. This used to strip a
+              " (DEMO)" suffix, which meant seeded sample bills displayed
+              under a heading indistinguishable from real legislation --
+              the marker survived only in small metadata. If placeholder
+              data ever reaches this component again it should be
+              conspicuous, not tidied away. */}
+          <h2 className="mt-1 text-lg font-semibold text-ledger-900">{bill.bill_number}</h2>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(bill.status)}`}>{bill.status}</span>
       </div>

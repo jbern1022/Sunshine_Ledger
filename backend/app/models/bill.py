@@ -43,6 +43,13 @@ class Bill(TimestampMixin, Base):
     # bill-text ingestion exists.
     description: Mapped[str | None] = mapped_column(Text)
 
+    # Cleaned text of the filed bill PDF (see pipeline/bill_text.py), which
+    # runs 10-75x longer than `description`. Populated separately from
+    # ingestion because it costs one extra LegiScan call per bill. Not yet
+    # used as the summarization input -- that swap needs the Roadmap's
+    # Step 2 quality gate first.
+    full_text: Mapped[str | None] = mapped_column(Text)
+
     # Geographic scope tagging per BRD 5.3, e.g. scope_type="county", scope_names=["Miami-Dade County"]
     geo_scope_type: Mapped[str | None] = mapped_column(String(20))  # statewide | county | city
     geo_scope_names: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, default=list)
