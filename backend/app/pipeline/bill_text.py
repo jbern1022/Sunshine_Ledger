@@ -1,12 +1,18 @@
 """Fetch and clean real bill text from LegiScan (Roadmap: replace the thin
 `description` blurb as summarization input).
 
-LegiScan returns bill documents base64-encoded, usually as PDFs of the
-filed bill. Those PDFs are laid out for print, so raw extraction is noisy:
-every content line carries a trailing line number, and each page repeats a
-chamber header, a CODING legend, a document id, and a page marker. Feeding
-that to a model wastes context on furniture and invites it to quote line
-numbers back. `clean_legislative_text` strips it.
+LegiScan returns bill documents base64-encoded in one of two formats, and
+both need cleaning before a model sees them:
+
+- PDFs of the filed bill, laid out for print. Every content line carries a
+  *trailing* line number, and each page repeats a chamber header, a CODING
+  legend, a document id and a page marker.
+- HTML documents (roughly half the Florida corpus, Senate resolutions
+  especially), which number lines at the *start* and carry a drafting
+  stamp instead of per-page furniture.
+
+Feeding either raw to a model wastes context on furniture and invites it
+to quote line numbers back.
 
 Deliberately does NOT change what the summarizer reads. Swapping the
 summarization input from `description` to full text is a material change to
@@ -45,6 +51,18 @@ _BOILERPLATE = re.compile(
 # Trailing line number on a content line, e.g. "...effective date. 9"
 _TRAILING_LINE_NUMBER = re.compile(r"\s(\d{1,3})\s*$")
 
+# HTML bill text numbers lines at the START instead, e.g.
+# "    2         A resolution designating February 3, 2026..."
+# The trailing separator must be optional: bills contain numbered lines with
+# no content ("    4  "), and those arrive here already rstripped. Requiring
+# whitespace after the digits would fail to match them, break the expected
+# sequence, and leave every following line's number embedded in the text.
+_LEADING_LINE_NUMBER = re.compile(r"^\s*(\d{1,3})(?:\s|$)")
+
+# Drafting stamp that appears once per HTML document, e.g.
+# "8-02178-26                                            20261780__"
+_DRAFT_STAMP = re.compile(r"^\s*\d+-\d+-\d+\s+\d+_*\s*$")
+
 
 def clean_legislative_text(raw: str) -> str:
     """Strip print furniture from extracted bill-PDF text.
@@ -77,6 +95,48 @@ def clean_legislative_text(raw: str) -> str:
     return "\n".join(cleaned)
 
 
+def clean_html_legislative_text(raw: str) -> str:
+    """Strip furniture from the text of an HTML bill document.
+
+    Same job as `clean_legislative_text`, different layout: LegiScan's HTML
+    documents number lines at the *start* rather than the end, and carry a
+    drafting stamp instead of per-page headers. The sequential check is the
+    same idea and exists for the same reason -- a line legitimately opening
+    with a number ("2026 Regular Session...") must not lose it.
+    """
+    cleaned: list[str] = []
+    expected = 0
+
+    for line in raw.split("\n"):
+        line = line.rstrip()
+        if not line.strip() or _DRAFT_STAMP.match(line):
+            continue
+
+        match = _LEADING_LINE_NUMBER.match(line)
+        if match and int(match.group(1)) == expected + 1:
+            expected = int(match.group(1))
+            line = line[match.end():]
+
+        if line.strip():
+            cleaned.append(line.strip())
+
+    return "\n".join(cleaned)
+
+
+def extract_html_text(html_bytes: bytes) -> str:
+    """Extract and clean text from an HTML bill document.
+
+    Roughly half of LegiScan's Florida documents are served as text/html
+    rather than PDF -- Senate resolutions especially. Treating those as
+    unreadable would leave those bills falling back to the short blurb for
+    no good reason.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html_bytes.decode("utf-8", errors="replace"), "html.parser")
+    return clean_html_legislative_text(soup.get_text())
+
+
 def extract_pdf_text(pdf_bytes: bytes) -> str:
     """Extract and clean text from a bill PDF."""
     from pypdf import PdfReader  # imported lazily -- only bill-text runs need it
@@ -95,11 +155,15 @@ def fetch_bill_text(client: LegiScanClient, doc_id: int) -> str | None:
     """
     doc = client._call("getBillText", id=str(doc_id))["text"]
     mime = doc.get("mime")
-    if mime != "application/pdf":
-        logger.warning("doc_id=%s is %s, not PDF -- skipping", doc_id, mime)
-        return None
+    raw = base64.b64decode(doc["doc"])
 
-    return extract_pdf_text(base64.b64decode(doc["doc"]))
+    if mime == "application/pdf":
+        return extract_pdf_text(raw)
+    if mime in ("text/html", "application/html"):
+        return extract_html_text(raw)
+
+    logger.warning("doc_id=%s has unsupported mime %s -- skipping", doc_id, mime)
+    return None
 
 
 def backfill_bill_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:

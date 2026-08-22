@@ -6,7 +6,7 @@ real Florida bill PDFs (HB 95 / HB 11, 2026 session) -- keep them that way,
 since the whole point is matching the actual layout.
 """
 
-from app.pipeline.bill_text import clean_legislative_text
+from app.pipeline.bill_text import clean_html_legislative_text, clean_legislative_text
 
 
 def test_strips_trailing_line_numbers():
@@ -102,3 +102,56 @@ def test_empty_input():
 def test_text_with_no_furniture_is_unchanged():
     raw = "Be It Enacted by the Legislature of the State of Florida:"
     assert clean_legislative_text(raw) == raw
+
+
+# --- HTML documents ------------------------------------------------------
+
+
+def test_html_strips_leading_line_numbers():
+    raw = "\n".join(
+        [
+            "    1                          Senate Resolution",
+            "    2         A resolution designating February 3, 2026, as “Space",
+            "    3         Day” in Florida.",
+        ]
+    )
+    assert clean_html_legislative_text(raw) == "\n".join(
+        [
+            "Senate Resolution",
+            "A resolution designating February 3, 2026, as “Space",
+            "Day” in Florida.",
+        ]
+    )
+
+
+def test_html_empty_numbered_line_does_not_break_the_sequence():
+    """Regression: bills contain numbered lines with no content ("    4  ").
+    Those arrive rstripped, so a pattern requiring whitespace after the
+    digits fails to match, the expected sequence stalls, and every
+    following line keeps its number embedded in the text."""
+    raw = "\n".join(
+        [
+            "    1         first line",
+            "    2         second line",
+            "    3  ",
+            "    4         fourth line",
+        ]
+    )
+    assert clean_html_legislative_text(raw) == "\n".join(
+        ["first line", "second line", "fourth line"]
+    )
+
+
+def test_html_strips_drafting_stamp():
+    raw = "\n".join(["8-02178-26                                            20261780__", "    1         content"])
+    assert clean_html_legislative_text(raw) == "content"
+
+
+def test_html_keeps_out_of_sequence_numbers():
+    """A line that legitimately opens with a number keeps it."""
+    raw = "\n".join(["    1         first line", "2026 Regular Session begins"])
+    assert clean_html_legislative_text(raw).split("\n")[1] == "2026 Regular Session begins"
+
+
+def test_html_empty_input():
+    assert clean_html_legislative_text("") == ""
