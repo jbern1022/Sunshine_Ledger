@@ -201,3 +201,62 @@ def load_tiger_shapefile(
     db.commit()
     logger.info("Loaded %d boundaries from %s", count, shapefile_path)
     return count
+
+
+TIGER_DISTRICT_URLS = {
+    "sldl": "https://www2.census.gov/geo/tiger/TIGER2024/SLDL/tl_2024_12_sldl.zip",
+    "sldu": "https://www2.census.gov/geo/tiger/TIGER2024/SLDU/tl_2024_12_sldu.zip",
+}
+
+
+def download_and_load_districts(db: Session, *, chamber: str, state_fips: str = "12") -> int:
+    """Fetch a TIGER district shapefile and load it in one step.
+
+    Deliberately does both in a single call: container restarts wipe /tmp,
+    so a download in one step and a load in another can silently lose the
+    file in between (see docs/RUNBOOK.md).
+    """
+    import io
+    import tempfile
+    import zipfile
+
+    import httpx
+
+    url = TIGER_DISTRICT_URLS[chamber]
+    logger.info("Downloading %s", url)
+    resp = httpx.get(url, timeout=120.0, follow_redirects=True)
+    resp.raise_for_status()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zipfile.ZipFile(io.BytesIO(resp.content)).extractall(tmpdir)
+        shp = next(Path(tmpdir).glob("*.shp"))
+        return load_tiger_districts(db, shp, chamber=chamber, state_fips=state_fips)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from app.db import SessionLocal
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    parser = argparse.ArgumentParser(description="Load reference boundary geometry.")
+    parser.add_argument(
+        "--districts",
+        action="store_true",
+        help="Download and load TIGER state legislative districts (both chambers).",
+    )
+    parser.add_argument("--state-fips", default="12", help="Default 12 (Florida).")
+    args = parser.parse_args()
+
+    session = SessionLocal()
+    try:
+        if args.districts:
+            total = sum(
+                download_and_load_districts(session, chamber=c, state_fips=args.state_fips)
+                for c in ("sldl", "sldu")
+            )
+            print(f"Loaded {total} district boundaries.")
+        else:
+            print(f"Loaded {load_sample_boundaries(session)} sample boundaries.")
+    finally:
+        session.close()

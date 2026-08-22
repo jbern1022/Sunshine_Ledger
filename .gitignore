@@ -12,6 +12,7 @@ node_modules/
 out/
 frontend/.env*.local
 frontend/next-env.d.ts
+*.tsbuildinfo
 
 # Env files
 .env

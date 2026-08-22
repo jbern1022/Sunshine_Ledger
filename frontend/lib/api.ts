@@ -1,4 +1,10 @@
-import type { BillDetail, BillListResponse, CountyFeatureCollection, FlagCreate } from "./types";
+import type {
+  BillDetail,
+  BillListResponse,
+  CountyFeatureCollection,
+  DistrictFeatureCollection,
+  FlagCreate,
+} from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -32,6 +38,14 @@ export async function fetchBill(entityId: string): Promise<BillDetail> {
 export async function fetchCountyGeoJSON(): Promise<CountyFeatureCollection> {
   const res = await fetch(`${API_URL}/map/counties`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch map data: ${res.status}`);
+  return res.json();
+}
+
+/** Sponsorship activity by legislative district — a different measure than
+ *  fetchCountyGeoJSON's geographic impact. Don't mix the two. */
+export async function fetchDistrictGeoJSON(): Promise<DistrictFeatureCollection> {
+  const res = await fetch(`${API_URL}/map/districts`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch district data: ${res.status}`);
   return res.json();
 }
 
