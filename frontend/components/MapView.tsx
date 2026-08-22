@@ -45,11 +45,17 @@ function colorForImpact(count: number): string {
 
 /** Sponsorship counts run far higher than per-county impact counts (a single
  *  legislator files dozens of bills), so the impact thresholds would render
- *  nearly every district at max shade. */
+ *  nearly every district at max shade.
+ *
+ *  Breaks are the quartiles of the real FL distribution (n=160: median 25,
+ *  p25 15, p75 38, max 109) rather than round numbers -- picking plausible
+ *  round thresholds first put 55% of districts in the top bucket, which
+ *  flattened the map into one colour. Re-check these if the corpus grows
+ *  substantially or another state is added. */
 function colorForSponsorship(count: number): string {
   if (count === 0) return "#e2e8f0";
-  if (count <= 5) return "#fde68a";
-  if (count <= 20) return "#f5c518";
+  if (count <= 15) return "#fde68a";
+  if (count <= 38) return "#f5c518";
   return "#b58200";
 }
 
