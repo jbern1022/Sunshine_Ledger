@@ -10,10 +10,10 @@ export default function MapPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ledger-900">Impact map</h1>
+        <h1 className="text-2xl font-bold text-ledger-900">Maps</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Counties shaded by number of tracked bills affecting them. Click a county to see its bills.
-          County/district boundaries only — no per-address mapping at MVP.
+          Two different views of the same bills: where they apply, and who files them. County and
+          district boundaries only — no per-address mapping at MVP.
         </p>
       </div>
       <MapView />

@@ -68,8 +68,39 @@ class LegiScanClient:
         """Full bill detail: sponsors, status, text docs, description."""
         return self._call("getBill", id=str(bill_id))["bill"]
 
+    def get_sessions(self, state: str) -> list[dict]:
+        """All known sessions for a state, newest first."""
+        return self._call("getSessionList", state=state)["sessions"]
 
-def _get_or_create_person(db: Session, *, name: str, external_id: str) -> Entity:
+    def get_session_people(self, session_id: int) -> list[dict]:
+        """Every legislator in a session, with district/role/party -- one API
+        call for the whole chamber, rather than one getBill per bill."""
+        return self._call("getSessionPeople", id=str(session_id))["sessionpeople"]["people"]
+
+
+def _person_attributes(*, district: str | None, role: str | None, party: str | None) -> dict:
+    """Only the fields LegiScan actually populates -- omitting empties keeps
+    `attributes` free of null-valued keys that would otherwise have to be
+    special-cased downstream."""
+    return {k: v for k, v in (("district", district), ("role", role), ("party", party)) if v}
+
+
+def _get_or_create_person(
+    db: Session,
+    *,
+    name: str,
+    external_id: str,
+    district: str | None = None,
+    role: str | None = None,
+    party: str | None = None,
+) -> Entity:
+    """Upsert a legislator. `district` (e.g. "HD-120"/"SD-024") is what the
+    district sponsorship map joins on -- see app/api/map.py. Attributes are
+    refreshed on existing rows too, so people ingested before districts were
+    tracked get backfilled on the next run that touches their bill.
+    """
+    attributes = _person_attributes(district=district, role=role, party=party)
+
     existing = db.execute(
         select(Entity).where(
             Entity.entity_type == "person",
@@ -77,6 +108,8 @@ def _get_or_create_person(db: Session, *, name: str, external_id: str) -> Entity
         )
     ).scalar_one_or_none()
     if existing:
+        if attributes:
+            existing.attributes = {**(existing.attributes or {}), **attributes}
         return existing
 
     person = Entity(
@@ -85,7 +118,7 @@ def _get_or_create_person(db: Session, *, name: str, external_id: str) -> Entity
         jurisdiction_level="state",
         jurisdiction_name=settings.legiscan_state,
         external_ids={"legiscan_people_id": external_id},
-        attributes={},
+        attributes=attributes,
     )
     db.add(person)
     db.flush()
@@ -182,7 +215,12 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
 
         for sponsor in detail.get("sponsors", []):
             person = _get_or_create_person(
-                db, name=sponsor.get("name", "Unknown"), external_id=str(sponsor.get("people_id"))
+                db,
+                name=sponsor.get("name", "Unknown"),
+                external_id=str(sponsor.get("people_id")),
+                district=sponsor.get("district"),
+                role=sponsor.get("role"),
+                party=sponsor.get("party"),
             )
             rel_type = "sponsor" if sponsor.get("sponsor_type_id") == 1 else "co_sponsor"
             exists = db.execute(
@@ -207,6 +245,52 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
     db.commit()
     logger.info("Ingested %d bills from LegiScan for state=%s", len(written), state)
     return written
+
+
+def backfill_person_districts(db: Session, *, state: str | None = None, sessions: int = 2) -> int:
+    """Attach district/role/party to already-stored legislators.
+
+    `ingest_state_bills` records these going forward, but it skips bills whose
+    `change_hash` is unchanged (to stay inside the API quota), so legislators
+    ingested before districts were tracked would never be updated by a normal
+    run. This backfills them via `getSessionPeople` -- one API call per
+    session rather than one per bill.
+
+    Returns the number of people actually updated.
+    """
+    state = state or settings.legiscan_state
+    client = LegiScanClient()
+
+    people: dict[str, dict] = {}
+    for session in client.get_sessions(state)[:sessions]:
+        for person in client.get_session_people(int(session["session_id"])):
+            people.setdefault(str(person.get("people_id")), person)
+
+    updated = 0
+    for people_id, person in people.items():
+        attributes = _person_attributes(
+            district=person.get("district"), role=person.get("role"), party=person.get("party")
+        )
+        if not attributes:
+            continue
+
+        entity = db.execute(
+            select(Entity).where(
+                Entity.entity_type == "person",
+                Entity.external_ids["legiscan_people_id"].as_string() == people_id,
+            )
+        ).scalar_one_or_none()
+        if entity is None:
+            continue  # legislator we've never seen sponsor a tracked bill
+
+        merged = {**(entity.attributes or {}), **attributes}
+        if merged != entity.attributes:
+            entity.attributes = merged
+            updated += 1
+
+    db.commit()
+    logger.info("Backfilled district/role/party for %d legislators (state=%s)", updated, state)
+    return updated
 
 
 def _parse_date(value: str | None) -> date | None:

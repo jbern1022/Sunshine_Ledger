@@ -58,6 +58,18 @@ export interface CountyFeatureProperties {
   source: string | null;
 }
 
+/** Sponsorship activity per legislative district — NOT geographic impact.
+ *  `bill_count` is how many tracked bills that district's legislator filed.
+ *  See the /map/districts docstring before reusing this anywhere. */
+export interface DistrictFeatureProperties {
+  scope_type: string;
+  scope_name: string;
+  chamber: string;
+  bill_count: number;
+  legislators: string[];
+  source: string | null;
+}
+
 export interface NewsItemOut {
   id: string;
   title: string;
@@ -79,5 +91,14 @@ export interface CountyFeatureCollection {
     type: "Feature";
     geometry: unknown;
     properties: CountyFeatureProperties;
+  }>;
+}
+
+export interface DistrictFeatureCollection {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    geometry: unknown;
+    properties: DistrictFeatureProperties;
   }>;
 }
