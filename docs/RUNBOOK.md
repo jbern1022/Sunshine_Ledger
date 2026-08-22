@@ -103,9 +103,21 @@ ingest_local_bills(db, client_name='jaxcityc', limit=200)
 # Real Miami bills (scraped from iQM2, not Legistar -- see gotcha below)
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.miami_iqm2
 
-# Summarize everything that doesn't have a summary yet (safe to re-run --
-# only processes bills with zero existing claims)
+# Summarize bills whose summaries are missing or stale. Safe and cheap to
+# re-run: each claim stores a hash of what generated it (source text +
+# model + prompt version), so unchanged bills are skipped without a model
+# call, and amended bills are refreshed. The run logs how many it skipped.
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.summarize_batch
+
+# Re-summarize everything regardless of hash (after a prompt change, say).
+# Expensive at full corpus size -- normally the hash check is what you want.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.summarize_batch --force
+
+# One-off: mark pre-existing claims as current instead of re-summarizing
+# them. Read the docstring first -- it asserts each stored summary came
+# from the description now in the DB, which is false for any bill amended
+# since it was last summarized.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.summarize_batch --mark-current
 
 # GDELT headlines (slow -- ~8s/bill minimum due to rate limiting, see gotcha below)
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.gdelt
