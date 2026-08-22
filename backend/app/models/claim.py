@@ -28,6 +28,14 @@ class Claim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     claim_text: Mapped[str] = mapped_column(Text, nullable=False)
     generated_by: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "llm:llama3.1" or "manual_review"
 
+    # sha256 of exactly what produced this claim (source text + model +
+    # prompt version). Lets the batch job skip bills whose input hasn't
+    # changed -- BRD 6's cost-aware requirement -- and, just as importantly,
+    # re-summarize the ones whose input *has* changed, which the old
+    # "skip anything with claims" rule could never do. Null on claims
+    # written before this column existed, and on manual_review claims.
+    input_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+
     bill_entity: Mapped["Entity"] = relationship(back_populates="claims")
     source_links: Mapped[list["ClaimSource"]] = relationship(back_populates="claim", cascade="all, delete-orphan")
 

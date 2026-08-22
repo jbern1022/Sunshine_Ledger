@@ -1,5 +1,12 @@
-"""Batch-generate plain-language summaries for already-ingested bills that
-don't have one yet (BRD 5.2).
+"""Batch-generate plain-language summaries for already-ingested bills whose
+summaries are missing or out of date (BRD 5.2).
+
+Work is selected by comparing a hash of the exact summarization input
+(source text + model + prompt version) against what each stored claim was
+generated from. That skips bills nothing has changed for -- BRD 6's
+cost-aware requirement -- and, unlike the older "skip anything that already
+has a claim" rule, actually refreshes bills whose text was amended after
+they were first summarized.
 
 Uses each bill's short official `description` (from LegiScan, stored at
 ingestion time) as the LLM input rather than full bill text -- real,
@@ -28,7 +35,7 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.db import SessionLocal
 from app.models import Bill, Entity, Source
-from app.pipeline.summarize import summarize_and_store
+from app.pipeline.summarize import summarize_and_store, summary_input_hash
 
 logger = logging.getLogger(__name__)
 
@@ -51,26 +58,102 @@ def _check_ollama_reachable() -> None:
         )
 
 
-def summarize_unclaimed_bills(limit: int | None = None) -> tuple[int, int]:
+def select_bills_needing_summary(
+    db, *, model: str, limit: int | None = None, force: bool = False
+) -> tuple[list[Entity], int]:
+    """Bills whose summaries are missing or stale, plus a count of those
+    skipped as already up to date.
+
+    A bill needs work when it has no LLM-generated claims yet, or when its
+    claims were generated from a different input (see `summary_input_hash`:
+    source text, model, prompt version). The previous rule -- skip anything
+    with *any* claim -- meant an amended bill kept its original summary
+    permanently, since ingestion updates `bill.description` in place.
+
+    No DB writes and no Ollama calls, so this stays testable without a
+    reachable model host.
+    """
+    stmt = (
+        select(Entity)
+        .join(Bill, Bill.entity_id == Entity.id)
+        .where(Entity.entity_type == "bill")
+        .options(selectinload(Entity.bill), selectinload(Entity.claims))
+    )
+
+    candidates: list[Entity] = []
+    skipped = 0
+    for entity in db.execute(stmt).scalars().all():
+        if not entity.bill or not entity.bill.description:
+            continue
+
+        if not force:
+            expected = summary_input_hash(entity.bill.description, model=model)
+            llm_claims = [c for c in entity.claims if c.generated_by.startswith("llm:")]
+            if llm_claims and all(c.input_hash == expected for c in llm_claims):
+                skipped += 1
+                continue
+
+        candidates.append(entity)
+
+    if limit:
+        candidates = candidates[:limit]
+    return candidates, skipped
+
+
+def mark_existing_claims_current(db, *, model: str) -> int:
+    """Backfill `input_hash` on LLM claims that predate the column, treating
+    them as generated from their bill's current description.
+
+    Opt-in (`--mark-current`), never automatic, because it asserts something
+    we can't actually verify: that each existing summary was produced from
+    the description now stored. That's true for any bill unchanged since it
+    was summarized, and false for one amended in between -- those would be
+    marked current while showing a stale summary.
+
+    The alternative is leaving the hashes null, which re-summarizes the
+    whole corpus on the next run. Correct, but not free. Use this only when
+    the stored summaries are known to match the current model and prompts.
+
+    Returns the number of claims updated.
+    """
+    stmt = (
+        select(Entity)
+        .join(Bill, Bill.entity_id == Entity.id)
+        .where(Entity.entity_type == "bill")
+        .options(selectinload(Entity.bill), selectinload(Entity.claims))
+    )
+
+    updated = 0
+    for entity in db.execute(stmt).scalars().all():
+        if not entity.bill or not entity.bill.description:
+            continue
+        expected = summary_input_hash(entity.bill.description, model=model)
+        for claim in entity.claims:
+            if claim.generated_by.startswith("llm:") and claim.input_hash is None:
+                claim.input_hash = expected
+                updated += 1
+
+    db.commit()
+    logger.info("Marked %d pre-existing claims as current for model=%s", updated, model)
+    return updated
+
+
+def summarize_unclaimed_bills(limit: int | None = None, *, force: bool = False) -> tuple[int, int]:
     """Returns (succeeded, failed) counts."""
     _check_ollama_reachable()
 
     db = SessionLocal()
     succeeded = failed = 0
     try:
-        stmt = (
-            select(Entity)
-            .join(Bill, Bill.entity_id == Entity.id)
-            .where(Entity.entity_type == "bill")
-            .options(selectinload(Entity.bill), selectinload(Entity.claims))
+        candidates, skipped = select_bills_needing_summary(
+            db, model=settings.ollama_model, limit=limit, force=force
         )
-        candidates = [
-            e for e in db.execute(stmt).scalars().all() if not e.claims and e.bill and e.bill.description
-        ]
-        if limit:
-            candidates = candidates[:limit]
 
-        logger.info("Summarizing %d bills with no existing claims", len(candidates))
+        logger.info(
+            "Summarizing %d bills (%d skipped -- summaries already match current input)",
+            len(candidates),
+            skipped,
+        )
 
         for entity in candidates:
             bill = entity.bill
@@ -103,7 +186,26 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-summarize even when the stored summaries match the current input. "
+        "Expensive at full corpus size -- normally the hash check is what you want.",
+    )
+    parser.add_argument(
+        "--mark-current",
+        action="store_true",
+        help="Backfill input_hash on pre-existing claims instead of summarizing. "
+        "Asserts they match the current description/model -- read the docstring first.",
+    )
     args = parser.parse_args()
 
-    ok, bad = summarize_unclaimed_bills(limit=args.limit)
-    print(f"\nDone: {ok} summarized, {bad} failed.")
+    if args.mark_current:
+        db = SessionLocal()
+        try:
+            print(f"Marked {mark_existing_claims_current(db, model=settings.ollama_model)} claims as current.")
+        finally:
+            db.close()
+    else:
+        ok, bad = summarize_unclaimed_bills(limit=args.limit, force=args.force)
+        print(f"\nDone: {ok} summarized, {bad} failed.")

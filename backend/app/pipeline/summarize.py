@@ -13,9 +13,11 @@ bills/year). Bill text is truncated to keep prompts small and cheap.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -24,6 +26,24 @@ from app.models import Claim, ClaimSource, Entity, Source
 logger = logging.getLogger(__name__)
 
 MAX_BILL_TEXT_CHARS = 12_000  # keep prompts cheap; most bill summaries/digests fit well within this
+
+# Bump when a prompt changes in a way that should invalidate stored
+# summaries. It's part of the input hash, so bumping it makes the batch job
+# re-summarize everything on its next run -- which is the intended effect,
+# but it is not free at scale. Don't bump for typo fixes.
+PROMPT_VERSION = "1"
+
+
+def summary_input_hash(bill_text: str, *, model: str, prompt_version: str = PROMPT_VERSION) -> str:
+    """Fingerprint everything that determines the generated summaries.
+
+    Covers the model and prompt version, not just the text: a summary
+    produced by a different model or an older prompt is stale even when the
+    bill itself hasn't changed. Hashes the *truncated* text, since that's
+    what is actually sent to the model.
+    """
+    payload = "\x00".join([prompt_version, model, bill_text[:MAX_BILL_TEXT_CHARS]])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 WHAT_IT_DOES_PROMPT = """You are summarizing a piece of legislation for a general public audience with no legal background.
 
@@ -124,18 +144,46 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
 
     client = OllamaClient()
     summaries = generate_bill_summaries(entity.bill.bill_number, entity.name, bill_text, client=client)
+    input_hash = summary_input_hash(bill_text, model=client.model)
+    generated_by = f"llm:{client.model}"
 
     claims = []
     for claim_type, text in summaries.items():
-        claim = Claim(
-            bill_entity_id=entity.id,
-            claim_type=claim_type,
-            claim_text=text,
-            generated_by=f"llm:{client.model}",
-        )
-        db.add(claim)
+        # Update the existing claim in place rather than replacing it.
+        # Flags reference claims with ON DELETE CASCADE, so deleting and
+        # re-inserting on every refresh would silently destroy the user
+        # reports (BRD 5.5) attached to the old claim.
+        existing = db.execute(
+            select(Claim).where(
+                Claim.bill_entity_id == entity.id,
+                Claim.claim_type == claim_type,
+                Claim.generated_by.like("llm:%"),
+            )
+        ).scalars().first()
+
+        if existing is not None:
+            existing.claim_text = text
+            existing.generated_by = generated_by
+            existing.input_hash = input_hash
+            claim = existing
+        else:
+            claim = Claim(
+                bill_entity_id=entity.id,
+                claim_type=claim_type,
+                claim_text=text,
+                generated_by=generated_by,
+                input_hash=input_hash,
+            )
+            db.add(claim)
         db.flush()
-        db.add(ClaimSource(claim_id=claim.id, source_id=primary_source.id))
+
+        already_linked = db.execute(
+            select(ClaimSource).where(
+                ClaimSource.claim_id == claim.id, ClaimSource.source_id == primary_source.id
+            )
+        ).scalars().first()
+        if already_linked is None:
+            db.add(ClaimSource(claim_id=claim.id, source_id=primary_source.id))
         claims.append(claim)
 
     db.commit()
