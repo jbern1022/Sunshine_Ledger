@@ -263,7 +263,23 @@ Automated, off-box, and restore-tested as of 2026-08-04.
   that one directory, nothing else on the Pi is reachable with it.
 - **Retention**: 14 days, pruned automatically both on Omen (by the backup
   script itself) and on the Pi (separate cron job there, since the
-  restricted key can't run arbitrary prune commands remotely).
+  restricted key can't run arbitrary prune commands remotely). On Omen the
+  prune runs *before* the dump, deliberately — see below.
+- **Failure handling**: the script fails loudly (`BACKUP FAILED: <reason>`
+  on stderr) and deletes its own partial dump, so the backup directory
+  never contains a file that isn't a real backup. It checks free space up
+  front, runs `pg_restore --list` against the dump to confirm the archive
+  is actually restorable, and enforces a minimum size as a backstop.
+
+  **A backup that "exists" is not a backup that works.** On 2026-08-21 a
+  full disk produced a 0-byte dump that looked like a success until the
+  log was read by hand. The failure was also self-reinforcing: retention
+  pruning used to run at the *end*, so an aborted run never pruned, and
+  the next run had no more space than the last. If you touch the ordering
+  in this script, keep the prune first.
+
+  Cron still swallows the non-zero exit, so nothing actively alerts yet —
+  check `/home/joe/scripts/backup.log`, or grep it for `BACKUP FAILED`.
 
 ### Restoring
 
