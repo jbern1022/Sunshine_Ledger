@@ -7,7 +7,7 @@ can be reasoned about (and regression-tested) without a reachable host.
 
 from app.models import Claim
 from app.pipeline.summarize import PROMPT_VERSION, summary_input_hash
-from app.pipeline.summarize_batch import select_bills_needing_summary
+from app.pipeline.summarize_batch import select_bills_needing_summary, summarization_input
 
 MODEL = "llama3.1:8b"
 
@@ -175,3 +175,73 @@ def test_limit_caps_candidates(db_session, bill_factory):
 
     candidates, _ = select_bills_needing_summary(db_session, model=MODEL, limit=2)
     assert len(candidates) == 2
+
+
+# --- input source selection ---------------------------------------------
+
+
+def test_prefers_full_text_over_description(db_session, bill_factory):
+    entity = bill_factory()
+    entity.bill.description = "short blurb"
+    entity.bill.full_text = "the full text of the bill"
+    db_session.commit()
+
+    text, label = summarization_input(entity.bill)
+    assert text == "the full text of the bill"
+    assert label == "legiscan_full_text"
+
+
+def test_falls_back_to_description_without_full_text(db_session, bill_factory):
+    """Legistar and iQM2 bills have no PDF to extract, and the LegiScan
+    backfill may not have reached every bill yet."""
+    entity = bill_factory()
+    entity.bill.description = "short blurb"
+    entity.bill.full_text = None
+    db_session.commit()
+
+    text, label = summarization_input(entity.bill)
+    assert text == "short blurb"
+    assert label.endswith("_description")
+
+
+def test_no_input_when_neither_is_present(db_session, bill_factory):
+    entity = bill_factory()
+    entity.bill.description = None
+    entity.bill.full_text = None
+    db_session.commit()
+
+    assert summarization_input(entity.bill) == (None, "none")
+
+
+def test_gaining_full_text_marks_bill_stale(db_session, bill_factory):
+    """Backfilling full text must invalidate a description-based summary --
+    this is what makes the input swap roll out without manual invalidation."""
+    entity = bill_factory()
+    entity.bill.description = "short blurb"
+    db_session.commit()
+    _add_claim(db_session, entity, input_hash=_hash("short blurb"))
+
+    assert select_bills_needing_summary(db_session, model=MODEL)[0] == []
+
+    entity.bill.full_text = "the much longer full text"
+    db_session.commit()
+
+    candidates, _ = select_bills_needing_summary(db_session, model=MODEL)
+    assert [e.id for e in candidates] == [entity.id]
+
+
+def test_selection_hash_matches_stored_hash(db_session, bill_factory):
+    """Selection and execution must derive the input identically. If they
+    diverged, every bill would look stale on every run and re-summarize
+    forever."""
+    entity = bill_factory()
+    entity.bill.description = "short blurb"
+    entity.bill.full_text = "the full text of the bill"
+    db_session.commit()
+
+    text, _ = summarization_input(entity.bill)
+    _add_claim(db_session, entity, input_hash=summary_input_hash(text, model=MODEL))
+
+    candidates, skipped = select_bills_needing_summary(db_session, model=MODEL)
+    assert candidates == []
+    assert skipped == 1

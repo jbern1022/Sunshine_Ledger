@@ -8,11 +8,10 @@ cost-aware requirement -- and, unlike the older "skip anything that already
 has a claim" rule, actually refreshes bills whose text was amended after
 they were first summarized.
 
-Uses each bill's short official `description` (from LegiScan, stored at
-ingestion time) as the LLM input rather than full bill text -- real,
-authoritative text, just thinner than the full legal text. A fuller
-PDF-bill-text pipeline can replace this input later without changing
-anything downstream (summarize_and_store just takes a string).
+Summarizes the cleaned full text of the filed bill where available (see
+pipeline/bill_text.py), falling back to the short official `description`
+for sources with no PDF to extract -- Legistar and iQM2 bills, and any
+LegiScan bill the text backfill hasn't reached. See `summarization_input`.
 
 Only run this after the Roadmap's Step 2 quality gate
 (`review_summaries.py`) has been checked against real bills -- this writes
@@ -38,6 +37,31 @@ from app.models import Bill, Entity, Source
 from app.pipeline.summarize import summarize_and_store, summary_input_hash
 
 logger = logging.getLogger(__name__)
+
+
+def summarization_input(bill: Bill) -> tuple[str | None, str]:
+    """The text to summarize for `bill`, plus a label describing its origin.
+
+    Prefers the cleaned full bill text over the short official blurb. The
+    Step 2 quality gate against real 2026-session bills showed full text is
+    materially better: it names the specific groups a bill regulates where
+    the blurb produced "does not specify a particular affected group", and
+    it captures conditions the blurb omits entirely.
+
+    Falls back to `description` for bills with no full text -- Legistar and
+    iQM2 sources have no PDF to extract, and full-text backfill for
+    LegiScan bills is a separate job that may not have reached every bill.
+
+    Single source of truth on purpose: work selection and execution must
+    derive the input the same way, or the hash computed when deciding to
+    summarize wouldn't match the hash stored afterwards, and those bills
+    would be re-summarized on every run forever.
+    """
+    if bill.full_text:
+        return bill.full_text, "legiscan_full_text"
+    if bill.description:
+        return bill.description, f"{bill.source_system}_description"
+    return None, "none"
 
 
 def _check_ollama_reachable() -> None:
@@ -83,11 +107,14 @@ def select_bills_needing_summary(
     candidates: list[Entity] = []
     skipped = 0
     for entity in db.execute(stmt).scalars().all():
-        if not entity.bill or not entity.bill.description:
+        if not entity.bill:
+            continue
+        text, _ = summarization_input(entity.bill)
+        if not text:
             continue
 
         if not force:
-            expected = summary_input_hash(entity.bill.description, model=model)
+            expected = summary_input_hash(text, model=model)
             llm_claims = [c for c in entity.claims if c.generated_by.startswith("llm:")]
             if llm_claims and all(c.input_hash == expected for c in llm_claims):
                 skipped += 1
@@ -125,9 +152,12 @@ def mark_existing_claims_current(db, *, model: str) -> int:
 
     updated = 0
     for entity in db.execute(stmt).scalars().all():
-        if not entity.bill or not entity.bill.description:
+        if not entity.bill:
             continue
-        expected = summary_input_hash(entity.bill.description, model=model)
+        text, _ = summarization_input(entity.bill)
+        if not text:
+            continue
+        expected = summary_input_hash(text, model=model)
         for claim in entity.claims:
             if claim.generated_by.startswith("llm:") and claim.input_hash is None:
                 claim.input_hash = expected
@@ -158,18 +188,22 @@ def summarize_unclaimed_bills(limit: int | None = None, *, force: bool = False) 
         for entity in candidates:
             bill = entity.bill
             try:
+                text, input_label = summarization_input(bill)
                 source = Source(
                     url=bill.full_text_url or "",
                     document_reference=bill.bill_number,
                     publisher=f"{entity.jurisdiction_name or ''} via {bill.source_system}".strip(),
                     source_type=f"{bill.source_system}_bill",
                     retrieved_at=datetime.now(timezone.utc),
-                    metadata_json={"used_for": "summarization", "input": "legiscan_description"},
+                    # Record which text produced the summary -- the two
+                    # inputs differ enough in quality that knowing which was
+                    # used matters when reviewing a claim.
+                    metadata_json={"used_for": "summarization", "input": input_label},
                 )
                 db.add(source)
                 db.flush()
 
-                summarize_and_store(db, entity, bill.description, source)
+                summarize_and_store(db, entity, text, source)
                 succeeded += 1
                 print(f"  OK  {bill.bill_number}")
             except Exception as exc:  # noqa: BLE001 -- one bad bill shouldn't kill the batch
