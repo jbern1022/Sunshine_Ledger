@@ -57,8 +57,12 @@ def summarization_input(bill: Bill) -> tuple[str | None, str]:
     summarize wouldn't match the hash stored afterwards, and those bills
     would be re-summarized on every run forever.
     """
+    # Label by the system the text actually came from. Full text now arrives
+    # from LegiScan's text API *and* from Legistar attachments, so a fixed
+    # "legiscan_full_text" would misattribute every Jacksonville summary --
+    # inaccurate provenance on a site whose premise is traceability.
     if bill.full_text:
-        return bill.full_text, "legiscan_full_text"
+        return bill.full_text, f"{bill.source_system}_full_text"
     if bill.description:
         return bill.description, f"{bill.source_system}_description"
     return None, "none"

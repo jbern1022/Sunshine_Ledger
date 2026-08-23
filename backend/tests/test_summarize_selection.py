@@ -291,3 +291,15 @@ def test_hash_changes_when_fast_model_swapped():
     a = summary_input_hash("text", model=MODEL, fast_model="llama3.2:latest")
     b = summary_input_hash("text", model=MODEL, fast_model="qwen2.5:3b")
     assert a != b
+
+
+def test_input_label_reflects_the_source_system(db_session, bill_factory):
+    """Full text now comes from LegiScan's text API and from Legistar
+    attachments. A fixed label would misattribute every Jacksonville
+    summary."""
+    entity = bill_factory()
+    entity.bill.source_system = "legistar"
+    entity.bill.full_text = "ordinance text"
+    db_session.commit()
+
+    assert summarization_input(entity.bill)[1] == "legistar_full_text"
