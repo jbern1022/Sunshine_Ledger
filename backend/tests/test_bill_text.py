@@ -6,7 +6,7 @@ real Florida bill PDFs (HB 95 / HB 11, 2026 session) -- keep them that way,
 since the whole point is matching the actual layout.
 """
 
-from app.pipeline.bill_text import clean_html_legislative_text, clean_legislative_text
+from app.pipeline.bill_text import _ORIGINAL_BILL, clean_html_legislative_text, clean_legislative_text
 
 
 def test_strips_trailing_line_numbers():
@@ -155,3 +155,46 @@ def test_html_keeps_out_of_sequence_numbers():
 
 def test_html_empty_input():
     assert clean_html_legislative_text("") == ""
+
+
+# --- Legistar attachment selection ---------------------------------------
+
+
+def _pick(attachments):
+    """Mirrors the selection in fetch_legistar_bill_text."""
+    return next(
+        (a for a in attachments if _ORIGINAL_BILL.search(a.get("MatterAttachmentName") or "")),
+        None,
+    )
+
+
+def test_picks_original_bill_over_exhibits():
+    """Legistar returns the ordinance alongside supporting exhibits (maps,
+    agreements, budget tables). Summarizing an exhibit would describe the
+    attachment rather than the legislation."""
+    attachments = [
+        {"MatterAttachmentName": "2026-646 - Exhibit 1"},
+        {"MatterAttachmentName": "2026-646 - Original Bill"},
+    ]
+    assert _pick(attachments)["MatterAttachmentName"] == "2026-646 - Original Bill"
+
+
+def test_matches_naming_variants():
+    """Punctuation and spacing differ between records, so matching is on the
+    phrase rather than an exact title."""
+    for name in ("2026-662 Original Bill", "2026-646 - Original Bill", "ORIGINAL BILL", "Original  Bill"):
+        assert _pick([{"MatterAttachmentName": name}]) is not None
+
+
+def test_returns_nothing_when_only_exhibits_exist():
+    """Normal for procedural matters -- they should fall back to the
+    description rather than be summarized from an exhibit."""
+    attachments = [
+        {"MatterAttachmentName": "2026-647 Exhibit 1"},
+        {"MatterAttachmentName": "2026-647 Exhibit 2"},
+    ]
+    assert _pick(attachments) is None
+
+
+def test_tolerates_missing_attachment_name():
+    assert _pick([{"MatterAttachmentFileName": "x.pdf"}, {"MatterAttachmentName": None}]) is None

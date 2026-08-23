@@ -1,8 +1,17 @@
-"""Fetch and clean real bill text from LegiScan (Roadmap: replace the thin
-`description` blurb as summarization input).
+"""Fetch and clean real bill text, replacing the thin `description` blurb as
+summarization input (Roadmap).
 
-LegiScan returns bill documents base64-encoded in one of two formats, and
-both need cleaning before a model sees them:
+Two sources, two retrieval paths, one cleaner:
+
+- **LegiScan** (state bills) returns documents base64-encoded from a text
+  API, as either PDF or HTML.
+- **Legistar** (Jacksonville) has no text endpoint at all --
+  `/Matters/{id}/Texts` returns 405 -- so the ordinance has to be picked out
+  of the matter's attachment list, where it sits among exhibits under a name
+  like "2026-646 - Original Bill".
+
+LegiScan's documents come in two formats and both need cleaning before a
+model sees them:
 
 - PDFs of the filed bill, laid out for print. Every content line carries a
   *trailing* line number, and each page repeats a chamber header, a CODING
@@ -14,11 +23,12 @@ both need cleaning before a model sees them:
 Feeding either raw to a model wastes context on furniture and invites it
 to quote line numbers back.
 
-Deliberately does NOT change what the summarizer reads. Swapping the
-summarization input from `description` to full text is a material change to
-public-facing output and needs the Roadmap's Step 2 quality gate
-(`review_summaries.py`) run against real bills first. This module only
-fetches and stores; wiring it in is a separate, reviewed step.
+This module only fetches and stores. `summarize_batch.summarization_input`
+decides what the model actually reads, and prefers `full_text` where it
+exists -- a preference that passed the Roadmap's Step 2 quality gate before
+being switched on (see docs and the ticket history). Storing text here is
+enough to make a bill eligible for re-summarization: full text changes the
+input hash, so the batch job picks it up on its own.
 """
 
 from __future__ import annotations
@@ -166,6 +176,99 @@ def fetch_bill_text(client: LegiScanClient, doc_id: int) -> str | None:
     return None
 
 
+# Legistar exposes the ordinance itself as one attachment among several
+# exhibits, distinguished only by name -- "2026-646 - Original Bill",
+# "2026-662 Original Bill". Punctuation and spacing vary between records, so
+# match on the phrase rather than an exact title.
+_ORIGINAL_BILL = re.compile(r"original\s+bill", re.IGNORECASE)
+
+
+def fetch_legistar_bill_text(client_name: str, matter_id: int, *, timeout: float = 90.0) -> str | None:
+    """Cleaned text of a Legistar matter's "Original Bill" attachment.
+
+    Legistar has no text endpoint (`/Matters/{id}/Texts` returns 405), so the
+    bill itself has to be pulled from the attachment list. Exhibits are
+    deliberately skipped: they're supporting material (maps, agreements,
+    budget tables) rather than the legislation, and folding them in would
+    dilute the summarization input rather than enrich it.
+
+    Returns None when no Original Bill attachment exists, which is normal --
+    some matters are procedural and carry only exhibits.
+    """
+    import httpx
+
+    base = f"https://webapi.legistar.com/v1/{client_name}"
+    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+        attachments = client.get(f"{base}/Matters/{matter_id}/Attachments").json()
+        original = next(
+            (a for a in attachments if _ORIGINAL_BILL.search(a.get("MatterAttachmentName") or "")),
+            None,
+        )
+        if original is None:
+            return None
+
+        link = original.get("MatterAttachmentHyperlink")
+        if not link:
+            return None
+
+        resp = client.get(link)
+        resp.raise_for_status()
+
+    if not resp.content.startswith(b"%PDF"):
+        logger.warning("Legistar attachment for matter %s is not a PDF -- skipping", matter_id)
+        return None
+
+    return extract_pdf_text(resp.content)
+
+
+def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:
+    """Populate `bills.full_text` for Legistar-sourced bills.
+
+    Separate from the LegiScan backfill because the retrieval path is
+    entirely different -- attachment list rather than a text API -- though
+    both end up in the same PDF cleaner.
+
+    Returns (fetched, skipped_or_failed).
+    """
+    stmt = (
+        select(Entity)
+        .join(Bill, Bill.entity_id == Entity.id)
+        .where(Entity.entity_type == "bill", Bill.source_system == "legistar")
+        .options(selectinload(Entity.bill))
+    )
+    entities = [
+        e for e in db.execute(stmt).scalars().all() if refresh or not (e.bill and e.bill.full_text)
+    ]
+    if limit:
+        entities = entities[:limit]
+
+    logger.info("Fetching Legistar bill text for %d bills", len(entities))
+
+    fetched = failed = 0
+    for entity in entities:
+        ids = entity.external_ids or {}
+        matter_id, client_name = ids.get("legistar_matter_id"), ids.get("legistar_client")
+        if not matter_id or not client_name:
+            failed += 1
+            continue
+
+        try:
+            text = fetch_legistar_bill_text(client_name, int(matter_id))
+            if not text:
+                failed += 1
+                continue
+            entity.bill.full_text = text
+            db.commit()
+            fetched += 1
+        except Exception as exc:  # noqa: BLE001 -- one bad attachment shouldn't kill the backfill
+            db.rollback()
+            failed += 1
+            logger.warning("Legistar text fetch failed for matter %s: %s", matter_id, exc)
+
+    logger.info("Legistar bill text: %d fetched, %d skipped/failed", fetched, failed)
+    return fetched, failed
+
+
 def backfill_bill_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:
     """Populate `bills.full_text` for LegiScan bills that don't have it.
 
@@ -234,11 +337,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--refresh", action="store_true", help="Re-fetch bills that already have text.")
+    parser.add_argument(
+        "--source",
+        choices=("legiscan", "legistar", "all"),
+        default="legiscan",
+        help="Which source system to backfill text for.",
+    )
     args = parser.parse_args()
 
     session = SessionLocal()
     try:
-        ok, bad = backfill_bill_texts(session, limit=args.limit, refresh=args.refresh)
+        ok = bad = 0
+        if args.source in ("legiscan", "all"):
+            a, b = backfill_bill_texts(session, limit=args.limit, refresh=args.refresh)
+            ok, bad = ok + a, bad + b
+        if args.source in ("legistar", "all"):
+            a, b = backfill_legistar_texts(session, limit=args.limit, refresh=args.refresh)
+            ok, bad = ok + a, bad + b
         print(f"Done: {ok} fetched, {bad} skipped/failed.")
     finally:
         session.close()
