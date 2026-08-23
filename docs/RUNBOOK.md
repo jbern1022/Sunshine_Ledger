@@ -151,6 +151,16 @@ host**, only the resolved container env vars are sent over the Docker API.
   Ollama itself is down. Real fix: DHCP-reserve the wired MAC, or just
   disable Wi-Fi on a machine that's always plugged in anyway (see Todoist
   ticket).
+- **Miami's iQM2 attachments are not bill text, and some contain personal
+  data.** iQM2 legislation pages link documents via
+  `FileOpen.aspx?Type=N&ID=NNNNN`. At least one of those is a scan of
+  **public comment cards carrying residents' full names and home street
+  addresses**. Do not add iQM2 attachment ingestion without a verified way
+  to tell the legislation document apart from comment cards, minutes and
+  videos — feeding one of these to the summarizer would republish private
+  addresses on a public site and contradict the privacy page. Miami bills
+  summarize from their descriptions instead, which is a deliberate choice,
+  not an unfinished one (see the Todoist ticket for the full reasoning).
 - **Legistar client tokens aren't guessable from the city name.** Miami's
   is `miamifl`, Jacksonville's is `jaxcityc`, Fort Lauderdale's is
   `fortlauderdale`. Wrong guesses 500 with `LegistarConnectionString
