@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { fetchBills } from "@/lib/api";
 import type { BillListItem } from "@/lib/types";
 import BillCard from "@/components/BillCard";
+import ElectionContext from "@/components/ElectionContext";
 
 const JURISDICTIONS = [
   { label: "All jurisdictions", value: "" },
@@ -82,6 +83,8 @@ function BrowsePageInner() {
           )}
         </p>
       </div>
+
+      <ElectionContext />
 
       {autoDetected && jurisdiction && (
         <div className="mb-4 flex items-center justify-between rounded-md bg-sunshine-50 px-3 py-2 text-xs text-slate-600">

@@ -7,6 +7,7 @@ import type { BillListItem } from "@/lib/types";
 
 vi.mock("@/lib/api", () => ({
   fetchBills: vi.fn(),
+  fetchElections: vi.fn(() => Promise.reject(new Error("not under test"))),
 }));
 
 vi.mock("@/components/BillCard", () => ({

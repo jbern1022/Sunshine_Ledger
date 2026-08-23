@@ -102,3 +102,24 @@ export interface DistrictFeatureCollection {
     properties: DistrictFeatureProperties;
   }>;
 }
+
+/** Published election dates (BRD 5.8). Deliberately carries no candidate,
+ *  party, or outcome data — the BRD permits the calendar but rules out
+ *  scoring and predictive claims at MVP. */
+export interface ElectionEvent {
+  date: string;
+  label: string;
+  kind: string;
+  is_past: boolean;
+  days_away: number;
+}
+
+export interface ElectionCalendar {
+  state: string;
+  year: number;
+  source: { name: string; url: string };
+  verify_by: string;
+  as_of: string;
+  next_event: ElectionEvent | null;
+  events: ElectionEvent[];
+}

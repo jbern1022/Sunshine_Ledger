@@ -3,6 +3,7 @@ import type {
   BillListResponse,
   CountyFeatureCollection,
   DistrictFeatureCollection,
+  ElectionCalendar,
   FlagCreate,
 } from "./types";
 
@@ -59,4 +60,11 @@ export async function submitFlag(payload: FlagCreate): Promise<void> {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail ?? `Failed to submit flag: ${res.status}`);
   }
+}
+
+export async function fetchElections(state?: string): Promise<ElectionCalendar> {
+  const qs = state ? `?state=${encodeURIComponent(state)}` : "";
+  const res = await fetch(`${API_URL}/elections${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch election calendar: ${res.status}`);
+  return res.json();
 }
