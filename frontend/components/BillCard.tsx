@@ -65,6 +65,17 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
     : [];
   const whoItAffects = detail?.claims.find((c) => c.claim_type === "who_it_affects")?.claim_text ?? null;
 
+  // Which model wrote the summaries on this card. Stored per claim, so the
+  // fields can legitimately differ once cheaper-model routing is enabled
+  // (see docs/LLM_MODEL_ROUTING.md) -- hence a set rather than one value.
+  const summaryModels = Array.from(
+    new Set(
+      (detail?.claims ?? [])
+        .filter((c) => c.generated_by.startsWith("llm:"))
+        .map((c) => c.generated_by.slice("llm:".length)),
+    ),
+  );
+
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -188,6 +199,27 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 </li>
               ))}
             </ul>
+          )}
+          {/* Disclose authorship where the summary is actually read. The
+              privacy page already said summaries are AI-generated, but
+              nobody reading a bill card sees that. On a site whose premise
+              is that claims are traceable, how the text was produced is
+              part of what needs tracing. */}
+          {!loading && summaryModels.length > 0 && (
+            <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-400">
+              Plain-language summaries above were written by an AI model (
+              {summaryModels.join(", ")}) from the source{uniqueSources.length === 1 ? "" : "s"} listed
+              here, and are published without a human reviewing each one. They can be wrong or
+              incomplete — the linked source is the authority. Something look off?{" "}
+              <button
+                type="button"
+                onClick={() => setShowFlagForm(true)}
+                className="underline hover:text-slate-600"
+              >
+                Flag it
+              </button>
+              .
+            </p>
           )}
           {!loading && detail && uniqueSources.length === 0 && (
             <p className="text-slate-400">

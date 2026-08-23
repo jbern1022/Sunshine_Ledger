@@ -110,3 +110,37 @@ describe("BillCard", () => {
     expect(await screen.findByText(/couldn.t submit/i)).toBeInTheDocument();
   });
 });
+
+describe("BillCard AI disclosure", () => {
+  beforeEach(() => {
+    vi.mocked(api.fetchBill).mockReset();
+  });
+
+  it("discloses AI authorship and names the model when sources are expanded", async () => {
+    vi.mocked(api.fetchBill).mockResolvedValueOnce(baseDetail);
+    const user = userEvent.setup();
+    render(<BillCard bill={baseBill} />);
+
+    await user.click(screen.getByRole("button", { name: /sources \(2\)/i }));
+
+    // The privacy page says summaries are AI-generated, but nobody reading a
+    // bill card sees that. This disclosure is the one at the point of use.
+    expect(await screen.findByText(/written by an AI model/i)).toBeInTheDocument();
+    expect(screen.getByText(/llama3\.1/)).toBeInTheDocument();
+    expect(screen.getByText(/without a human reviewing each one/i)).toBeInTheDocument();
+  });
+
+  it("does not claim AI authorship when no LLM-generated claims exist", async () => {
+    vi.mocked(api.fetchBill).mockResolvedValueOnce({
+      ...baseDetail,
+      claims: [{ ...baseDetail.claims[0], generated_by: "manual_review" }],
+    });
+    const user = userEvent.setup();
+    render(<BillCard bill={baseBill} />);
+
+    await user.click(screen.getByRole("button", { name: /sources \(2\)/i }));
+    await screen.findByText(/Residents of Example County/);
+
+    expect(screen.queryByText(/written by an AI model/i)).not.toBeInTheDocument();
+  });
+});
