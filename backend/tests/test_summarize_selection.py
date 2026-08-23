@@ -245,3 +245,49 @@ def test_selection_hash_matches_stored_hash(db_session, bill_factory):
     candidates, skipped = select_bills_needing_summary(db_session, model=MODEL)
     assert candidates == []
     assert skipped == 1
+
+
+# --- per-field model routing ---------------------------------------------
+
+from app.pipeline.summarize import FAST_MODEL_CLAIM_TYPES, model_for_claim_type
+
+FAST = "llama3.2:latest"
+
+
+def test_no_fast_model_means_everything_uses_quality_model():
+    for ct in ("what_it_does", "who_it_affects"):
+        assert model_for_claim_type(ct, quality_model=MODEL) == MODEL
+
+
+def test_fast_model_only_handles_designated_fields():
+    assert model_for_claim_type("what_it_does", quality_model=MODEL, fast_model=FAST) == FAST
+
+
+def test_who_it_affects_never_routes_to_the_fast_model():
+    """The field that justified the full-text switch. On a 3B it fell back to
+    "does not specify a particular affected group" twice as often as on the
+    8B, so it must stay on the quality model regardless of config."""
+    assert "who_it_affects" not in FAST_MODEL_CLAIM_TYPES
+    assert model_for_claim_type("who_it_affects", quality_model=MODEL, fast_model=FAST) == MODEL
+
+
+def test_hash_unchanged_when_no_fast_model_configured():
+    """Adding the fast-model parameter must not by itself invalidate every
+    stored claim: with routing off the fingerprint has to match what was
+    already written, or enabling this code would trigger a pointless full
+    re-summarization producing the same summaries again."""
+    assert summary_input_hash("text", model=MODEL, fast_model="") == summary_input_hash("text", model=MODEL)
+
+
+def test_hash_changes_when_fast_model_configured():
+    """Turning routing on genuinely changes what the model writes, so those
+    summaries are stale and must regenerate."""
+    a = summary_input_hash("text", model=MODEL)
+    b = summary_input_hash("text", model=MODEL, fast_model=FAST)
+    assert a != b
+
+
+def test_hash_changes_when_fast_model_swapped():
+    a = summary_input_hash("text", model=MODEL, fast_model="llama3.2:latest")
+    b = summary_input_hash("text", model=MODEL, fast_model="qwen2.5:3b")
+    assert a != b

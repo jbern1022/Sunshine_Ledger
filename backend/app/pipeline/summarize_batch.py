@@ -114,7 +114,7 @@ def select_bills_needing_summary(
             continue
 
         if not force:
-            expected = summary_input_hash(text, model=model)
+            expected = summary_input_hash(text, model=model, fast_model=settings.ollama_model_fast)
             llm_claims = [c for c in entity.claims if c.generated_by.startswith("llm:")]
             if llm_claims and all(c.input_hash == expected for c in llm_claims):
                 skipped += 1
@@ -157,7 +157,7 @@ def mark_existing_claims_current(db, *, model: str) -> int:
         text, _ = summarization_input(entity.bill)
         if not text:
             continue
-        expected = summary_input_hash(text, model=model)
+        expected = summary_input_hash(text, model=model, fast_model=settings.ollama_model_fast)
         for claim in entity.claims:
             if claim.generated_by.startswith("llm:") and claim.input_hash is None:
                 claim.input_hash = expected

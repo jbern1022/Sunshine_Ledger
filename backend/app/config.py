@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
 
+    # Optional cheaper model for the summary fields that measured as
+    # quality-insensitive (BRD 6's cost-aware requirement). Empty means
+    # every prompt uses `ollama_model` -- see docs/LLM_MODEL_ROUTING.md for
+    # the measurements behind the default and when turning this on is
+    # actually worth it.
+    ollama_model_fast: str = ""
+
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 

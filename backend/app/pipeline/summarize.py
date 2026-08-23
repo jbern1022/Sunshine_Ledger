@@ -33,17 +33,57 @@ MAX_BILL_TEXT_CHARS = 12_000  # keep prompts cheap; most bill summaries/digests 
 # but it is not free at scale. Don't bump for typo fixes.
 PROMPT_VERSION = "1"
 
+# Summary fields a cheaper model may write when one is configured.
+# "who_it_affects" is deliberately absent: on a 3B model it fell back to
+# "does not specify a particular affected group" twice as often as on the
+# 8B, and that field is precisely what justified moving to full bill text
+# in the first place. See docs/LLM_MODEL_ROUTING.md.
+FAST_MODEL_CLAIM_TYPES = frozenset({"what_it_does"})
 
-def summary_input_hash(bill_text: str, *, model: str, prompt_version: str = PROMPT_VERSION) -> str:
+
+def model_for_claim_type(claim_type: str, *, quality_model: str, fast_model: str = "") -> str:
+    """Which model generates a given summary field.
+
+    Measured on real bills, the two prompts are not equally sensitive to
+    model size (see docs/LLM_MODEL_ROUTING.md): "what it does" came out
+    comparable on a 3B and an 8B, while "who it affects" doubled its
+    non-answer rate on the 3B -- and that field is the one the whole
+    full-text switch was justified on. So routing is per-field, not
+    per-bill: a cheaper model may write "what it does" while "who it
+    affects" stays on the quality model.
+
+    With no fast model configured (the default), everything uses the
+    quality model.
+    """
+    if fast_model and claim_type in FAST_MODEL_CLAIM_TYPES:
+        return fast_model
+    return quality_model
+
+
+def summary_input_hash(
+    bill_text: str, *, model: str, fast_model: str = "", prompt_version: str = PROMPT_VERSION
+) -> str:
     """Fingerprint everything that determines the generated summaries.
 
-    Covers the model and prompt version, not just the text: a summary
+    Covers the models and prompt version, not just the text: a summary
     produced by a different model or an older prompt is stale even when the
     bill itself hasn't changed. Hashes the *truncated* text, since that's
     what is actually sent to the model.
+
+    `fast_model` is part of the fingerprint because it changes the output of
+    whichever fields it handles. Turning routing on or off, or swapping the
+    cheap model, therefore invalidates stored summaries and re-generates
+    them -- which is the intended behaviour, and not free at corpus scale.
+
+    It is only appended when set, so that adding this parameter did not by
+    itself change the fingerprint of every already-stored claim and trigger
+    a full re-summarization producing the same summaries again.
     """
-    payload = "\x00".join([prompt_version, model, bill_text[:MAX_BILL_TEXT_CHARS]])
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    parts = [prompt_version, model]
+    if fast_model:
+        parts.append(f"fast={fast_model}")
+    parts.append(bill_text[:MAX_BILL_TEXT_CHARS])
+    return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()
 
 WHAT_IT_DOES_PROMPT = """You are summarizing a piece of legislation for a general public audience with no legal background.
 
@@ -115,8 +155,20 @@ class OllamaClient:
         return data["response"].strip()
 
 
-def generate_bill_summaries(bill_number: str, title: str, bill_text: str, client: OllamaClient | None = None) -> dict[str, str]:
+def generate_bill_summaries(
+    bill_number: str,
+    title: str,
+    bill_text: str,
+    client: OllamaClient | None = None,
+    *,
+    fast_client: OllamaClient | None = None,
+) -> dict[str, str]:
     """Run both prompts and return {'what_it_does': ..., 'who_it_affects': ...}.
+
+    `fast_client`, when given, handles the fields listed in
+    FAST_MODEL_CLAIM_TYPES; everything else uses `client`. Passing an
+    explicit `client` and no `fast_client` keeps this single-model, which is
+    what the Step 2 review script and the model comparisons rely on.
 
     Pure function (no DB access) so it can be used standalone by the Step 2
     manual review script before any pipeline automation exists.
@@ -124,13 +176,17 @@ def generate_bill_summaries(bill_number: str, title: str, bill_text: str, client
     client = client or OllamaClient()
     truncated = bill_text[:MAX_BILL_TEXT_CHARS]
 
-    what_it_does = client.generate(
-        WHAT_IT_DOES_PROMPT.format(bill_number=bill_number, title=title, bill_text=truncated)
-    )
-    who_it_affects = client.generate(
-        WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, bill_text=truncated)
-    )
-    return {"what_it_does": what_it_does, "who_it_affects": who_it_affects}
+    prompts = {
+        "what_it_does": WHAT_IT_DOES_PROMPT,
+        "who_it_affects": WHO_IT_AFFECTS_PROMPT,
+    }
+    out: dict[str, str] = {}
+    for claim_type, prompt in prompts.items():
+        chosen = fast_client if (fast_client and claim_type in FAST_MODEL_CLAIM_TYPES) else client
+        out[claim_type] = chosen.generate(
+            prompt.format(bill_number=bill_number, title=title, bill_text=truncated)
+        )
+    return out
 
 
 def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_source: Source) -> list[Claim]:
@@ -143,12 +199,23 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
         raise ValueError("Entity is not a bill")
 
     client = OllamaClient()
-    summaries = generate_bill_summaries(entity.bill.bill_number, entity.name, bill_text, client=client)
-    input_hash = summary_input_hash(bill_text, model=client.model)
-    generated_by = f"llm:{client.model}"
+    fast_model = settings.ollama_model_fast
+    fast_client = OllamaClient(model=fast_model) if fast_model else None
+
+    summaries = generate_bill_summaries(
+        entity.bill.bill_number, entity.name, bill_text, client=client, fast_client=fast_client
+    )
+    input_hash = summary_input_hash(bill_text, model=client.model, fast_model=fast_model)
 
     claims = []
     for claim_type, text in summaries.items():
+        # Attribute each claim to the model that actually wrote it -- with
+        # routing on, the two fields can come from different models, and
+        # "which model said this" matters when reviewing a flagged claim.
+        generated_by = "llm:" + model_for_claim_type(
+            claim_type, quality_model=client.model, fast_model=fast_model
+        )
+
         # Update the existing claim in place rather than replacing it.
         # Flags reference claims with ON DELETE CASCADE, so deleting and
         # re-inserting on every refresh would silently destroy the user
