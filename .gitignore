@@ -28,3 +28,9 @@ frontend/next-env.d.ts
 # Data
 backend/app/pipeline/sample_data/*.cache.json
 *.log
+
+# macOS/iCloud sync duplicates ("test_map_api 2.py", "routes.d 2.ts"). These
+# are byte-identical copies, and a duplicated test file makes pytest collect
+# and run the same tests twice -- which has already caused false failures by
+# tripping per-endpoint rate limits.
+* [0-9].*
