@@ -35,6 +35,10 @@ services:
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8010}
+      # Server-side rendering talks to the API directly over the compose
+      # network. Using the public hostname would send each server render out
+      # through the tunnel and back in for no reason.
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://backend:8000}
       DEV_ORIGIN_HOST: ${DEV_ORIGIN_HOST:-}
     ports:
       - "${FRONTEND_PORT:-3010}:3000"

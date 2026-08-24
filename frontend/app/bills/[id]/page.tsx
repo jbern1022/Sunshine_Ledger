@@ -1,42 +1,44 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { fetchBill } from "@/lib/api";
-import type { BillDetail } from "@/lib/types";
+import { notFound } from "next/navigation";
+import { getBill } from "@/lib/server-api";
 
 /** Permalink for a single bill.
  *
- *  Until now bills only existed as expandable cards inside the browse list,
- *  so there was no way to link someone to one — a real gap for a site whose
- *  purpose is helping people point at specific legislation. This page is
- *  that address.
+ *  Rendered on the server rather than fetched in the browser. Bills only
+ *  existed as expandable cards before this page, so there was no address to
+ *  share -- and an address nobody can find is barely an improvement: the
+ *  first client-rendered version returned an empty shell to crawlers, with
+ *  "Sunshine Ledger" as the title for all 2,375 bills. People find
+ *  legislation through search, so the content has to be in the HTML.
+ *
+ *  Pure display, no interactivity, so no client component is needed.
  */
-export default function BillPage() {
-  const params = useParams<{ id: string }>();
-  const [bill, setBill] = useState<BillDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!params?.id) return;
-    fetchBill(params.id)
-      .then(setBill)
-      .catch(() => setError("This bill could not be found."));
-  }, [params?.id]);
+type Props = { params: Promise<{ id: string }> };
 
-  if (error) {
-    return (
-      <div>
-        <p className="text-sm text-slate-500">{error}</p>
-        <Link href="/" className="mt-3 inline-block text-sm text-sunshine-600 underline">
-          ← Back to all bills
-        </Link>
-      </div>
-    );
-  }
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const bill = await getBill(id);
+  if (!bill) return { title: "Bill not found — Sunshine Ledger" };
 
-  if (!bill) return <p className="text-sm text-slate-400">Loading bill…</p>;
+  // Prefer the plain-language summary for the description: it's written for
+  // a general audience, which is exactly what a search result needs.
+  const description = (bill.what_it_does ?? bill.name ?? "").slice(0, 300);
+  const title = `${bill.bill_number} — ${bill.jurisdiction_name ?? "Florida"} | Sunshine Ledger`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "article" },
+    twitter: { card: "summary", title, description },
+  };
+}
+
+export default async function BillPage({ params }: Props) {
+  const { id } = await params;
+  const bill = await getBill(id);
+  if (!bill) notFound();
 
   const summaryModels = Array.from(
     new Set(
@@ -128,7 +130,7 @@ export default function BillPage() {
                 </a>
                 <span className="text-slate-400">
                   {" "}
-                  — retrieved {new Date(s.retrieved_at).toLocaleDateString()}
+                  — retrieved {new Date(s.retrieved_at).toLocaleDateString("en-US")}
                 </span>
               </li>
             ))}
