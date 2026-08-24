@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getAllBillsForSitemap } from "@/lib/server-api";
+import { getAllBillsForSitemap, getAllPeopleForSitemap } from "@/lib/server-api";
 
 const SITE = "https://sunshineledger.josephbernal.com";
 
@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/privacy`, changeFrequency: "monthly", priority: 0.3 },
   ];
 
-  const bills = await getAllBillsForSitemap();
+  const [bills, peopleIds] = await Promise.all([getAllBillsForSitemap(), getAllPeopleForSitemap()]);
 
   return [
     ...staticPages,
@@ -30,6 +30,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: b.last_action_date ? new Date(b.last_action_date) : undefined,
       changeFrequency: "weekly" as const,
       priority: 0.8,
+    })),
+    ...peopleIds.map((id) => ({
+      url: `${SITE}/people/${id}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
     })),
   ];
 }

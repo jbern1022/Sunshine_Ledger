@@ -1,45 +1,49 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { fetchPerson } from "@/lib/api";
-import type { PersonDetail } from "@/lib/types";
+import { notFound } from "next/navigation";
+import { getPerson } from "@/lib/server-api";
 
 /** One sponsor and the bills they're attached to.
  *
  *  May be a person, a committee, or an office -- city records use all
  *  three, so the copy avoids calling every entry a legislator.
  *
+ *  Server-rendered for the same reason as bill pages: "who sponsored this"
+ *  is a question people put into a search engine, and a client-rendered
+ *  page answers it with an empty shell.
+ *
  *  Strictly a record of sponsorship drawn from bill data. No voting record,
- *  no consistency score, no characterisation of the person — those are
+ *  no consistency score, no characterisation of the sponsor -- those are
  *  Phase 2/3 on the Roadmap and sit behind a legal review that hasn't
  *  happened.
  */
-export default function PersonPage() {
-  const params = useParams<{ id: string }>();
-  const [person, setPerson] = useState<PersonDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!params?.id) return;
-    fetchPerson(params.id)
-      .then(setPerson)
-      .catch(() => setError("This sponsor could not be found."));
-  }, [params?.id]);
+type Props = { params: Promise<{ id: string }> };
 
-  if (error) {
-    return (
-      <div>
-        <p className="text-sm text-slate-500">{error}</p>
-        <Link href="/people" className="mt-3 inline-block text-sm text-sunshine-600 underline">
-          ← All sponsors
-        </Link>
-      </div>
-    );
-  }
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const person = await getPerson(id);
+  if (!person) return { title: "Sponsor not found — Sunshine Ledger" };
 
-  if (!person) return <p className="text-sm text-slate-400">Loading…</p>;
+  const qualifiers = [person.role, person.district].filter(Boolean).join(" ");
+  const title = `${person.name}${qualifiers ? ` (${qualifiers})` : ""} | Sunshine Ledger`;
+  const description =
+    `Bills sponsored or co-sponsored by ${person.name}` +
+    `${person.district ? `, ${person.district}` : ""} — ${person.sponsored_count} tracked. ` +
+    "Sponsorship record only; no ratings or voting record.";
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "profile" },
+    twitter: { card: "summary", title, description },
+  };
+}
+
+export default async function PersonPage({ params }: Props) {
+  const { id } = await params;
+  const person = await getPerson(id);
+  if (!person) notFound();
 
   return (
     <div>
@@ -65,9 +69,15 @@ export default function PersonPage() {
       ) : (
         <ul className="mt-4 space-y-3">
           {person.bills.map((b) => (
-            <li key={`${b.entity_id}-${b.relationship_type}`} className="rounded-lg border border-slate-200 bg-white p-4">
+            <li
+              key={`${b.entity_id}-${b.relationship_type}`}
+              className="rounded-lg border border-slate-200 bg-white p-4"
+            >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <Link href={`/bills/${b.entity_id}`} className="text-sm font-semibold text-sunshine-600 underline">
+                <Link
+                  href={`/bills/${b.entity_id}`}
+                  className="text-sm font-semibold text-sunshine-600 underline"
+                >
                   {b.bill_number}
                 </Link>
                 <span className="text-xs text-slate-400">

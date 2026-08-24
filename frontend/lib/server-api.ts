@@ -1,4 +1,4 @@
-import type { BillDetail, BillListResponse } from "./types";
+import type { BillDetail, BillListResponse, PersonDetail, PersonListResponse } from "./types";
 
 /** Server-side API base.
  *
@@ -57,4 +57,46 @@ export async function getAllBillsForSitemap(): Promise<
   }
 
   return out;
+}
+
+/** Fetch a sponsor on the server. Same rationale as getBill: "who sponsored
+ *  this" is a real search query, and a client-rendered page answers it with
+ *  an empty shell. */
+export async function getPerson(entityId: string): Promise<PersonDetail | null> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/people/${entityId}`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Sponsor ids for the sitemap. */
+export async function getAllPeopleForSitemap(): Promise<string[]> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/people?limit=200`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const page: PersonListResponse = await res.json();
+    return page.items.map((p) => p.entity_id);
+  } catch {
+    return [];
+  }
+}
+
+/** Recently-active bills for the RSS feed. The bills API already orders by
+ *  last action, so "recent" needs no extra parameter. */
+export async function getRecentBillsForFeed(limit = 50): Promise<BillListResponse["items"]> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/bills?limit=${limit}`, {
+      next: { revalidate: 3600 },
+    });
+    if (!res.ok) return [];
+    const page: BillListResponse = await res.json();
+    return page.items;
+  } catch {
+    return [];
+  }
 }
