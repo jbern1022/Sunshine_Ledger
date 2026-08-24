@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Bill, Entity, Relationship, Source
+from app.pipeline._status import normalize_status
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +203,14 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
         bill.bill_number = detail.get("bill_number", row.get("number", ""))
         bill.session = detail.get("session", {}).get("session_name", "")
         bill.chamber = "Senate" if bill.bill_number.upper().startswith("S") else "House"
-        bill.status = STATUS_MAP.get(status_code, row.get("status", "Introduced"))
+        # Falling back to the master list's `status` leaks LegiScan's raw
+        # numeric code into a user-facing field -- that is how a bill came to
+        # display a status of "0". Only accept the fallback if it isn't a bare
+        # number.
+        fallback = str(row.get("status", "") or "").strip()
+        if not fallback or fallback.isdigit():
+            fallback = "Unknown"
+        bill.status = normalize_status(STATUS_MAP.get(status_code, fallback))
         bill.introduced_date = _parse_date(detail.get("introduced"))
         bill.last_action_date = _parse_date(detail.get("status_date") or row.get("last_action_date"))
         bill.last_action = detail.get("last_action") or row.get("last_action")

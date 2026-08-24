@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Bill, Entity, Relationship, Source
+from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ def ingest_miami_legislation(db: Session, *, limit: int = 20) -> list[Entity]:
         bill.session = str(action_date.year) if action_date else "current"
         department = record["department"]
         bill.chamber = fit(department, CHAMBER_MAX_LENGTH)
-        bill.status = record["status"]
+        bill.status = normalize_status(record["status"])
         bill.last_action_date = action_date
         bill.last_action = record["status"]
         bill.full_text_url = detail_url
