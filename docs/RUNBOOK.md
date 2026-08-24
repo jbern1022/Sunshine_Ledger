@@ -78,6 +78,23 @@ concern and just upsert every run.
 Logs land in `/home/joe/scripts/ingestion.log` on Omen (uncapped --
 worth an eye on size over time, no rotation configured yet).
 
+**Steps are deliberately isolated, and the script does not use `set -e`.**
+Each source runs independently; a failure is recorded, the run continues,
+and the script exits non-zero at the end naming what failed. This is not
+stylistic. The original `set -e` version meant a crash in the Legistar step
+cancelled the Miami scrape and the summarization run behind it — nightly
+ingestion was dead for four consecutive nights (Aug 21–24) and 45 bills sat
+ingested but unsummarized. If you edit this script, keep the isolation.
+
+**Nothing alerts on failure.** Both this and the backup script fail loudly
+to their logs, but cron discards the exit code, so "loud" still means
+"nobody finds out". Until a push monitor exists (tracked in Todoist):
+
+```bash
+grep 'INGESTION FAILED' /home/joe/scripts/ingestion.log
+grep 'BACKUP FAILED' /home/joe/scripts/backup.log
+```
+
 ## Running pipeline jobs manually
 
 For one-off/ad-hoc runs (backfills, testing changes) from the Mac against
