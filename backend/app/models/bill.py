@@ -27,7 +27,11 @@ class Bill(TimestampMixin, Base):
 
     bill_number: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # e.g. "HB 123"
     session: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "2026 Regular Session"
-    chamber: Mapped[str | None] = mapped_column(String(50))  # House | Senate | Council | Commission
+    # The body handling the bill: "House"/"Senate" at state level, but a
+    # committee or department name locally -- Jacksonville has bodies up to
+    # 87 characters. Sized at 50 originally, which crashed nightly ingestion
+    # once a long committee name appeared; see CHAMBER_MAX_LENGTH.
+    chamber: Mapped[str | None] = mapped_column(String(200))
 
     status: Mapped[str] = mapped_column(String(100), nullable=False, default="Introduced")
     introduced_date: Mapped[date | None] = mapped_column(Date)

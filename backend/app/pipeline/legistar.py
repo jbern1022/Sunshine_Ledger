@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Bill, Entity, Relationship, Source
+from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
         bill.bill_number = matter.get("MatterFile", str(matter_id))
         bill.session = str(matter.get("MatterAgendaDate", ""))[:4] or "current"
-        bill.chamber = matter.get("MatterBodyName")
+        bill.chamber = fit(matter.get("MatterBodyName"), CHAMBER_MAX_LENGTH)
         bill.status = matter.get("MatterStatusName", "Introduced")
         bill.introduced_date = _parse_date(matter.get("MatterIntroDate"))
         bill.last_action_date = _parse_date(matter.get("MatterPassedDate")) or bill.introduced_date

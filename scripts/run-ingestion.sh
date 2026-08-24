@@ -19,18 +19,37 @@
 #
 # Usage: run-ingestion.sh [--with-gdelt]
 
-set -euo pipefail
+# NOT `set -e`. The steps below are independent data sources, and an
+# earlier failure must not cancel the later ones: a single over-long
+# Jacksonville committee name crashed the Legistar step on four consecutive
+# nights, and because the script aborted there, the Miami scrape and the
+# summarization run never executed at all. Each step now records its own
+# failure and the script reports them together at the end.
+set -uo pipefail
 
 CONTAINER="sunshineledger-backend-1"
 WITH_GDELT="${1:-}"
 
-run() {
-  docker exec "$CONTAINER" python -c "$1"
+FAILED_STEPS=()
+
+# Run one pipeline step, isolating its failure from the rest of the run.
+step() {
+    local name="$1"
+    shift
+    echo "[$(date)] ${name}"
+    if ! "$@"; then
+        echo "[$(date)] STEP FAILED: ${name}" >&2
+        FAILED_STEPS+=("$name")
+    fi
+}
+
+py() {
+    docker exec "$CONTAINER" python -c "$1"
 }
 
 echo "[$(date)] Starting scheduled ingestion run."
 
-run "
+step "LegiScan state bills" py "
 from app.db import SessionLocal
 from app.pipeline.legiscan import ingest_state_bills
 db = SessionLocal()
@@ -38,7 +57,7 @@ written = ingest_state_bills(db)
 print(f'LegiScan: {len(written)} bills changed/new')
 "
 
-run "
+step "Legistar (jaxcityc)" py "
 from app.db import SessionLocal
 from app.pipeline.legistar import ingest_local_bills
 db = SessionLocal()
@@ -46,15 +65,19 @@ written = ingest_local_bills(db, client_name='jaxcityc', limit=200)
 print(f'Legistar (jaxcityc): {len(written)} bills upserted')
 "
 
-echo "[$(date)] Miami iQM2 scrape"
-docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2
+step "Miami iQM2 scrape" docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2
 
-echo "[$(date)] Summarizing new bills"
-docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
+step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
 
 if [ "$WITH_GDELT" = "--with-gdelt" ]; then
-  echo "[$(date)] GDELT headline refresh (slow -- expect multiple hours)"
-  docker exec "$CONTAINER" python -m app.pipeline.gdelt
+    step "GDELT headline refresh" docker exec "$CONTAINER" python -m app.pipeline.gdelt
 fi
 
-echo "[$(date)] Scheduled ingestion run complete."
+if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
+    # Exit non-zero so a healthcheck ping or alert wrapper can detect this.
+    # Until one exists, `grep "INGESTION FAILED" ingestion.log` finds it.
+    echo "[$(date)] INGESTION FAILED: ${#FAILED_STEPS[@]} step(s) -- ${FAILED_STEPS[*]}" >&2
+    exit 1
+fi
+
+echo "[$(date)] Scheduled ingestion run complete (all steps OK)."
