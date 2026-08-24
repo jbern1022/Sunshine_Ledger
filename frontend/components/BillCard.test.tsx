@@ -13,6 +13,7 @@ vi.mock("@/lib/api", () => ({
 const baseBill: BillListItem = {
   entity_id: "bill-1",
   bill_number: "HB 123",
+  name: "Test Bill Title",
   session: "2026 Regular Session",
   chamber: "House",
   status: "In Committee",

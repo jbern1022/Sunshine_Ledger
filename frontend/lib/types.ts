@@ -24,6 +24,8 @@ export interface SponsorOut {
 export interface BillListItem {
   entity_id: string;
   bill_number: string;
+  /** The bill's actual title, distinct from its number. */
+  name: string;
   session: string;
   chamber: string | null;
   status: string;
@@ -122,4 +124,35 @@ export interface ElectionCalendar {
   as_of: string;
   next_event: ElectionEvent | null;
   events: ElectionEvent[];
+}
+
+/** A legislator who sponsors tracked bills. Counts are plain facts drawn
+ *  from bill records — deliberately not a ranking or an activity score. */
+export interface PersonListItem {
+  entity_id: string;
+  name: string;
+  district: string | null;
+  role: string | null;
+  party: string | null;
+  jurisdiction_name: string | null;
+  sponsored_count: number;
+}
+
+export interface PersonBillItem {
+  entity_id: string;
+  bill_number: string;
+  name: string;
+  status: string;
+  relationship_type: string;
+  last_action_date: string | null;
+  what_it_does: string | null;
+}
+
+export interface PersonDetail extends PersonListItem {
+  bills: PersonBillItem[];
+}
+
+export interface PersonListResponse {
+  total: number;
+  items: PersonListItem[];
 }

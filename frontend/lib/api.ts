@@ -5,6 +5,8 @@ import type {
   DistrictFeatureCollection,
   ElectionCalendar,
   FlagCreate,
+  PersonDetail,
+  PersonListResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -66,5 +68,21 @@ export async function fetchElections(state?: string): Promise<ElectionCalendar> 
   const qs = state ? `?state=${encodeURIComponent(state)}` : "";
   const res = await fetch(`${API_URL}/elections${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch election calendar: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPeople(params: { q?: string; limit?: number; offset?: number } = {}): Promise<PersonListResponse> {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== "") search.set(k, String(v));
+  });
+  const res = await fetch(`${API_URL}/people?${search.toString()}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch legislators: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPerson(entityId: string): Promise<PersonDetail> {
+  const res = await fetch(`${API_URL}/people/${entityId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch legislator: ${res.status}`);
   return res.json();
 }

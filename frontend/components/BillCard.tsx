@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { fetchBill, submitFlag } from "@/lib/api";
 import type { BillDetail, BillListItem, SourceOut } from "@/lib/types";
 
@@ -97,7 +98,11 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               the marker survived only in small metadata. If placeholder
               data ever reaches this component again it should be
               conspicuous, not tidied away. */}
-          <h2 className="mt-1 text-lg font-semibold text-ledger-900">{bill.bill_number}</h2>
+          <h2 className="mt-1 text-lg font-semibold text-ledger-900">
+            <Link href={`/bills/${bill.entity_id}`} className="hover:text-sunshine-600 hover:underline">
+              {bill.bill_number}
+            </Link>
+          </h2>
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(bill.status)}`}>{bill.status}</span>
       </div>

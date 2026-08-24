@@ -35,6 +35,7 @@ def _to_list_item(entity: Entity, *, primary_sponsor: str | None = None) -> Bill
     return BillListItem(
         entity_id=entity.id,
         bill_number=bill.bill_number,
+        name=entity.name,
         session=bill.session,
         chamber=bill.chamber,
         status=bill.status,

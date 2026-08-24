@@ -48,6 +48,9 @@ class BillListItem(BaseModel):
 
     entity_id: uuid.UUID
     bill_number: str
+    # The bill's actual title. Held on the entity, but never exposed until
+    # now -- the UI could only ever show a bill number.
+    name: str
     session: str
     chamber: str | None
     status: str

@@ -23,6 +23,7 @@ function makeBill(bill_number: string): BillListItem {
   return {
     entity_id: bill_number,
     bill_number,
+    name: `Title for ${bill_number}`,
     session: "2026 Regular Session",
     chamber: "House",
     status: "Introduced",
