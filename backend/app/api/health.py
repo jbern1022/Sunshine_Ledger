@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.data.elections import CALENDARS
 from app.db import get_db
 from app.models import Bill, Claim, Entity, Source
 
@@ -81,6 +82,22 @@ def data_health(response: Response, db: Session = Depends(get_db)) -> dict:
     if missing_summary:
         reasons.append(f"{missing_summary} bill(s) older than {STUCK_AFTER_HOURS}h have no summary")
 
+    # Election dates are hand-entered from the state's published calendar
+    # and carry a re-verify date, because there's no machine-readable feed
+    # to catch a change. Nothing enforced that date until now, and the
+    # stakes are higher than for bill data: the next Florida event is the
+    # voter registration deadline, and publishing a wrong one could cost
+    # someone their vote. Flag it rather than trusting the date silently.
+    today = now.date()
+    stale_calendars = [
+        f"{cal.state} {cal.year}" for cal in CALENDARS.values() if cal.verify_by < today
+    ]
+    if stale_calendars:
+        reasons.append(
+            f"election calendar past its re-verify date: {', '.join(stale_calendars)} "
+            "-- re-check against the state's published calendar"
+        )
+
     if reasons:
         response.status_code = 503
 
@@ -91,5 +108,13 @@ def data_health(response: Response, db: Session = Depends(get_db)) -> dict:
         "hours_since_ingest": age_hours,
         "bills_total": bills_total,
         "bills_missing_summary": missing_summary,
+        "election_calendars": {
+            cal.state: {
+                "year": cal.year,
+                "verify_by": cal.verify_by.isoformat(),
+                "days_until_reverify": (cal.verify_by - now.date()).days,
+            }
+            for cal in CALENDARS.values()
+        },
         "checked_at": now.isoformat(),
     }

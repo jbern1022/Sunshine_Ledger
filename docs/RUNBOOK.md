@@ -298,12 +298,19 @@ green through three days of stale data (Aug 21-24) while nightly ingestion
 crashed every night. The process was alive the entire time. `/health/data`
 is the check that would have caught it — point any monitor at that one.
 
-It flags two conditions:
+It flags three conditions:
 - Last ingestion older than 48h (one missed daily run is tolerated so a
   single transient failure doesn't page anyone).
 - Bills older than 24h that still have no summary. The 24h grace exists
   because scraping and summarizing run back-to-back in the same job, so a
   bill without a summary mid-run is normal rather than a fault.
+- An election calendar past its `verify_by` date. Those dates are
+  hand-entered from the state's published calendar with no machine-readable
+  feed behind them, and the stakes are higher than for bill data — the next
+  Florida event is a **voter registration deadline**, and publishing a wrong
+  one could cost someone their vote. When this fires, re-check the dates
+  against the source in `app/data/elections.py` and move `verify_by`
+  forward.
 
 ## Backups
 

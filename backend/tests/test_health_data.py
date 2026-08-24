@@ -135,3 +135,56 @@ def test_payload_carries_the_numbers_a_human_needs(client, db_session):
     for key in ("last_ingest_at", "hours_since_ingest", "bills_total", "checked_at"):
         assert key in body
     assert 4 < body["hours_since_ingest"] < 6
+
+
+# --- election calendar freshness -----------------------------------------
+
+
+def test_flags_election_calendar_past_its_reverify_date(client, db_session, monkeypatch):
+    """Election dates are hand-entered with no machine-readable feed behind
+    them. The next Florida event is a voter registration deadline, so a
+    wrong date could cost someone their vote -- this must not be trusted
+    silently once its re-verify date passes."""
+    from app.api import health as health_module
+    from app.data.elections import ElectionCalendar
+
+    _add_source(db_session, hours_ago=1)
+    expired = ElectionCalendar(
+        state="FL",
+        year=2026,
+        source_name="Florida Department of State, Division of Elections",
+        source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
+        verify_by=dt.date.today() - dt.timedelta(days=1),
+        events=(),
+    )
+    monkeypatch.setattr(health_module, "CALENDARS", {"FL": expired})
+
+    resp = client.get("/health/data")
+    assert resp.status_code == 503
+    assert any("re-verify date" in r for r in resp.json()["reasons"])
+
+
+def test_calendar_within_its_reverify_window_is_fine(client, db_session, monkeypatch):
+    from app.api import health as health_module
+    from app.data.elections import ElectionCalendar
+
+    _add_source(db_session, hours_ago=1)
+    current = ElectionCalendar(
+        state="FL",
+        year=2026,
+        source_name="Florida Department of State, Division of Elections",
+        source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
+        verify_by=dt.date.today() + dt.timedelta(days=30),
+        events=(),
+    )
+    monkeypatch.setattr(health_module, "CALENDARS", {"FL": current})
+
+    assert client.get("/health/data").status_code == 200
+
+
+def test_payload_exposes_days_until_reverify(client, db_session):
+    """Surfaced so the deadline is visible before it lapses, not only after."""
+    _add_source(db_session, hours_ago=1)
+    cals = client.get("/health/data").json()["election_calendars"]
+    assert "FL" in cals
+    assert "days_until_reverify" in cals["FL"]
