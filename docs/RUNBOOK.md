@@ -277,13 +277,33 @@ default.
 
 ## Monitoring
 
-None yet — see the "add uptime monitoring" ticket. In the meantime, a
-manual health check:
+No alerting yet — see the "add uptime monitoring" and "cron jobs fail
+silently" tickets. Two endpoints exist, and they answer different
+questions:
 
 ```bash
+# Liveness: is the process up. Dependency-free by design -- it must not
+# start failing because the database is slow or the pipeline is behind.
 curl -s https://sunshineledger-api.josephbernal.com/health
+
+# Freshness: is the DATA current. 200 when healthy, 503 when stale, with
+# `reasons` naming the failing check.
+curl -s https://sunshineledger-api.josephbernal.com/health/data
+
 curl -s -o /dev/null -w "%{http_code}\n" https://sunshineledger.josephbernal.com/
 ```
+
+`/health` alone is not enough, and this is not hypothetical: it stayed
+green through three days of stale data (Aug 21-24) while nightly ingestion
+crashed every night. The process was alive the entire time. `/health/data`
+is the check that would have caught it — point any monitor at that one.
+
+It flags two conditions:
+- Last ingestion older than 48h (one missed daily run is tolerated so a
+  single transient failure doesn't page anyone).
+- Bills older than 24h that still have no summary. The 24h grace exists
+  because scraping and summarizing run back-to-back in the same job, so a
+  bill without a summary mid-run is normal rather than a fault.
 
 ## Backups
 
