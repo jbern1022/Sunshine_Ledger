@@ -62,3 +62,47 @@ def test_get_bill_detail(client, bill_factory):
 def test_get_bill_not_found(client):
     resp = client.get(f"/bills/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+# --- status filter options ------------------------------------------------
+
+
+def test_statuses_endpoint_is_empty_without_bills(client):
+    assert client.get("/bills/statuses").json() == []
+
+
+def test_statuses_returns_counts(client, bill_factory):
+    bill_factory(bill_number="HB 1", status="Introduced")
+    bill_factory(bill_number="HB 2", status="Introduced")
+    bill_factory(bill_number="HB 3", status="Passed")
+
+    body = client.get("/bills/statuses").json()
+    assert {s["status"]: s["count"] for s in body} == {"Introduced": 2, "Passed": 1}
+
+
+def test_statuses_ordered_by_count_descending(client, bill_factory):
+    """Common statuses first so a dropdown isn't led by one-off municipal
+    vocabulary."""
+    bill_factory(bill_number="HB 1", status="Rare Status")
+    for i in range(3):
+        bill_factory(bill_number=f"HB 1{i}", status="Introduced")
+
+    assert [s["status"] for s in client.get("/bills/statuses").json()] == ["Introduced", "Rare Status"]
+
+
+def test_statuses_scoped_by_jurisdiction(client, db_session, bill_factory):
+    a = bill_factory(bill_number="HB 1", status="Introduced")
+    b = bill_factory(bill_number="ORD 1", status="Enacted")
+    b.jurisdiction_name = "Jacksonville"
+    db_session.commit()
+
+    body = client.get("/bills/statuses", params={"jurisdiction_name": "Jacksonville"}).json()
+    assert [s["status"] for s in body] == ["Enacted"]
+    assert a.jurisdiction_name == "FL"
+
+
+def test_statuses_route_is_not_shadowed_by_the_bill_detail_route(client, bill_factory):
+    """FastAPI matches in definition order, so /bills/{entity_id} declared
+    first would swallow this path and fail parsing "statuses" as a UUID."""
+    bill_factory()
+    assert client.get("/bills/statuses").status_code == 200

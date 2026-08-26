@@ -7,6 +7,7 @@ import type {
   FlagCreate,
   PersonDetail,
   PersonListResponse,
+  StatusCount,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -84,5 +85,12 @@ export async function fetchPeople(params: { q?: string; limit?: number; offset?:
 export async function fetchPerson(entityId: string): Promise<PersonDetail> {
   const res = await fetch(`${API_URL}/people/${entityId}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch legislator: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchStatuses(jurisdictionName?: string): Promise<StatusCount[]> {
+  const qs = jurisdictionName ? `?jurisdiction_name=${encodeURIComponent(jurisdictionName)}` : "";
+  const res = await fetch(`${API_URL}/bills/statuses${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch statuses: ${res.status}`);
   return res.json();
 }

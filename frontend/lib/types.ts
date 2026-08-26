@@ -156,3 +156,11 @@ export interface PersonListResponse {
   total: number;
   items: PersonListItem[];
 }
+
+/** A status and how many bills carry it. Options come from the data rather
+ *  than a hardcoded list, because the three sources use different
+ *  vocabularies and any fixed list would drift. */
+export interface StatusCount {
+  status: string;
+  count: number;
+}

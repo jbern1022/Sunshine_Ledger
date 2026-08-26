@@ -8,6 +8,7 @@ import type { BillListItem } from "@/lib/types";
 vi.mock("@/lib/api", () => ({
   fetchBills: vi.fn(),
   fetchElections: vi.fn(() => Promise.reject(new Error("not under test"))),
+  fetchStatuses: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("@/components/BillCard", () => ({
@@ -90,5 +91,66 @@ describe("BrowsePage", () => {
 
     await screen.findByText(/120 bills — page 1 of 3/i);
     expect(screen.getByRole("button", { name: /previous/i })).toBeDisabled();
+  });
+});
+
+
+describe("BrowsePage status filter", () => {
+  beforeEach(() => {
+    searchParams = new URLSearchParams();
+    vi.mocked(api.fetchBills).mockReset();
+    vi.mocked(api.fetchStatuses).mockReset();
+  });
+
+  it("offers statuses from the data with their counts", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchStatuses).mockResolvedValue([
+      { status: "Failed", count: 1280 },
+      { status: "Introduced", count: 384 },
+    ]);
+    render(<BrowsePage />);
+
+    // Options come from the data, not a hardcoded list -- the three sources
+    // use different vocabularies and a fixed list would drift.
+    expect(await screen.findByRole("option", { name: "Failed (1280)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Introduced (384)" })).toBeInTheDocument();
+  });
+
+  it("passes the chosen status through to the API", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchStatuses).mockResolvedValue([{ status: "Passed", count: 255 }]);
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+
+    await screen.findByRole("option", { name: "Passed (255)" });
+    await user.selectOptions(screen.getByLabelText(/filter by status/i), "Passed");
+
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ status: "Passed" })),
+    );
+  });
+
+  it("clears a status that doesn't exist in the newly-chosen jurisdiction", async () => {
+    // Otherwise the filter silently matches nothing and the page looks empty
+    // for no visible reason.
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchStatuses).mockResolvedValue([{ status: "Enacted", count: 89 }]);
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+
+    await screen.findByRole("option", { name: "Enacted (89)" });
+    await user.selectOptions(screen.getByLabelText(/filter by status/i), "Enacted");
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ status: "Enacted" })),
+    );
+
+    vi.mocked(api.fetchStatuses).mockResolvedValue([{ status: "Introduced", count: 344 }]);
+    await user.selectOptions(screen.getByLabelText(/filter by jurisdiction/i), "FL");
+
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: undefined, jurisdiction_name: "FL" }),
+      ),
+    );
   });
 });

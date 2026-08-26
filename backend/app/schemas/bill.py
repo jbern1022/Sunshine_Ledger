@@ -76,3 +76,10 @@ class BillDetail(BillListItem):
 class BillListResponse(BaseModel):
     total: int
     items: list[BillListItem]
+
+
+class StatusCount(BaseModel):
+    """One status and how many bills carry it, for building a filter UI."""
+
+    status: str
+    count: int

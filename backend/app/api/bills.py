@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
@@ -16,6 +16,7 @@ from app.schemas.bill import (
     NewsItemOut,
     SourceOut,
     SponsorOut,
+    StatusCount,
 )
 
 router = APIRouter(prefix="/bills", tags=["bills"])
@@ -105,6 +106,39 @@ def list_bills(
     items = [_to_list_item(e, primary_sponsor=sponsors_by_bill.get(e.id)) for e in entities]
 
     return BillListResponse(total=total, items=items)
+
+
+# Declared before /{entity_id}: FastAPI matches routes in definition order,
+# so a dynamic path defined first would swallow "/bills/statuses" and try to
+# parse "statuses" as a UUID.
+@router.get("/statuses", response_model=list[StatusCount])
+def list_statuses(
+    jurisdiction_name: str | None = Query(None, description="Scope counts to one jurisdiction"),
+    db: Session = Depends(get_db),
+) -> list[StatusCount]:
+    """Distinct bill statuses with counts, for building a filter.
+
+    Driven by what's actually in the data rather than a hardcoded list. The
+    three sources use different vocabularies -- LegiScan has
+    Introduced/Engrossed/Passed/Vetoed/Failed, Legistar adds Enacted and
+    In Committee, iQM2 has its own ("Recommended Approval with Conditions")
+    -- so any fixed list would drift out of step with reality.
+
+    Ordered by count so the statuses that describe most bills come first;
+    the long tail of one-off municipal statuses sorts to the bottom rather
+    than crowding the top of a dropdown.
+    """
+    stmt = (
+        select(Bill.status, func.count().label("n"))
+        .join(Entity, Entity.id == Bill.entity_id)
+        .where(Entity.entity_type == "bill", Bill.status.isnot(None))
+        .group_by(Bill.status)
+        .order_by(func.count().desc(), Bill.status)
+    )
+    if jurisdiction_name:
+        stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+
+    return [StatusCount(status=status, count=n) for status, n in db.execute(stmt).all()]
 
 
 @router.get("/{entity_id}", response_model=BillDetail)

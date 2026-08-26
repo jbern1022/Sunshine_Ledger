@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBills } from "@/lib/api";
-import type { BillListItem } from "@/lib/types";
+import { fetchBills, fetchStatuses } from "@/lib/api";
+import type { BillListItem, StatusCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
 
@@ -23,6 +23,8 @@ function BrowsePageInner() {
   const [q, setQ] = useState("");
   const [jurisdiction, setJurisdiction] = useState(() => searchParams.get("jurisdiction") ?? "");
   const [autoDetected, setAutoDetected] = useState(() => searchParams.get("auto") === "1");
+  const [status, setStatus] = useState("");
+  const [statuses, setStatuses] = useState<StatusCount[]>([]);
   const [offset, setOffset] = useState(0);
   const [bills, setBills] = useState<BillListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -33,7 +35,28 @@ function BrowsePageInner() {
   // an offset past the end of a newly-narrowed result set.
   useEffect(() => {
     setOffset(0);
-  }, [q, jurisdiction, geoFilter]);
+  }, [q, jurisdiction, status, geoFilter]);
+
+  // Options follow the jurisdiction filter: showing Jacksonville's
+  // municipal statuses while browsing state bills would offer filters that
+  // match nothing.
+  useEffect(() => {
+    let cancelled = false;
+    fetchStatuses(jurisdiction || undefined)
+      .then((s) => !cancelled && setStatuses(s))
+      .catch(() => !cancelled && setStatuses([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [jurisdiction]);
+
+  // A status that doesn't exist in the newly-chosen jurisdiction would
+  // silently return nothing, so drop it rather than leave a dead filter on.
+  useEffect(() => {
+    if (status && statuses.length > 0 && !statuses.some((s) => s.status === status)) {
+      setStatus("");
+    }
+  }, [statuses, status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +66,7 @@ function BrowsePageInner() {
     fetchBills({
       q: q || undefined,
       jurisdiction_name: jurisdiction || undefined,
+      status: status || undefined,
       geo_scope_name: geoFilter || undefined,
       limit: PAGE_SIZE,
       offset,
@@ -62,7 +86,7 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, jurisdiction, geoFilter, offset]);
+  }, [q, jurisdiction, status, geoFilter, offset]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -124,6 +148,19 @@ function BrowsePageInner() {
           {JURISDICTIONS.map((j) => (
             <option key={j.value} value={j.value}>
               {j.label}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter by status"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
+        >
+          <option value="">All statuses</option>
+          {statuses.map((s) => (
+            <option key={s.status} value={s.status}>
+              {s.status} ({s.count})
             </option>
           ))}
         </select>
