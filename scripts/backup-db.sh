@@ -37,24 +37,47 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DUMP_FILE="sunshineledger-${TIMESTAMP}.dump"
 HOST_PATH="${BACKUP_DIR}/${DUMP_FILE}"
 
-mkdir -p "$BACKUP_DIR"
+# shellcheck source=monitoring.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitoring.sh"
+
+# Last message passed to fail(), so the exit trap can report *why* rather
+# than just that something went wrong. An alert saying "only 340MB free"
+# is actionable at 3am; "backup failed" is not.
+FAIL_REASON=""
 
 fail() {
+    FAIL_REASON="$*"
     echo "[$(date)] BACKUP FAILED: $*" >&2
     exit 1
 }
 
 # Never leave a partial dump behind: a 0-byte file in the backup directory
 # is worse than no file, because it looks like a backup exists.
-cleanup_partial() {
+#
+# The monitor ping lives here rather than at the end of the happy path so
+# it fires on EVERY exit, including a `set -e` abort nobody anticipated.
+# Those unhandled aborts are precisely the failures that went unnoticed
+# before, so pinging only where we remembered to would miss them again.
+on_exit() {
     local code=$?
     if [ $code -ne 0 ]; then
         rm -f "$HOST_PATH"
         docker exec "$CONTAINER" rm -f "/tmp/${DUMP_FILE}" 2>/dev/null || true
         echo "[$(date)] Cleaned up partial dump after failure (exit ${code})." >&2
+        monitor_ping "${BACKUP_PUSH_URL:-}" down \
+            "${FAIL_REASON:-exited ${code} before completing}" "$SECONDS"
+    else
+        monitor_ping "${BACKUP_PUSH_URL:-}" up \
+            "dump ${DUMP_BYTES_HUMAN:-unknown} pushed to ${REMOTE_HOST}" "$SECONDS"
     fi
 }
-trap cleanup_partial EXIT
+trap on_exit EXIT
+
+# Installed AFTER the trap, deliberately. Anything failing before the trap
+# exists dies silently, which is the exact failure mode this file is meant
+# to remove -- so the trap goes up first and everything that can fail comes
+# after it, mkdir included.
+mkdir -p "$BACKUP_DIR"
 
 echo "[$(date)] Starting backup: ${DUMP_FILE}"
 
@@ -87,7 +110,8 @@ if [ "$DUMP_BYTES" -lt "$MIN_DUMP_BYTES" ]; then
     fail "dump is ${DUMP_BYTES} bytes, expected at least ${MIN_DUMP_BYTES} -- treating as truncated"
 fi
 
-echo "[$(date)] Dump created and verified: $(du -h "$HOST_PATH" | cut -f1)"
+DUMP_BYTES_HUMAN=$(du -h "$HOST_PATH" | cut -f1)
+echo "[$(date)] Dump created and verified: ${DUMP_BYTES_HUMAN}"
 
 # Push off-box. The remote key is restricted (rrsync, write-only, this
 # directory only) -- see docs/RUNBOOK.md for how it was set up.

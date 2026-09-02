@@ -27,6 +27,9 @@
 # failure and the script reports them together at the end.
 set -uo pipefail
 
+# shellcheck source=monitoring.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitoring.sh"
+
 CONTAINER="sunshineledger-backend-1"
 WITH_GDELT="${1:-}"
 
@@ -74,10 +77,16 @@ if [ "$WITH_GDELT" = "--with-gdelt" ]; then
 fi
 
 if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
-    # Exit non-zero so a healthcheck ping or alert wrapper can detect this.
-    # Until one exists, `grep "INGESTION FAILED" ingestion.log` finds it.
+    # Exit non-zero as well as pinging: the exit code is what a human sees
+    # running this by hand, the ping is what reaches someone at 4am.
     echo "[$(date)] INGESTION FAILED: ${#FAILED_STEPS[@]} step(s) -- ${FAILED_STEPS[*]}" >&2
+    # Name the failing steps in the alert. The four-night outage was one
+    # step failing while the rest were fine; an alert that says which one
+    # turns a debugging session into a glance.
+    monitor_ping "${INGESTION_PUSH_URL:-}" down \
+        "${#FAILED_STEPS[@]} step(s) failed: ${FAILED_STEPS[*]}" "$SECONDS"
     exit 1
 fi
 
 echo "[$(date)] Scheduled ingestion run complete (all steps OK)."
+monitor_ping "${INGESTION_PUSH_URL:-}" up "all steps OK${WITH_GDELT:+ (with GDELT)}" "$SECONDS"
