@@ -34,3 +34,6 @@ backend/app/pipeline/sample_data/*.cache.json
 # and run the same tests twice -- which has already caused false failures by
 # tripping per-endpoint rate limits.
 * [0-9].*
+
+# Monitoring push URLs -- secrets, kept off the repo (see scripts/monitoring.env.example)
+scripts/monitoring.env
