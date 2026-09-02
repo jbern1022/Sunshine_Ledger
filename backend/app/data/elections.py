@@ -49,12 +49,24 @@ class ElectionCalendar:
 # Cross-checked on entry: both elections fall on a Tuesday, registration
 # deadlines on the Monday 29 days prior, and early voting runs Saturday to
 # Saturday -- the shape Florida law requires.
+#
+# RE-VERIFICATION LOG (append a line each time; don't overwrite):
+#   2026-09-02 -- all ten dates re-checked against the source URL below and
+#     confirmed unchanged, character for character.
+#
+# `verify_by` is deliberately set to fall between events rather than at a
+# round interval. It now lands after the General registration deadline
+# (Oct 5) has passed but a week before the vote-by-mail deadline (Oct 22)
+# and early voting (Oct 24), so a late amendment to the dates still ahead
+# of us gets caught while it can still be acted on. Florida amends election
+# dates by emergency order after hurricanes, which is not hypothetical in
+# October.
 FLORIDA_2026 = ElectionCalendar(
     state="FL",
     year=2026,
     source_name="Florida Department of State, Division of Elections",
     source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
-    verify_by=dt.date(2026, 10, 1),
+    verify_by=dt.date(2026, 10, 15),
     events=(
         ElectionEvent(dt.date(2026, 7, 20), "Voter registration deadline (Primary)", "registration"),
         ElectionEvent(dt.date(2026, 8, 6), "Vote-by-mail request deadline (Primary)", "vote_by_mail"),
