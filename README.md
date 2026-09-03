@@ -125,7 +125,7 @@ live API / searching the city's public portal, not from any documentation.
   to manual review only — there's deliberately no public `GET /flags`
   endpoint or open-editing UI; review them directly in Postgres
   (`SELECT * FROM flags WHERE status = 'pending'`).
-- **Step 9 — homepage geo-filter (BRD 5.6).** [`frontend/middleware.ts`](frontend/middleware.ts)
+- **Step 9 — homepage geo-filter (BRD 5.6).** [`frontend/proxy.ts`](frontend/proxy.ts)
   detects the visitor's state/city from `CF-Connecting-IP` (once behind the
   planned Cloudflare Tunnel) or `X-Forwarded-For`, and redirects a first-time
   visit from Florida to `/?jurisdiction=<city or FL>`. A `sl_geo_resolved`
@@ -168,7 +168,7 @@ Before trusting the automated pipeline above on real bills:
 ```
 backend/
   app/models/       Entity/Relationship/Event/Source/SpatialContext + Bill/Claim/Flag
-  app/api/          FastAPI routers: /bills, /map, /flags
+  app/api/          FastAPI routers: /bills, /map, /flags, /elections, /people
   app/pipeline/      legiscan.py, legistar.py — ingestion
                       miami_iqm2.py — Miami-specific scraper (see note above)
                       summarize.py, review_summaries.py — LLM + Step 2 gate
@@ -223,7 +223,6 @@ risk at current traffic levels, worth revisiting if abuse shows up.
 
 ## Not yet built (out of this session's scope)
 
-- BRD 5.8: Florida election calendar surfacing
 - A dedicated standalone sources page (sources currently expand inline on
   the bill card only, per BRD 5.4's "inline rather than a separate page")
 - Everything in Phase 2/3 and Nationwide Expansion (rhetoric layer, ACS/BLS

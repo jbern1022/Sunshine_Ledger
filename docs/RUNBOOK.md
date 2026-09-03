@@ -277,9 +277,22 @@ default.
 
 ## Monitoring
 
-No alerting yet — see the "add uptime monitoring" and "cron jobs fail
-silently" tickets. Two endpoints exist, and they answer different
-questions:
+Heartbeat-ping scaffolding shipped 2026-09-02 (`scripts/monitoring.sh`,
+wired into both `backup-db.sh` and `run-ingestion.sh` — see "Scheduled
+ingestion" above). Each script pings on success and failure; a *missing*
+ping is itself an alert, which catches the job not running at all, not
+just a job that ran and failed.
+
+**This is not live yet.** Every ping is a silent no-op until
+`scripts/monitoring.env` exists on Omen with real Uptime Kuma Push-monitor
+URLs in it (see `scripts/monitoring.env.example` for the exact steps —
+Kuma is already running on this host for other services). That setup has
+to happen in the Kuma UI, so it can't be done from here; it's tracked as
+the remaining step on the "add uptime monitoring" / "cron jobs fail
+silently" tickets. Until it's done, treat this section as if it still said
+"no alerting" for anything not covered by the two endpoints below.
+
+Two endpoints exist, and they answer different questions:
 
 ```bash
 # Liveness: is the process up. Dependency-free by design -- it must not

@@ -71,17 +71,16 @@ comparable blocker.
 | Backups | `pg_dump` cron -> rsync to a Pi | RDS automated snapshots supersede this outright. |
 | Secrets | `.env` file, Docker Compose env vars | AWS Secrets Manager or Parameter Store, injected as task-definition env vars -- same variable names, no application code changes. |
 
-## Known gap found during this audit
+## Gap found during this audit (fixed 2026-08-04)
 
-`docker-compose.yml`'s `frontend` service runs `npm run dev`, i.e. Next.js
-dev-server mode, in what's otherwise the production deployment. This
-works but isn't what "clean AWS migration" should carry forward --
+`docker-compose.yml`'s `frontend` service used to run `npm run dev`, i.e.
+Next.js dev-server mode, in what's otherwise the production deployment --
 `next dev` doesn't optimize the build and behaves differently from `next
-start` under load. Worth switching to `next build && next start` in
-`docker-compose.yml` regardless of AWS timing; flagging here since this
-audit is what surfaced it. Not fixed in this pass -- out of scope for a
-verification/documentation ticket, and switching the live frontend's run
-mode deserves its own change and testing pass.
+start` under load. Flagged here when this audit surfaced it; fixed
+shortly after in a dedicated change. `docker-compose.yml` now runs
+`sh -c "npm run build && npm run start"`. Leaving this section in place
+as a record of the finding, since the target-architecture table above
+still assumes a real production build.
 
 ## Trigger threshold: when to actually move
 
