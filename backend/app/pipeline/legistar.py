@@ -55,6 +55,30 @@ class LegistarClient:
         return resp.json()
 
 
+def _bill_title(matter: dict) -> str:
+    """MatterName is null in practice for both confirmed clients -- MatterTitle
+    carries the actual legislative title (full legal text, sometimes several
+    paragraphs). entities.name is capped at 500 chars, so truncate here; the
+    full text is kept in bill.description instead.
+
+    A version of exactly this kind of untruncated-field bug (a different
+    column, same root cause) crashed nightly ingestion for four consecutive
+    nights in August 2026 -- see docs/RUNBOOK.md's "Steps are deliberately
+    isolated" note. This function exists so the truncation rule has a name
+    and can be tested on its own."""
+    full_title = matter.get("MatterName") or matter.get("MatterTitle") or f"Matter {matter['MatterId']}"
+    return full_title if len(full_title) <= 490 else full_title[:489] + "…"
+
+
+def _bill_session(matter: dict) -> str:
+    """Legistar has no real 'session' concept (that's a state-legislature
+    idea) -- we derive a year label from the agenda date so bills group
+    sensibly, falling back to "current" when the date is missing or doesn't
+    start with a parseable year."""
+    year = str(matter.get("MatterAgendaDate", ""))[:4]
+    return year if year.isdigit() else "current"
+
+
 def _get_or_create_bill_entity(db: Session, *, client_name: str, matter_id: int) -> Entity | None:
     return db.execute(
         select(Entity).where(
@@ -106,12 +130,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         matter_id = matter["MatterId"]
         detail_url = f"https://{client_name}.legistar.com/LegislationDetail.aspx?ID={matter_id}"
 
-        # MatterName is null in practice for both confirmed clients -- MatterTitle
-        # carries the actual legislative title (full legal text, sometimes
-        # several paragraphs). entities.name is capped at 500 chars, so
-        # truncate here; the full text is kept in bill.description below.
-        full_title = matter.get("MatterName") or matter.get("MatterTitle") or f"Matter {matter_id}"
-        title = full_title if len(full_title) <= 490 else full_title[:489] + "…"
+        title = _bill_title(matter)
 
         entity = _get_or_create_bill_entity(db, client_name=client_name, matter_id=matter_id)
         if entity is None:
@@ -145,7 +164,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
             db.add(bill)
 
         bill.bill_number = matter.get("MatterFile", str(matter_id))
-        bill.session = str(matter.get("MatterAgendaDate", ""))[:4] or "current"
+        bill.session = _bill_session(matter)
         bill.chamber = fit(matter.get("MatterBodyName"), CHAMBER_MAX_LENGTH)
         bill.status = normalize_status(matter.get("MatterStatusName")) or "Introduced"
         bill.introduced_date = _parse_date(matter.get("MatterIntroDate"))
