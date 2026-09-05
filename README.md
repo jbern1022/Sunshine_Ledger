@@ -146,6 +146,59 @@ live API / searching the city's public portal, not from any documentation.
   docker compose exec backend python -m app.pipeline.gdelt
   ```
 
+## Roll-call votes (state bills)
+
+Added 2026-09-05, scoped from a Todoist note asking whether tracking how
+legislators actually vote was already covered by the Phase 2
+rhetoric-vs-substance work (it isn't — that compares a sponsor's statements
+against a bill's text; this is the separate, plain-fact question of how a
+roll call actually went). Verified live against real LegiScan endpoints
+before building: `getBill` (already called for every bill) includes a
+`votes` array of roll-call summaries at no extra API cost, and
+`getRollCall(id)` returns each legislator's Yea/Nay/NV/Absent. Deliberately
+facts only — tallies and who voted which way, no scoring or "consistency"
+framing, which stays gated behind the same legal review already required
+for the rhetoric-vs-substance work.
+
+State bills only: a live check against several enacted Jacksonville
+(Legistar) matters found zero recorded roll calls — most local business
+passes by consent/voice vote — so this isn't worth building for local bills
+right now.
+
+[`app/pipeline/legiscan.py`](backend/app/pipeline/legiscan.py)'s
+`ingest_state_bills` now syncs vote data automatically going forward for any
+bill it fetches fresh detail for (`sync_votes=True` by default — pass
+`sync_votes=False` to skip it). Bills already ingested before this feature
+existed won't be revisited by that (their `change_hash` already matches, so
+`ingest_state_bills` skips the `getBill` call entirely) — backfill those
+explicitly with `sync_state_votes`:
+
+```bash
+# Test on a small batch first -- also useful to gauge real per-bill cost
+# before running the full corpus.
+docker compose exec backend python -c "
+from app.db import SessionLocal
+from app.pipeline.legiscan import sync_state_votes
+db = SessionLocal()
+bills, roll_calls = sync_state_votes(db, limit=20)
+print(f'{bills} bills checked, {roll_calls} new roll calls fetched')
+"
+
+# Full corpus (~2,300 bills). Idempotent -- a roll call already recorded is
+# skipped, so a partial or repeated run only pays for what it hasn't
+# already fetched. At full size this is a meaningful chunk of the
+# 30,000/month free-tier quota (~2,300 getBill calls plus one getRollCall
+# call per not-yet-recorded roll call) -- run it as one deliberate pass,
+# not a repeated habit. Omit `limit` for the whole corpus.
+docker compose exec backend python -c "
+from app.db import SessionLocal
+from app.pipeline.legiscan import sync_state_votes
+db = SessionLocal()
+bills, roll_calls = sync_state_votes(db)
+print(f'{bills} bills checked, {roll_calls} new roll calls fetched')
+"
+```
+
 ## The build-order gates (Roadmap Section 8)
 
 Before trusting the automated pipeline above on real bills:

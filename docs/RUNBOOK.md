@@ -120,6 +120,20 @@ ingest_local_bills(db, client_name='jaxcityc', limit=200)
 # Real Miami bills (scraped from iQM2, not Legistar -- see gotcha below)
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.miami_iqm2
 
+# Backfill roll-call votes for state bills already ingested before this
+# feature existed (ingest_state_bills syncs votes automatically going
+# forward, but skips already-stable bills entirely, so it never revisits
+# them). Idempotent -- safe to re-run, only pays for roll calls not already
+# recorded. See README's "Roll-call votes" section for the quota math
+# before running without `limit`.
+docker compose -f docker-compose.yml exec -T backend python -c "
+from app.db import SessionLocal
+from app.pipeline.legiscan import sync_state_votes
+db = SessionLocal()
+bills, roll_calls = sync_state_votes(db, limit=20)
+print(f'{bills} bills checked, {roll_calls} new roll calls fetched')
+"
+
 # Summarize bills whose summaries are missing or stale. Safe and cheap to
 # re-run: each claim stores a hash of what generated it (source text +
 # model + prompt version), so unchanged bills are skipped without a model
