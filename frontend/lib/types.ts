@@ -41,11 +41,36 @@ export interface BillListItem {
   primary_sponsor: string | null;
 }
 
+export interface IndividualVoteOut {
+  person_entity_id: string;
+  person_name: string;
+  vote: string;
+}
+
+/** A single roll-call vote. Plain facts only -- tallies and who voted which
+ *  way, sourced from LegiScan. Not a score or a characterization of anyone. */
+export interface RollCallOut {
+  id: string;
+  roll_call_id: string;
+  chamber: string | null;
+  description: string;
+  date: string;
+  yea: number | null;
+  nay: number | null;
+  nv: number | null;
+  absent: number | null;
+  total: number | null;
+  passed: boolean;
+  source_url: string | null;
+  votes: IndividualVoteOut[];
+}
+
 export interface BillDetail extends BillListItem {
   last_action: string | null;
   sponsors: SponsorOut[];
   claims: ClaimOut[];
   news: NewsItemOut[];
+  votes: RollCallOut[];
 }
 
 export interface BillListResponse {
@@ -148,8 +173,20 @@ export interface PersonBillItem {
   what_it_does: string | null;
 }
 
+/** One roll-call vote this legislator cast. Plain fact only -- how they
+ *  voted, not a score or a consistency judgement. */
+export interface PersonVoteItem {
+  entity_id: string;
+  bill_number: string;
+  bill_name: string;
+  vote: string;
+  roll_call_description: string | null;
+  date: string | null;
+}
+
 export interface PersonDetail extends PersonListItem {
   bills: PersonBillItem[];
+  votes: PersonVoteItem[];
 }
 
 export interface PersonListResponse {

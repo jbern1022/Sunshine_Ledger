@@ -64,6 +64,34 @@ export default async function PersonPage({ params }: Props) {
         voting record, and nothing here rates or characterises this sponsor.
       </p>
 
+      {person.votes.length > 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold text-ledger-900">Voting record</h2>
+          <p className="text-[11px] text-slate-400">
+            Plain vote tallies from official roll calls — not a score, and not a claim about this
+            sponsor.
+          </p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {person.votes.map((v, i) => (
+              <li key={`${v.entity_id}-${i}`} className="flex flex-wrap items-baseline justify-between gap-2">
+                <span>
+                  <Link href={`/bills/${v.entity_id}`} className="text-sunshine-600 underline">
+                    {v.bill_number}
+                  </Link>
+                  {v.roll_call_description && (
+                    <span className="text-slate-400"> — {v.roll_call_description}</span>
+                  )}
+                </span>
+                <span className="shrink-0 text-xs text-slate-500">
+                  {v.vote}
+                  {v.date && <span className="text-slate-400"> · {v.date}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {person.bills.length === 0 ? (
         <p className="mt-4 text-sm text-slate-400">No tracked bills for this sponsor.</p>
       ) : (

@@ -46,6 +46,7 @@ const baseBill: BillDetail = {
   sponsors: [],
   claims: [],
   news: [],
+  votes: [],
 };
 
 const basePerson: PersonDetail = {
@@ -57,6 +58,7 @@ const basePerson: PersonDetail = {
   jurisdiction_name: "FL",
   sponsored_count: 0,
   bills: [],
+  votes: [],
 };
 
 describe("getBill", () => {

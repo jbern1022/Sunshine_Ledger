@@ -52,6 +52,7 @@ const baseDetail: BillDetail = {
     },
   ],
   news: [],
+  votes: [],
 };
 
 describe("BillCard", () => {

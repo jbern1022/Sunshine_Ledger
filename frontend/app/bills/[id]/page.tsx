@@ -110,6 +110,61 @@ export default async function BillPage({ params }: Props) {
         </section>
       )}
 
+      {bill.votes.length > 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold text-ledger-900">Votes</h2>
+          <p className="text-[11px] text-slate-400">
+            Plain vote tallies from official roll calls — not a score, and not a claim about any
+            legislator.
+          </p>
+          <ul className="mt-1 space-y-2 text-sm">
+            {bill.votes.map((v) => (
+              <li key={v.id} className="rounded-md border border-slate-200 p-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium text-slate-700">{v.description}</span>
+                  <span className="text-xs text-slate-400">{v.date}</span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {v.passed ? "Passed" : "Failed"} {v.yea}-{v.nay}
+                  {v.nv ? `, ${v.nv} not voting` : ""}
+                  {v.absent ? `, ${v.absent} absent` : ""}
+                </p>
+                {v.votes.length > 0 && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-sunshine-600 underline">
+                      {v.votes.length} individual vote{v.votes.length === 1 ? "" : "s"}
+                    </summary>
+                    <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-3">
+                      {v.votes.map((iv) => (
+                        <li key={iv.person_entity_id}>
+                          <Link
+                            href={`/people/${iv.person_entity_id}`}
+                            className="underline hover:text-slate-800"
+                          >
+                            {iv.person_name}
+                          </Link>
+                          : {iv.vote}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {v.source_url && (
+                  <a
+                    href={v.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-block text-xs text-sunshine-600 underline"
+                  >
+                    View roll call ↗
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-4 text-sm text-slate-600">
         <h2 className="text-sm font-semibold text-ledger-900">Status</h2>
         <p className="mt-1">

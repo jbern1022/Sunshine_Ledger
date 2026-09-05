@@ -31,6 +31,7 @@ const basePerson: PersonDetail = {
   jurisdiction_name: "FL",
   sponsored_count: 2,
   bills: [],
+  votes: [],
 };
 
 describe("PersonPage", () => {
@@ -85,6 +86,35 @@ describe("PersonPage", () => {
 
     expect(screen.getByText(/no summary generated yet/i)).toBeInTheDocument();
     expect(screen.getByText(/last action 2026-02-01/)).toBeInTheDocument();
+  });
+
+  it("shows the voting record with a no-scoring caveat, and omits the section when there are no votes", async () => {
+    vi.mocked(serverApi.getPerson).mockResolvedValueOnce({
+      ...basePerson,
+      votes: [
+        {
+          entity_id: "b1",
+          bill_number: "HB 7",
+          bill_name: "A Test Bill",
+          vote: "Yea",
+          roll_call_description: "House: Third Reading RCS#549",
+          date: "2026-02-25",
+        },
+      ],
+    });
+    await renderPersonPage();
+
+    expect(screen.getByText("Voting record")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "HB 7" })).toHaveAttribute("href", "/bills/b1");
+    expect(screen.getByText(/House: Third Reading RCS#549/)).toBeInTheDocument();
+    expect(screen.getByText("Yea")).toBeInTheDocument();
+    expect(screen.getByText(/not a score, and not a claim/i)).toBeInTheDocument();
+  });
+
+  it("does not render a Voting record section when there are no votes", async () => {
+    vi.mocked(serverApi.getPerson).mockResolvedValueOnce(basePerson);
+    await renderPersonPage();
+    expect(screen.queryByText("Voting record")).not.toBeInTheDocument();
   });
 });
 

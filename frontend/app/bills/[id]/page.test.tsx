@@ -46,6 +46,7 @@ const baseBill: BillDetail = {
   sponsors: [],
   claims: [],
   news: [],
+  votes: [],
 };
 
 describe("BillPage", () => {
@@ -154,6 +155,46 @@ describe("BillPage", () => {
     await renderBillPage();
 
     expect(screen.queryByText(/written by an AI model/i)).not.toBeInTheDocument();
+  });
+
+  it("shows roll-call vote tallies and individual votes, with a no-scoring caveat", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      votes: [
+        {
+          id: "v1",
+          roll_call_id: "1644238",
+          chamber: "H",
+          description: "House: Third Reading RCS#549",
+          date: "2026-02-25",
+          yea: 82,
+          nay: 30,
+          nv: 5,
+          absent: 0,
+          total: 117,
+          passed: true,
+          source_url: "https://legiscan.com/FL/rollcall/H0033/id/1644238",
+          votes: [{ person_entity_id: "p1", person_name: "Jane Smith", vote: "Yea" }],
+        },
+      ],
+    });
+    await renderBillPage();
+
+    expect(screen.getByText("House: Third Reading RCS#549")).toBeInTheDocument();
+    expect(screen.getByText(/passed 82-30/i)).toBeInTheDocument();
+    expect(screen.getByText(/not a score, and not a claim/i)).toBeInTheDocument();
+
+    expect(screen.getByRole("link", { name: "Jane Smith" })).toHaveAttribute("href", "/people/p1");
+    expect(screen.getByRole("link", { name: /view roll call/i })).toHaveAttribute(
+      "href",
+      "https://legiscan.com/FL/rollcall/H0033/id/1644238",
+    );
+  });
+
+  it("does not render a Votes section when there are no roll calls", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
+    await renderBillPage();
+    expect(screen.queryByText("Votes")).not.toBeInTheDocument();
   });
 
   it("shows news mentions with the unscored caveat when present", async () => {
