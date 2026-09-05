@@ -4,11 +4,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.db import get_db
-from app.models import Bill, Claim, Entity, Relationship
-from app.schemas.person import PersonBillItem, PersonDetail, PersonListItem, PersonListResponse
+from app.models import Bill, Claim, Entity, Event, Relationship
+from app.schemas.person import PersonBillItem, PersonDetail, PersonListItem, PersonListResponse, PersonVoteItem
 
 router = APIRouter(prefix="/people", tags=["people"])
 
@@ -121,6 +121,39 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
         for bill_entity, bill, rel_type, text in rows
     ]
 
+    # The roll call's own date/description live on a `vote` Event attached
+    # to the bill, keyed by the same roll_call_id the `voted` Relationship
+    # carries -- joined here rather than duplicated onto the Relationship.
+    vote_event = aliased(Event)
+    vote_rows = db.execute(
+        select(Bill, Entity, Relationship.attributes, vote_event.event_date, vote_event.title)
+        .join(Entity, Entity.id == Bill.entity_id)
+        .join(Relationship, Relationship.to_entity_id == Entity.id)
+        .outerjoin(
+            vote_event,
+            (vote_event.entity_id == Entity.id)
+            & (vote_event.event_type == "vote")
+            & (
+                vote_event.attributes["roll_call_id"].as_string()
+                == Relationship.attributes["roll_call_id"].as_string()
+            ),
+        )
+        .where(Relationship.from_entity_id == person.id, Relationship.relationship_type == "voted")
+        .order_by(vote_event.event_date.desc().nulls_last())
+    ).all()
+
+    votes = [
+        PersonVoteItem(
+            entity_id=bill_entity.id,
+            bill_number=bill.bill_number,
+            bill_name=bill_entity.name,
+            vote=rel_attrs.get("vote", "Unknown"),
+            roll_call_description=event_title,
+            date=event_date.isoformat() if event_date else None,
+        )
+        for bill, bill_entity, rel_attrs, event_date, event_title in vote_rows
+    ]
+
     return PersonDetail(
         entity_id=person.id,
         name=person.name,
@@ -132,4 +165,5 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
         # co-sponsor on the same bill.
         sponsored_count=len({b.entity_id for b in bills}),
         bills=bills,
+        votes=votes,
     )

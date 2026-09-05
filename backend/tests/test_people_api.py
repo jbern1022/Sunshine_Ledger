@@ -7,8 +7,9 @@ how active someone is.
 """
 
 import uuid
+from datetime import date
 
-from app.models import Claim, Entity, Relationship
+from app.models import Claim, Entity, Event, Relationship
 
 
 def _add_person(db, *, name, district=None, role=None, party=None, jurisdiction="FL"):
@@ -126,6 +127,48 @@ def test_detail_includes_the_plain_language_summary(client, db_session, bill_fac
     db_session.commit()
 
     assert client.get(f"/people/{person.id}").json()["bills"][0]["what_it_does"] == "This bill does a thing."
+
+
+def test_detail_includes_voting_record_with_the_roll_calls_own_date_and_description(
+    client, db_session, bill_factory
+):
+    bill = bill_factory(bill_number="HB 7", name="A Test Bill")
+    person = _add_person(db_session, name="Jane Smith")
+
+    db_session.add(
+        Event(
+            entity_id=bill.id,
+            event_type="vote",
+            event_date=date(2026, 2, 25),
+            title="House: Third Reading RCS#549",
+            attributes={"roll_call_id": "1644238", "chamber": "H", "yea": 82, "nay": 30, "passed": True},
+        )
+    )
+    db_session.add(
+        Relationship(
+            from_entity_id=person.id,
+            to_entity_id=bill.id,
+            relationship_type="voted",
+            attributes={"roll_call_id": "1644238", "vote": "Yea"},
+        )
+    )
+    db_session.commit()
+
+    body = client.get(f"/people/{person.id}").json()
+    assert len(body["votes"]) == 1
+    vote = body["votes"][0]
+    assert vote["bill_number"] == "HB 7"
+    assert vote["vote"] == "Yea"
+    assert vote["roll_call_description"] == "House: Third Reading RCS#549"
+    assert vote["date"] == "2026-02-25"
+
+
+def test_voting_record_is_empty_for_a_sponsor_who_never_voted(client, db_session, bill_factory):
+    bill = bill_factory()
+    person = _add_person(db_session, name="Jane Smith")
+    _sponsor(db_session, person, bill)
+
+    assert client.get(f"/people/{person.id}").json()["votes"] == []
 
 
 def test_detail_404s_for_unknown_person(client):

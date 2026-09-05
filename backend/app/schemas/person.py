@@ -29,8 +29,21 @@ class PersonBillItem(BaseModel):
     what_it_does: str | None
 
 
+class PersonVoteItem(BaseModel):
+    """One roll-call vote this legislator cast. Plain fact only -- how they
+    voted, not a score or a consistency judgement."""
+
+    entity_id: uuid.UUID
+    bill_number: str
+    bill_name: str
+    vote: str
+    roll_call_description: str | None
+    date: str | None
+
+
 class PersonDetail(PersonListItem):
     bills: list[PersonBillItem]
+    votes: list[PersonVoteItem]
 
 
 class PersonListResponse(BaseModel):

@@ -13,7 +13,9 @@ from app.schemas.bill import (
     BillListItem,
     BillListResponse,
     ClaimOut,
+    IndividualVoteOut,
     NewsItemOut,
+    RollCallOut,
     SourceOut,
     SponsorOut,
     StatusCount,
@@ -188,10 +190,54 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         if e.event_type == "news_mention" and e.source is not None
     ]
 
+    vote_events = [e for e in entity.events if e.event_type == "vote"]
+    votes_out: list[RollCallOut] = []
+    if vote_events:
+        roll_call_ids = [e.attributes.get("roll_call_id") for e in vote_events]
+        individual_stmt = (
+            select(Relationship, Entity)
+            .join(Entity, Entity.id == Relationship.from_entity_id)
+            .where(
+                Relationship.to_entity_id == entity_id,
+                Relationship.relationship_type == "voted",
+                Relationship.attributes["roll_call_id"].as_string().in_(roll_call_ids),
+            )
+        )
+        individual_by_roll_call: dict[str, list[IndividualVoteOut]] = {}
+        for rel, person in db.execute(individual_stmt).all():
+            individual_by_roll_call.setdefault(rel.attributes.get("roll_call_id"), []).append(
+                IndividualVoteOut(
+                    person_entity_id=person.id,
+                    person_name=person.name,
+                    vote=rel.attributes.get("vote", "Unknown"),
+                )
+            )
+
+        for e in sorted(vote_events, key=lambda e: e.event_date):
+            roll_call_id = e.attributes.get("roll_call_id")
+            votes_out.append(
+                RollCallOut(
+                    id=e.id,
+                    roll_call_id=roll_call_id,
+                    chamber=e.attributes.get("chamber"),
+                    description=e.title,
+                    date=e.event_date,
+                    yea=e.attributes.get("yea"),
+                    nay=e.attributes.get("nay"),
+                    nv=e.attributes.get("nv"),
+                    absent=e.attributes.get("absent"),
+                    total=e.attributes.get("total"),
+                    passed=bool(e.attributes.get("passed")),
+                    source_url=e.source.url if e.source else None,
+                    votes=individual_by_roll_call.get(roll_call_id, []),
+                )
+            )
+
     return BillDetail(
         **list_item.model_dump(),
         last_action=bill.last_action,
         sponsors=sponsors_out,
         claims=claims_out,
         news=news_out,
+        votes=votes_out,
     )

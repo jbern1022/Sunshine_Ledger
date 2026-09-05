@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Bill, Entity, Relationship, Source
+from app.models import Bill, Entity, Event, Relationship, Source
 from app.pipeline._status import normalize_status
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,13 @@ class LegiScanClient:
         call for the whole chamber, rather than one getBill per bill."""
         return self._call("getSessionPeople", id=str(session_id))["sessionpeople"]["people"]
 
+    def get_roll_call(self, roll_call_id: int) -> dict:
+        """Per-legislator votes for one roll call. Confirmed live 2026-09-03:
+        each entry is {people_id, vote_id, vote_text} -- no name, so callers
+        must resolve people_id against a session people roster
+        (get_session_people) to get a displayable name."""
+        return self._call("getRollCall", id=str(roll_call_id))["roll_call"]
+
 
 def _person_attributes(*, district: str | None, role: str | None, party: str | None) -> dict:
     """Only the fields LegiScan actually populates -- omitting empties keeps
@@ -126,6 +133,135 @@ def _get_or_create_person(
     return person
 
 
+def _build_people_by_id(client: LegiScanClient, state: str, *, sessions: int = 2) -> dict[str, dict]:
+    """people_id -> {name, district, role, party} for the state's most recent
+    sessions. Shared by backfill_person_districts and vote syncing -- both
+    need to resolve a bare people_id to a displayable legislator, and one
+    getSessionPeople call per session covers the whole chamber rather than
+    one call per person."""
+    people: dict[str, dict] = {}
+    for session in client.get_sessions(state)[:sessions]:
+        for person in client.get_session_people(int(session["session_id"])):
+            people.setdefault(str(person.get("people_id")), person)
+    return people
+
+
+def _sync_bill_votes(
+    db: Session,
+    *,
+    bill_entity: Entity,
+    votes: list[dict],
+    client: LegiScanClient,
+    state: str,
+    people_by_id: dict[str, dict],
+    fetch_individual: bool,
+) -> int:
+    """Store LegiScan's roll-call summaries (already present in every getBill
+    response) as `vote` Events, and -- if fetch_individual -- each
+    legislator's Yea/Nay/NV/Absent as a `voted` Relationship.
+
+    Idempotent per roll_call_id: a roll call already recorded is skipped
+    entirely (including its individual votes), so re-running this against
+    the same bill costs nothing extra in API quota. Returns the number of
+    NEW getRollCall calls actually made, so callers can log real quota use.
+
+    Deliberately plain facts only -- yea/nay counts and who voted which way,
+    no scoring or "consistency" framing. That kind of comparison is Phase
+    3/4 roadmap work gated behind the legal review already required for the
+    rhetoric-vs-substance work; this only extends the same sourced-fact
+    pattern the rest of the pipeline already follows.
+    """
+    roll_calls_fetched = 0
+
+    for v in votes:
+        roll_call_id = v.get("roll_call_id")
+        if roll_call_id is None:
+            continue
+        roll_call_id = str(roll_call_id)
+
+        vote_date = _parse_date(v.get("date"))
+        if vote_date is None:
+            logger.warning(
+                "Skipping roll call %s on bill %s: no parseable date", roll_call_id, bill_entity.id
+            )
+            continue
+
+        existing = db.execute(
+            select(Event).where(
+                Event.entity_id == bill_entity.id,
+                Event.event_type == "vote",
+                Event.attributes["roll_call_id"].as_string() == roll_call_id,
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            continue
+
+        vote_source = Source(
+            url=v.get("url") or v.get("state_link") or "",
+            publisher=f"{state} Legislature via LegiScan",
+            source_type="legiscan_roll_call",
+            retrieved_at=datetime.now(timezone.utc),
+            metadata_json={"roll_call_id": roll_call_id},
+        )
+        db.add(vote_source)
+        db.flush()
+
+        db.add(
+            Event(
+                entity_id=bill_entity.id,
+                event_type="vote",
+                event_date=vote_date,
+                title=v.get("desc") or "Roll call vote",
+                attributes={
+                    "roll_call_id": roll_call_id,
+                    "chamber": v.get("chamber"),
+                    "yea": v.get("yea"),
+                    "nay": v.get("nay"),
+                    "nv": v.get("nv"),
+                    "absent": v.get("absent"),
+                    "total": v.get("total"),
+                    "passed": bool(v.get("passed")),
+                },
+                source_id=vote_source.id,
+            )
+        )
+
+        if not fetch_individual:
+            continue
+
+        roll_call_detail = client.get_roll_call(int(roll_call_id))
+        roll_calls_fetched += 1
+
+        for vote_row in roll_call_detail.get("votes", []):
+            people_id = str(vote_row.get("people_id"))
+            person_info = people_by_id.get(people_id)
+            if person_info is None:
+                # Not in the fetched session roster (e.g. a since-departed
+                # legislator from an older session) -- skip rather than
+                # record a vote under a name we can't verify.
+                continue
+
+            person = _get_or_create_person(
+                db,
+                name=person_info.get("name", "Unknown"),
+                external_id=people_id,
+                district=person_info.get("district"),
+                role=person_info.get("role"),
+                party=person_info.get("party"),
+            )
+            db.add(
+                Relationship(
+                    from_entity_id=person.id,
+                    to_entity_id=bill_entity.id,
+                    relationship_type="voted",
+                    attributes={"roll_call_id": roll_call_id, "vote": vote_row.get("vote_text")},
+                    source_id=vote_source.id,
+                )
+            )
+
+    return roll_calls_fetched
+
+
 def _get_or_create_bill_entity(db: Session, *, legiscan_bill_id: int) -> Entity | None:
     return db.execute(
         select(Entity).where(
@@ -135,8 +271,18 @@ def _get_or_create_bill_entity(db: Session, *, legiscan_bill_id: int) -> Entity 
     ).scalar_one_or_none()
 
 
-def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | None = None) -> list[Entity]:
+def ingest_state_bills(
+    db: Session, *, state: str | None = None, limit: int | None = None, sync_votes: bool = True
+) -> list[Entity]:
     """Pull the master bill list for `state` and upsert each bill + sponsors + source.
+
+    `sync_votes` also stores any roll-call vote data already present in the
+    same getBill response as `vote` Events + per-legislator `voted`
+    Relationships -- no extra API cost for the chamber-level tallies, one
+    getRollCall call per *new* roll call for the individual breakdown. Only
+    covers bills this run actually fetches fresh detail for (i.e. new or
+    changed bills); see sync_state_votes for backfilling the rest of an
+    already-ingested corpus.
 
     Returns the list of bill Entities written (new or refreshed).
     """
@@ -149,6 +295,8 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
 
     written: list[Entity] = []
     now = datetime.now(timezone.utc)
+    people_by_id: dict[str, dict] | None = None  # built lazily, at most once
+    roll_calls_fetched = 0
 
     for row in master_list:
         legiscan_bill_id = int(row["bill_id"])
@@ -248,10 +396,29 @@ def ingest_state_bills(db: Session, *, state: str | None = None, limit: int | No
                     )
                 )
 
+        votes = detail.get("votes") or []
+        if sync_votes and votes:
+            if people_by_id is None:
+                people_by_id = _build_people_by_id(client, state)
+            roll_calls_fetched += _sync_bill_votes(
+                db,
+                bill_entity=entity,
+                votes=votes,
+                client=client,
+                state=state,
+                people_by_id=people_by_id,
+                fetch_individual=True,
+            )
+
         written.append(entity)
 
     db.commit()
-    logger.info("Ingested %d bills from LegiScan for state=%s", len(written), state)
+    logger.info(
+        "Ingested %d bills from LegiScan for state=%s (%d new roll calls fetched)",
+        len(written),
+        state,
+        roll_calls_fetched,
+    )
     return written
 
 
@@ -268,11 +435,7 @@ def backfill_person_districts(db: Session, *, state: str | None = None, sessions
     """
     state = state or settings.legiscan_state
     client = LegiScanClient()
-
-    people: dict[str, dict] = {}
-    for session in client.get_sessions(state)[:sessions]:
-        for person in client.get_session_people(int(session["session_id"])):
-            people.setdefault(str(person.get("people_id")), person)
+    people = _build_people_by_id(client, state, sessions=sessions)
 
     updated = 0
     for people_id, person in people.items():
@@ -299,6 +462,68 @@ def backfill_person_districts(db: Session, *, state: str | None = None, sessions
     db.commit()
     logger.info("Backfilled district/role/party for %d legislators (state=%s)", updated, state)
     return updated
+
+
+def sync_state_votes(
+    db: Session, *, state: str | None = None, limit: int | None = None, fetch_individual: bool = True
+) -> tuple[int, int]:
+    """Backfill vote data for bills already in the DB that `ingest_state_bills`
+    will never revisit, because their change_hash already matches (that skip
+    exists specifically to protect the API quota, so this is a deliberate,
+    explicit, one-time-per-bill re-fetch rather than something folded into
+    the nightly job).
+
+    Costs one getBill call per already-ingested bill (to see its current
+    votes array) plus one getRollCall call per roll call not already
+    recorded -- idempotent, so a partial or repeated run only pays for what
+    it hasn't already fetched. Pass `limit` to test on a small batch before
+    running the full corpus; at ~2,300 bills this is a meaningful chunk of
+    the 30,000/month free-tier quota and worth running as one deliberate
+    pass, not a repeated habit.
+
+    Returns (bills_processed, roll_calls_fetched).
+    """
+    state = state or settings.legiscan_state
+    client = LegiScanClient()
+    people_by_id = _build_people_by_id(client, state) if fetch_individual else {}
+
+    stmt = select(Entity).where(
+        Entity.entity_type == "bill", Entity.external_ids.has_key("legiscan_id")
+    )
+    if limit:
+        stmt = stmt.limit(limit)
+    bill_entities = db.execute(stmt).scalars().all()
+
+    bills_processed = 0
+    roll_calls_fetched = 0
+
+    for entity in bill_entities:
+        legiscan_bill_id = int(entity.external_ids["legiscan_id"])
+        detail = client.get_bill(legiscan_bill_id)
+        bills_processed += 1
+
+        votes = detail.get("votes") or []
+        if not votes:
+            continue
+
+        roll_calls_fetched += _sync_bill_votes(
+            db,
+            bill_entity=entity,
+            votes=votes,
+            client=client,
+            state=state,
+            people_by_id=people_by_id,
+            fetch_individual=fetch_individual,
+        )
+        db.commit()
+
+    logger.info(
+        "Vote backfill: checked %d bills, fetched %d new roll calls (state=%s)",
+        bills_processed,
+        roll_calls_fetched,
+        state,
+    )
+    return bills_processed, roll_calls_fetched
 
 
 def _parse_date(value: str | None) -> date | None:

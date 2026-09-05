@@ -41,6 +41,31 @@ class NewsItemOut(BaseModel):
     published_date: date | None
 
 
+class IndividualVoteOut(BaseModel):
+    person_entity_id: uuid.UUID
+    person_name: str
+    vote: str
+
+
+class RollCallOut(BaseModel):
+    """A single roll-call vote. Plain facts only -- tallies and who voted
+    which way, sourced straight from LegiScan, no scoring or characterization."""
+
+    id: uuid.UUID
+    roll_call_id: str
+    chamber: str | None
+    description: str
+    date: date
+    yea: int | None
+    nay: int | None
+    nv: int | None
+    absent: int | None
+    total: int | None
+    passed: bool
+    source_url: str | None
+    votes: list[IndividualVoteOut]
+
+
 class BillListItem(BaseModel):
     """Row shown in the browse/search list — no full source payload, just a trust count."""
 
@@ -71,6 +96,7 @@ class BillDetail(BillListItem):
     sponsors: list[SponsorOut]
     claims: list[ClaimOut]
     news: list[NewsItemOut]
+    votes: list[RollCallOut]
 
 
 class BillListResponse(BaseModel):

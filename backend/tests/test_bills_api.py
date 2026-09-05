@@ -1,4 +1,7 @@
 import uuid
+from datetime import date
+
+from app.models import Entity, Event, Relationship
 
 
 def test_list_bills_empty(client):
@@ -57,11 +60,66 @@ def test_get_bill_detail(client, bill_factory):
     assert body["bill_number"] == "HB 123"
     assert body["claims"] == []
     assert body["news"] == []
+    assert body["votes"] == []
 
 
 def test_get_bill_not_found(client):
     resp = client.get(f"/bills/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+def test_get_bill_detail_includes_a_roll_call_and_its_individual_votes(client, bill_factory, db_session):
+    entity = bill_factory()
+    person = Entity(
+        entity_type="person",
+        name="Jane Smith",
+        jurisdiction_level="state",
+        jurisdiction_name="FL",
+        external_ids={"legiscan_people_id": "19426"},
+        attributes={},
+    )
+    db_session.add(person)
+    db_session.flush()
+
+    vote_event = Event(
+        entity_id=entity.id,
+        event_type="vote",
+        event_date=date(2026, 2, 25),
+        title="House: Third Reading RCS#549",
+        attributes={
+            "roll_call_id": "1644238",
+            "chamber": "H",
+            "yea": 82,
+            "nay": 30,
+            "nv": 5,
+            "absent": 0,
+            "total": 117,
+            "passed": True,
+        },
+    )
+    db_session.add(vote_event)
+    db_session.add(
+        Relationship(
+            from_entity_id=person.id,
+            to_entity_id=entity.id,
+            relationship_type="voted",
+            attributes={"roll_call_id": "1644238", "vote": "Yea"},
+        )
+    )
+    db_session.commit()
+
+    resp = client.get(f"/bills/{entity.id}")
+    assert resp.status_code == 200
+    votes = resp.json()["votes"]
+
+    assert len(votes) == 1
+    roll_call = votes[0]
+    assert roll_call["description"] == "House: Third Reading RCS#549"
+    assert roll_call["yea"] == 82
+    assert roll_call["passed"] is True
+    assert roll_call["votes"] == [
+        {"person_entity_id": str(person.id), "person_name": "Jane Smith", "vote": "Yea"}
+    ]
 
 
 # --- status filter options ------------------------------------------------
