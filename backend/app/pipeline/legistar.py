@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Bill, Entity, Relationship, Source
+from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
 
@@ -42,17 +43,24 @@ class LegistarClient:
 
     def get_matters(self, *, top: int = 50) -> list[dict]:
         """Recent legislative matters (ordinances, resolutions), newest first."""
-        resp = self._client.get(
-            "/Matters",
-            params={"$orderby": "MatterIntroDate desc", "$top": str(top)},
-        )
-        resp.raise_for_status()
-        return resp.json()
+
+        def _do_request() -> list[dict]:
+            resp = self._client.get(
+                "/Matters",
+                params={"$orderby": "MatterIntroDate desc", "$top": str(top)},
+            )
+            resp.raise_for_status()
+            return resp.json()
+
+        return with_retry(_do_request, description=f"Legistar[{self.client_name}] get_matters")
 
     def get_sponsors(self, matter_id: int) -> list[dict]:
-        resp = self._client.get(f"/Matters/{matter_id}/Sponsors")
-        resp.raise_for_status()
-        return resp.json()
+        def _do_request() -> list[dict]:
+            resp = self._client.get(f"/Matters/{matter_id}/Sponsors")
+            resp.raise_for_status()
+            return resp.json()
+
+        return with_retry(_do_request, description=f"Legistar[{self.client_name}] get_sponsors({matter_id})")
 
 
 def _bill_title(matter: dict) -> str:

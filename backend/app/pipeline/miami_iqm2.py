@@ -24,6 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Bill, Entity, Relationship, Source
+from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
 
@@ -53,7 +54,10 @@ class IQM2Client:
         """Fetch and parse one legislation record. None if this ID isn't a
         legislation detail page (gaps in the ID space are expected -- other
         content types share the same numbering)."""
-        resp = self._client.get(f"{self.base_url}/Detail_LegiFile.aspx", params={"ID": legi_file_id})
+        resp = with_retry(
+            lambda: self._client.get(f"{self.base_url}/Detail_LegiFile.aspx", params={"ID": legi_file_id}),
+            description=f"iQM2[{self.subdomain}] get_legislation({legi_file_id})",
+        )
         if resp.status_code != 200:
             return None
         return self._parse(resp.text, legi_file_id)

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Bill, Entity, Event, Relationship, Source
+from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 
 logger = logging.getLogger(__name__)
@@ -52,9 +53,12 @@ class LegiScanClient:
         self._client = httpx.Client(base_url=LEGISCAN_BASE_URL, timeout=30.0)
 
     def _call(self, op: str, **params: str) -> dict:
-        resp = self._client.get("", params={"key": self.api_key, "op": op, **params})
-        resp.raise_for_status()
-        data = resp.json()
+        def _do_request() -> dict:
+            resp = self._client.get("", params={"key": self.api_key, "op": op, **params})
+            resp.raise_for_status()
+            return resp.json()
+
+        data = with_retry(_do_request, description=f"LegiScan op={op}")
         if data.get("status") != "OK":
             raise LegiScanError(f"LegiScan op={op} failed: {data}")
         return data
