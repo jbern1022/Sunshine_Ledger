@@ -100,7 +100,7 @@ def list_bills(
         like = f"%{q}%"
         stmt = stmt.where(or_(Entity.name.ilike(like), Bill.bill_number.ilike(like)))
 
-    total = len(db.execute(stmt).scalars().all())
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     stmt = stmt.order_by(Bill.last_action_date.desc().nulls_last()).offset(offset).limit(limit)
     entities = db.execute(stmt).scalars().all()
 
