@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBill } from "@/lib/server-api";
 import TagBadges from "@/components/TagBadges";
+import AmendmentDiff from "@/components/AmendmentDiff";
 
 /** Permalink for a single bill.
  *
@@ -177,6 +178,9 @@ export default async function BillPage({ params }: Props) {
                 {a.chamber && <> in {a.chamber}</>}
                 {a.adopted ? " — adopted" : " — not adopted"}
                 {a.description && <span className="text-slate-500"> — {a.description}</span>}
+                {a.amendment_text && bill.full_text && (
+                  <AmendmentDiff baseText={bill.full_text} amendedText={a.amendment_text} />
+                )}
               </li>
             ))}
           </ul>

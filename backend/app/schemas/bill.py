@@ -33,7 +33,13 @@ class AmendmentOut(BaseModel):
     date: date
     chamber: str | None
     adopted: bool
+    # LegiScan's own `description` field is routinely empty in practice;
+    # `title` (e.g. "House Committee Amendment #337249") is what actually
+    # carries the label -- verified live, see pipeline/amendments.py.
     description: str | None
+    # Full amendment text, when the opt-in backfill has fetched it (see
+    # backfill_amendment_texts) -- None until then. Powers the diff view.
+    amendment_text: str | None
 
 
 class SponsorOut(BaseModel):

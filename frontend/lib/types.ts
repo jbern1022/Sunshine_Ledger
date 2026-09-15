@@ -86,9 +86,9 @@ export interface RollCallOut {
   votes: IndividualVoteOut[];
 }
 
-/** One amendment timeline entry -- metadata only. No diff view yet: that
- *  needs the amendment's actual text, fetched by a separate opt-in backfill
- *  (see backend/app/pipeline/amendments.py), not wired into this. */
+/** One amendment timeline entry. `amendment_text` is null until the
+ *  opt-in backfill (see backend/app/pipeline/amendments.py) has fetched
+ *  it -- the diff view only renders once it's present. */
 export interface AmendmentOut {
   id: string;
   amendment_id: number | null;
@@ -96,6 +96,7 @@ export interface AmendmentOut {
   chamber: string | null;
   adopted: boolean;
   description: string | null;
+  amendment_text: string | null;
 }
 
 export interface BillDetail extends BillListItem {

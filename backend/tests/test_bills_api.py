@@ -109,8 +109,8 @@ def test_get_bill_detail_includes_amendment_timeline_entries(client, db_session,
             entity_id=entity.id,
             event_type="AMENDED",
             event_date=date(2026, 2, 10),
-            title="Amendment 1",
-            attributes={"amendment_id": 111, "chamber": "House", "adopted": True, "description": "Strikes section 2"},
+            title="House Committee Amendment #337249",
+            attributes={"amendment_id": 111, "chamber": "House", "adopted": True, "amendment_text": "Remove everything..."},
         )
     )
     db_session.commit()
@@ -124,7 +124,8 @@ def test_get_bill_detail_includes_amendment_timeline_entries(client, db_session,
             "date": "2026-02-10",
             "chamber": "House",
             "adopted": True,
-            "description": "Strikes section 2",
+            "description": "House Committee Amendment #337249",
+            "amendment_text": "Remove everything...",
         }
     ]
 

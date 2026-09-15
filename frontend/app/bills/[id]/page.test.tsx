@@ -214,7 +214,15 @@ describe("BillPage", () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce({
       ...baseBill,
       amendments: [
-        { id: "a1", amendment_id: 111, date: "2026-02-10", chamber: "House", adopted: true, description: "Strikes section 2" },
+        {
+          id: "a1",
+          amendment_id: 111,
+          date: "2026-02-10",
+          chamber: "House",
+          adopted: true,
+          description: "Strikes section 2",
+          amendment_text: null,
+        },
       ],
     });
     await renderBillPage();
@@ -227,6 +235,48 @@ describe("BillPage", () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();
     expect(screen.queryByText("Amendment history")).not.toBeInTheDocument();
+  });
+
+  it("shows a 'View changes' diff toggle when both amendment text and full bill text are present", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      full_text: "The original bill text.",
+      amendments: [
+        {
+          id: "a1",
+          amendment_id: 111,
+          date: "2026-02-10",
+          chamber: "House",
+          adopted: true,
+          description: "Strikes section 2",
+          amendment_text: "The amended bill text.",
+        },
+      ],
+    });
+    await renderBillPage();
+
+    expect(screen.getByRole("button", { name: "View changes" })).toBeInTheDocument();
+  });
+
+  it("does not show a diff toggle when the amendment has no fetched text yet", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      full_text: "The original bill text.",
+      amendments: [
+        {
+          id: "a1",
+          amendment_id: 111,
+          date: "2026-02-10",
+          chamber: "House",
+          adopted: true,
+          description: "Strikes section 2",
+          amendment_text: null,
+        },
+      ],
+    });
+    await renderBillPage();
+
+    expect(screen.queryByRole("button", { name: "View changes" })).not.toBeInTheDocument();
   });
 
   it("shows news mentions with the unscored caveat when present", async () => {
