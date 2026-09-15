@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from app.pipeline.gdelt import _parse_seendate
-from app.pipeline.legiscan import STATUS_MAP, _parse_date
+from app.pipeline.legiscan import STATUS_MAP, _extract_subjects, _parse_date
 from app.pipeline.legistar import _bill_session, _bill_title
 from app.pipeline.legistar import _parse_date as legistar_parse_date
 from app.pipeline.legistar import ingest_local_bills
@@ -21,6 +21,24 @@ def test_legiscan_status_map_covers_known_codes():
 
 def test_legiscan_parse_date_valid():
     assert _parse_date("2026-03-05") == date(2026, 3, 5)
+
+
+def test_extract_subjects_returns_names():
+    detail = {"subjects": [{"subject_id": 1, "subject_name": "AFFORDABLE HOUSING"}, {"subject_id": 2, "subject_name": "TAXATION"}]}
+    assert _extract_subjects(detail) == ["AFFORDABLE HOUSING", "TAXATION"]
+
+
+def test_extract_subjects_missing_field_returns_empty():
+    assert _extract_subjects({}) == []
+
+
+def test_extract_subjects_wrong_shape_returns_empty():
+    assert _extract_subjects({"subjects": "not a list"}) == []
+
+
+def test_extract_subjects_skips_entries_without_a_name():
+    detail = {"subjects": [{"subject_id": 1}, {"subject_id": 2, "subject_name": "TAXATION"}]}
+    assert _extract_subjects(detail) == ["TAXATION"]
 
 
 def test_legiscan_parse_date_none():
