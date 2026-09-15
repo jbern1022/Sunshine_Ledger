@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from app.models import BillTag, DemographicOverlay, Entity, Event, Relationship, Tag
+from app.models import DemographicOverlay, Entity, Event, Relationship, Tag
 from app.pipeline.topic_tagging import assign_tags_for_bill, set_bill_tag_active
 
 
@@ -100,6 +100,39 @@ def test_list_bills_sponsor_filter_no_matches(client, bill_factory):
     resp = client.get("/bills", params={"sponsor_entity_id": str(uuid.uuid4())})
     body = resp.json()
     assert body["total"] == 0
+
+
+def test_get_bill_detail_includes_amendment_timeline_entries(client, db_session, bill_factory):
+    entity = bill_factory()
+    db_session.add(
+        Event(
+            entity_id=entity.id,
+            event_type="AMENDED",
+            event_date=date(2026, 2, 10),
+            title="Amendment 1",
+            attributes={"amendment_id": 111, "chamber": "House", "adopted": True, "description": "Strikes section 2"},
+        )
+    )
+    db_session.commit()
+
+    resp = client.get(f"/bills/{entity.id}")
+    body = resp.json()
+    assert body["amendments"] == [
+        {
+            "id": body["amendments"][0]["id"],
+            "amendment_id": 111,
+            "date": "2026-02-10",
+            "chamber": "House",
+            "adopted": True,
+            "description": "Strikes section 2",
+        }
+    ]
+
+
+def test_get_bill_detail_amendments_empty_when_none(client, bill_factory):
+    entity = bill_factory()
+    resp = client.get(f"/bills/{entity.id}")
+    assert resp.json()["amendments"] == []
 
 
 def test_get_bill_detail(client, bill_factory):

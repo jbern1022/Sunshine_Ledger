@@ -27,6 +27,15 @@ class ClaimOut(BaseModel):
     sources: list[SourceOut]
 
 
+class AmendmentOut(BaseModel):
+    id: uuid.UUID
+    amendment_id: int | None
+    date: date
+    chamber: str | None
+    adopted: bool
+    description: str | None
+
+
 class SponsorOut(BaseModel):
     entity_id: uuid.UUID
     name: str
@@ -102,6 +111,7 @@ class BillDetail(BillListItem):
     news: list[NewsItemOut]
     votes: list[RollCallOut]
     demographic_overlays: list["DemographicOverlayOut"]
+    amendments: list[AmendmentOut]
 
 
 class BillListResponse(BaseModel):

@@ -167,6 +167,22 @@ export default async function BillPage({ params }: Props) {
         </section>
       )}
 
+      {bill.amendments.length > 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
+          <ul className="mt-1 space-y-1 text-sm text-slate-700">
+            {bill.amendments.map((a) => (
+              <li key={a.id}>
+                Amendment filed {a.date}
+                {a.chamber && <> in {a.chamber}</>}
+                {a.adopted ? " — adopted" : " — not adopted"}
+                {a.description && <span className="text-slate-500"> — {a.description}</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mt-4 text-sm text-slate-600">
         <h2 className="text-sm font-semibold text-ledger-900">Status</h2>
         <p className="mt-1">

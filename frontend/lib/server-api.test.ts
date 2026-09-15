@@ -49,6 +49,7 @@ const baseBill: BillDetail = {
   claims: [],
   news: [],
   votes: [],
+  amendments: [],
 };
 
 const basePerson: PersonDetail = {

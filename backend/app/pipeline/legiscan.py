@@ -90,6 +90,14 @@ class LegiScanClient:
         (get_session_people) to get a displayable name."""
         return self._call("getRollCall", id=str(roll_call_id))["roll_call"]
 
+    def get_amendment(self, amendment_id: int) -> dict:
+        """Full amendment document (base64 doc + mime), per LegiScan's
+        documented getAmendment op -- same shape family as getBillText.
+        Unlike get_roll_call, this has not been hand-verified against a
+        live call in this codebase; treat the exact field set as documented,
+        not confirmed, until a real amendment_id has been run through it."""
+        return self._call("getAmendment", id=str(amendment_id))["amendment"]
+
 
 def _person_attributes(*, district: str | None, role: str | None, party: str | None) -> dict:
     """Only the fields LegiScan actually populates -- omitting empties keeps
@@ -397,6 +405,17 @@ def ingest_state_bills(
         bill.geo_scope_type = "statewide"
         bill.geo_scope_names = [state]
         db.flush()
+
+        # Timeline entries only -- no extra API cost since `amendments` is
+        # already present on this getBill response. Amendment *text* (for
+        # a future diff view) is a separate opt-in backfill; see
+        # pipeline/amendments.py. Imported lazily here (rather than at
+        # module scope) because amendments.py imports bill_text.py, which
+        # imports LegiScanClient from this module -- a top-level import
+        # here would be a circular import.
+        from app.pipeline.amendments import sync_bill_amendments
+
+        sync_bill_amendments(db, bill_entity=entity, amendments=detail.get("amendments", []))
 
         for sponsor in detail.get("sponsors", []):
             person = _get_or_create_person(

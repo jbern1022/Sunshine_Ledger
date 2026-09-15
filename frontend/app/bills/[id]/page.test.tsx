@@ -49,6 +49,7 @@ const baseBill: BillDetail = {
   claims: [],
   news: [],
   votes: [],
+  amendments: [],
 };
 
 describe("BillPage", () => {
@@ -207,6 +208,25 @@ describe("BillPage", () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();
     expect(screen.queryByText("Votes")).not.toBeInTheDocument();
+  });
+
+  it("shows the amendment history when present", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      amendments: [
+        { id: "a1", amendment_id: 111, date: "2026-02-10", chamber: "House", adopted: true, description: "Strikes section 2" },
+      ],
+    });
+    await renderBillPage();
+
+    expect(screen.getByText("Amendment history")).toBeInTheDocument();
+    expect(screen.getByText(/Amendment filed 2026-02-10 in House — adopted/)).toBeInTheDocument();
+  });
+
+  it("does not render an amendment history section when there are none", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
+    await renderBillPage();
+    expect(screen.queryByText("Amendment history")).not.toBeInTheDocument();
   });
 
   it("shows news mentions with the unscored caveat when present", async () => {

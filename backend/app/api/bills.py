@@ -11,6 +11,7 @@ from app.db import get_db
 from app.models import Bill, BillTag, Claim, DemographicOverlay, Entity, Event, Relationship, Tag
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
+    AmendmentOut,
     BillDetail,
     BillListItem,
     BillListResponse,
@@ -389,6 +390,20 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
                 )
             )
 
+    amendments_out = [
+        AmendmentOut(
+            id=e.id,
+            amendment_id=e.attributes.get("amendment_id"),
+            date=e.event_date,
+            chamber=e.attributes.get("chamber"),
+            adopted=bool(e.attributes.get("adopted")),
+            description=e.attributes.get("description"),
+        )
+        for e in sorted(
+            (e for e in entity.events if e.event_type == "AMENDED"), key=lambda e: e.event_date
+        )
+    ]
+
     return BillDetail(
         **list_item.model_dump(),
         last_action=bill.last_action,
@@ -398,4 +413,5 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         news=news_out,
         votes=votes_out,
         demographic_overlays=_demographic_overlays_for_bill(db, entity, bill, tags_out),
+        amendments=amendments_out,
     )

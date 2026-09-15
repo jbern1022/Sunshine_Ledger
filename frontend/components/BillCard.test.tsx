@@ -55,6 +55,7 @@ const baseDetail: BillDetail = {
   ],
   news: [],
   votes: [],
+  amendments: [],
 };
 
 describe("BillCard", () => {
