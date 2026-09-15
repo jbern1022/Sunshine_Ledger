@@ -15,6 +15,16 @@ class Settings(BaseSettings):
     legiscan_api_key: str = ""
     legiscan_state: str = "FL"
 
+    # Free signup: https://api.census.gov/data/key_signup.html. Required as
+    # of 2026-09 -- unauthenticated requests now redirect to a key-missing
+    # error page rather than serving data.
+    census_api_key: str = ""
+
+    # Optional. BLS's public API works keyless (verified 2026-09-15) at a
+    # lower daily quota (25 req/day/IP vs. 500 with a registered key). Free
+    # signup: https://data.bls.gov/registrationEngine/
+    bls_api_key: str = ""
+
     legistar_clients: str = "miamifl,jaxcityc"
 
     ollama_host: str = "http://localhost:11434"

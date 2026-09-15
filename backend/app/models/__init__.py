@@ -7,6 +7,7 @@ from app.models.bill import Bill
 from app.models.claim import Claim, ClaimSource
 from app.models.flag import Flag
 from app.models.tag import BillTag, SubjectMapping, Tag
+from app.models.demographic_overlay import DemographicOverlay
 
 __all__ = [
     "Entity",
@@ -21,4 +22,5 @@ __all__ = [
     "Tag",
     "SubjectMapping",
     "BillTag",
+    "DemographicOverlay",
 ]

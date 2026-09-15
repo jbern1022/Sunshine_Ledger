@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.auth import require_admin
 from app.db import get_db
-from app.models import Bill, BillTag, Claim, Entity, Event, Relationship, Tag
+from app.models import Bill, BillTag, Claim, DemographicOverlay, Entity, Event, Relationship, Tag
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
     BillDetail,
@@ -16,6 +16,8 @@ from app.schemas.bill import (
     BillListResponse,
     BillTagUpdate,
     ClaimOut,
+    DemographicMetricOut,
+    DemographicOverlayOut,
     IndividualVoteOut,
     NewsItemOut,
     RollCallOut,
@@ -226,6 +228,67 @@ def list_statuses(
     return [StatusCount(status=status, count=n) for status, n in db.execute(stmt).all()]
 
 
+def _bill_geography(db: Session, entity: Entity, bill: Bill) -> tuple[str, str] | None:
+    """Which geography a bill's demographic overlay should be keyed to.
+    Local bills already carry a real county (geo_scope_names); state bills
+    have no inherent geography of their own, so this uses the primary
+    sponsor's district instead -- same logic as the district-sponsorship
+    map (app/api/map.py). Returns None when neither is resolvable (e.g. a
+    state bill with no primary sponsor on file)."""
+    if entity.jurisdiction_level == "city":
+        if bill.geo_scope_names:
+            return "county", bill.geo_scope_names[0]
+        return None
+
+    sponsor = db.execute(
+        select(Entity)
+        .join(Relationship, Relationship.from_entity_id == Entity.id)
+        .where(Relationship.to_entity_id == entity.id, Relationship.relationship_type == "sponsor")
+    ).scalars().first()
+    district = (sponsor.attributes or {}).get("district") if sponsor else None
+    if not district:
+        return None
+    return "district", district
+
+
+def _demographic_overlays_for_bill(
+    db: Session, entity: Entity, bill: Bill, tags: list[TagOut]
+) -> list[DemographicOverlayOut]:
+    """ACS/BLS context for this bill's active badges, at whatever geography
+    _bill_geography resolves. A badge with no matching overlay row (either
+    because it has no table mapping yet, or the geography couldn't be
+    resolved) simply contributes nothing -- never an error."""
+    if not tags:
+        return []
+    geography = _bill_geography(db, entity, bill)
+    if geography is None:
+        return []
+    geography_type, geography_id = geography
+
+    slugs = [t.slug for t in tags]
+    overlays = db.execute(
+        select(DemographicOverlay).where(
+            DemographicOverlay.geography_type == geography_type,
+            DemographicOverlay.geography_id == geography_id,
+            DemographicOverlay.badge_slug.in_(slugs),
+        )
+    ).scalars().all()
+
+    label_by_slug = {t.slug: t.label for t in tags}
+    return [
+        DemographicOverlayOut(
+            badge_slug=o.badge_slug,
+            badge_label=label_by_slug.get(o.badge_slug, o.badge_slug),
+            source=o.source,
+            geography_type=o.geography_type,
+            geography_id=o.geography_id,
+            as_of=o.as_of,
+            metrics=[DemographicMetricOut(**m) for m in o.metrics],
+        )
+        for o in overlays
+    ]
+
+
 @router.get("/{entity_id}", response_model=BillDetail)
 def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
     stmt = (
@@ -324,4 +387,5 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         claims=claims_out,
         news=news_out,
         votes=votes_out,
+        demographic_overlays=_demographic_overlays_for_bill(db, entity, bill, tags_out),
     )

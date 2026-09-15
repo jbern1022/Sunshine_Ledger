@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from app.models import BillTag, Entity, Event, Relationship, Tag
+from app.models import BillTag, DemographicOverlay, Entity, Event, Relationship, Tag
 from app.pipeline.topic_tagging import assign_tags_for_bill, set_bill_tag_active
 
 
@@ -294,3 +294,127 @@ def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
 def test_patch_bill_tag_not_found(client):
     resp = client.patch(f"/bills/tags/{uuid.uuid4()}", json={"active": False}, auth=("testadmin", "testpass"))
     assert resp.status_code == 404
+
+
+# --- ACS/BLS demographic overlay -------------------------------------------
+
+
+def test_bill_detail_includes_overlay_via_sponsors_district(client, db_session, bill_factory):
+    """State bill: geography comes from the primary sponsor's district."""
+    entity = bill_factory()
+    sponsor = Entity(
+        entity_type="person", name="Jane Smith", jurisdiction_level="state", jurisdiction_name="FL",
+        external_ids={}, attributes={"district": "HD-101"},
+    )
+    db_session.add(sponsor)
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=sponsor.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+    db_session.add(
+        DemographicOverlay(
+            geography_type="district", geography_id="HD-101", badge_slug="housing", source="acs",
+            metrics=[{"label": "Owner-occupied", "estimate": 38959.0, "margin_of_error": 1242.0, "unit": "housing units"}],
+            as_of="2022",
+        )
+    )
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert len(body["demographic_overlays"]) == 1
+    overlay = body["demographic_overlays"][0]
+    assert overlay["badge_slug"] == "housing"
+    assert overlay["geography_type"] == "district"
+    assert overlay["geography_id"] == "HD-101"
+    assert overlay["metrics"][0]["margin_of_error"] == 1242.0
+
+
+def test_bill_detail_includes_overlay_via_county_for_local_bill(client, db_session, bill_factory):
+    entity = bill_factory(geo_scope_names=["Duval County"])
+    entity.jurisdiction_level = "city"
+    tag = Tag(slug="infrastructure_transportation", label="Infrastructure/Transportation", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["infrastructure_transportation"])
+    db_session.add(
+        DemographicOverlay(
+            geography_type="county", geography_id="Duval County", badge_slug="infrastructure_transportation",
+            source="acs", metrics=[{"label": "Aggregate travel time", "estimate": 433097.0, "margin_of_error": 4310.0, "unit": "minutes"}],
+            as_of="2022",
+        )
+    )
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert len(body["demographic_overlays"]) == 1
+    assert body["demographic_overlays"][0]["geography_type"] == "county"
+    assert body["demographic_overlays"][0]["geography_id"] == "Duval County"
+
+
+def test_bill_detail_overlay_empty_without_a_resolvable_sponsor(client, db_session, bill_factory):
+    """State bill, no sponsor on file -- geography can't be resolved, so no
+    overlay is shown. Never an error."""
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+    db_session.add(
+        DemographicOverlay(
+            geography_type="district", geography_id="HD-101", badge_slug="housing", source="acs",
+            metrics=[], as_of="2022",
+        )
+    )
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert body["demographic_overlays"] == []
+
+
+def test_bill_detail_overlay_empty_for_a_badge_with_no_table_mapping(client, db_session, bill_factory):
+    """A tag whose badge has no ACS/BLS table (e.g. Governance) contributes
+    no overlay -- degrades gracefully, not an error."""
+    entity = bill_factory()
+    sponsor = Entity(
+        entity_type="person", name="Jane Smith", jurisdiction_level="state", jurisdiction_name="FL",
+        external_ids={}, attributes={"district": "HD-101"},
+    )
+    db_session.add(sponsor)
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=sponsor.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    tag = Tag(slug="governance", label="Governance", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["governance"])
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert body["demographic_overlays"] == []
+
+
+def test_bill_detail_overlay_renders_multiple_badges_without_breaking(client, db_session, bill_factory):
+    """Multi-tag bill: every applicable overlay shows, per the Roadmap
+    decision (no priority pick)."""
+    entity = bill_factory()
+    sponsor = Entity(
+        entity_type="person", name="Jane Smith", jurisdiction_level="state", jurisdiction_name="FL",
+        external_ids={}, attributes={"district": "HD-101"},
+    )
+    db_session.add(sponsor)
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=sponsor.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    housing = Tag(slug="housing", label="Housing", active=True)
+    infra = Tag(slug="infrastructure_transportation", label="Infrastructure/Transportation", active=True)
+    db_session.add_all([housing, infra])
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing", "infrastructure_transportation"])
+    db_session.add_all([
+        DemographicOverlay(geography_type="district", geography_id="HD-101", badge_slug="housing", source="acs", metrics=[], as_of="2022"),
+        DemographicOverlay(geography_type="district", geography_id="HD-101", badge_slug="infrastructure_transportation", source="acs", metrics=[], as_of="2022"),
+    ])
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert {o["badge_slug"] for o in body["demographic_overlays"]} == {"housing", "infrastructure_transportation"}
