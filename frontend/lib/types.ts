@@ -21,6 +21,26 @@ export interface SponsorOut {
   relationship_type: string;
 }
 
+/** One badge assigned to a bill. `bill_tag_id` (not the tag's own id)
+ *  identifies this specific assignment -- needed if a hide/reactivate
+ *  control is ever added client-side. */
+export interface TagOut {
+  bill_tag_id: string;
+  slug: string;
+  label: string;
+  tag_source: string;
+  active: boolean;
+}
+
+/** A badge category and how many bills currently carry it (active only),
+ *  for building a filter -- same "options come from the data" pattern as
+ *  StatusCount. */
+export interface TagCount {
+  slug: string;
+  label: string;
+  count: number;
+}
+
 export interface BillListItem {
   entity_id: string;
   bill_number: string;
@@ -39,6 +59,7 @@ export interface BillListItem {
   source_count: number;
   full_text_url: string | null;
   primary_sponsor: string | null;
+  tags: TagOut[];
 }
 
 export interface IndividualVoteOut {

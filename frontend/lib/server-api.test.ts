@@ -42,6 +42,7 @@ const baseBill: BillDetail = {
   source_count: 0,
   full_text_url: null,
   primary_sponsor: null,
+  tags: [],
   last_action: null,
   sponsors: [],
   claims: [],
@@ -117,6 +118,7 @@ function makeBills(n: number, offset = 0): BillListResponse["items"] {
     source_count: 0,
     full_text_url: null,
     primary_sponsor: null,
+    tags: [],
   }));
 }
 

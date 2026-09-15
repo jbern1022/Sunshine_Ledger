@@ -27,6 +27,7 @@ const baseBill: BillListItem = {
   source_count: 2,
   full_text_url: "https://example.com/bill",
   primary_sponsor: "Jane Smith",
+  tags: [],
 };
 
 const baseDetail: BillDetail = {
@@ -98,6 +99,23 @@ describe("BillCard", () => {
       }),
     );
     expect(await screen.findByText(/sent for manual review/i)).toBeInTheDocument();
+  });
+
+  it("renders topic badges when the bill has tags", () => {
+    render(
+      <BillCard
+        bill={{
+          ...baseBill,
+          tags: [{ bill_tag_id: "bt1", slug: "housing", label: "Housing", tag_source: "legiscan", active: true }],
+        }}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Housing" })).toHaveAttribute("href", "/?tag=housing");
+  });
+
+  it("renders no badges when the bill has no tags", () => {
+    render(<BillCard bill={baseBill} />);
+    expect(screen.queryByRole("link", { name: /housing|taxes/i })).not.toBeInTheDocument();
   });
 
   it("shows an error state if flag submission fails", async () => {

@@ -9,6 +9,7 @@ vi.mock("@/lib/api", () => ({
   fetchBills: vi.fn(),
   fetchElections: vi.fn(() => Promise.reject(new Error("not under test"))),
   fetchStatuses: vi.fn(() => Promise.resolve([])),
+  fetchTags: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("@/components/BillCard", () => ({
@@ -38,6 +39,7 @@ function makeBill(bill_number: string): BillListItem {
     source_count: 0,
     full_text_url: null,
     primary_sponsor: null,
+    tags: [],
   };
 }
 
@@ -151,6 +153,51 @@ describe("BrowsePage status filter", () => {
       expect(api.fetchBills).toHaveBeenLastCalledWith(
         expect.objectContaining({ status: undefined, jurisdiction_name: "FL" }),
       ),
+    );
+  });
+});
+
+describe("BrowsePage topic filter", () => {
+  beforeEach(() => {
+    searchParams = new URLSearchParams();
+    vi.mocked(api.fetchBills).mockReset();
+    vi.mocked(api.fetchTags).mockReset();
+  });
+
+  it("offers topics from the data with their counts", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchTags).mockResolvedValue([
+      { slug: "housing", label: "Housing", count: 120 },
+      { slug: "taxes_budget", label: "Taxes/Budget", count: 45 },
+    ]);
+    render(<BrowsePage />);
+
+    expect(await screen.findByRole("option", { name: "Housing (120)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Taxes/Budget (45)" })).toBeInTheDocument();
+  });
+
+  it("passes the chosen topic through to the API", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchTags).mockResolvedValue([{ slug: "housing", label: "Housing", count: 120 }]);
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+
+    await screen.findByRole("option", { name: "Housing (120)" });
+    await user.selectOptions(screen.getByLabelText(/filter by topic/i), "housing");
+
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ tag: "housing" })),
+    );
+  });
+
+  it("initializes the topic filter from the URL, e.g. after clicking a badge link", async () => {
+    searchParams = new URLSearchParams({ tag: "housing" });
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchTags).mockResolvedValue([{ slug: "housing", label: "Housing", count: 120 }]);
+    render(<BrowsePage />);
+
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ tag: "housing" })),
     );
   });
 });
