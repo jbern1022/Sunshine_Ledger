@@ -27,6 +27,7 @@ from app.models import Bill, Entity, Relationship, Source
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
+from app.pipeline.topic_tagging_ollama import tag_local_bill
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +265,8 @@ def ingest_miami_legislation(db: Session, *, limit: int = 20) -> list[Entity]:
                         source_id=source.id,
                     )
                 )
+
+        tag_local_bill(db, entity.id, title=name, description=bill.description or "")
 
         written.append(entity)
 

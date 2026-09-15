@@ -48,6 +48,7 @@ class Entity(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     spatial_contexts: Mapped[list["SpatialContext"]] = relationship(
         back_populates="entity", cascade="all, delete-orphan"
     )
+    bill_tags: Mapped[list["BillTag"]] = relationship(back_populates="bill_entity", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_entities_jurisdiction", "jurisdiction_level", "jurisdiction_name"),

@@ -1,7 +1,8 @@
 import uuid
 from datetime import date
 
-from app.models import Entity, Event, Relationship
+from app.models import BillTag, Entity, Event, Relationship, Tag
+from app.pipeline.topic_tagging import assign_tags_for_bill, set_bill_tag_active
 
 
 def test_list_bills_empty(client):
@@ -164,3 +165,132 @@ def test_statuses_route_is_not_shadowed_by_the_bill_detail_route(client, bill_fa
     first would swallow this path and fail parsing "statuses" as a UUID."""
     bill_factory()
     assert client.get("/bills/statuses").status_code == 200
+
+
+# --- bill topic tagging ----------------------------------------------------
+
+
+def test_bill_list_includes_active_tags(client, db_session, bill_factory):
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+
+    body = client.get("/bills").json()
+    assert body["items"][0]["tags"] == [
+        {
+            "bill_tag_id": body["items"][0]["tags"][0]["bill_tag_id"],
+            "slug": "housing",
+            "label": "Housing",
+            "tag_source": "ollama",
+            "active": True,
+        }
+    ]
+
+
+def test_bill_list_excludes_hidden_tags(client, db_session, bill_factory):
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+    set_bill_tag_active(db_session, created[0].id, active=False)
+
+    body = client.get("/bills").json()
+    assert body["items"][0]["tags"] == []
+
+
+def test_bill_detail_includes_tags(client, db_session, bill_factory):
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert len(body["tags"]) == 1
+    assert body["tags"][0]["slug"] == "housing"
+
+
+def test_bill_list_filters_by_tag(client, db_session, bill_factory):
+    a = bill_factory(bill_number="HB 1")
+    bill_factory(bill_number="HB 2")
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, a.id, ollama_tag_slugs=["housing"])
+
+    body = client.get("/bills", params={"tag": "housing"}).json()
+    assert body["total"] == 1
+    assert body["items"][0]["bill_number"] == "HB 1"
+
+
+def test_bill_list_tag_filter_excludes_hidden(client, db_session, bill_factory):
+    a = bill_factory(bill_number="HB 1")
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    created = assign_tags_for_bill(db_session, a.id, ollama_tag_slugs=["housing"])
+    set_bill_tag_active(db_session, created[0].id, active=False)
+
+    body = client.get("/bills", params={"tag": "housing"}).json()
+    assert body["total"] == 0
+
+
+def test_list_tags_endpoint_returns_counts(client, db_session, bill_factory):
+    a = bill_factory(bill_number="HB 1")
+    b = bill_factory(bill_number="HB 2")
+    housing = Tag(slug="housing", label="Housing", active=True)
+    taxes = Tag(slug="taxes_budget", label="Taxes/Budget", active=True)
+    db_session.add_all([housing, taxes])
+    db_session.commit()
+    assign_tags_for_bill(db_session, a.id, ollama_tag_slugs=["housing"])
+    assign_tags_for_bill(db_session, b.id, ollama_tag_slugs=["housing", "taxes_budget"])
+
+    body = client.get("/bills/tags").json()
+    counts = {row["slug"]: row["count"] for row in body}
+    assert counts == {"housing": 2, "taxes_budget": 1}
+
+
+def test_list_tags_endpoint_excludes_inactive_tag_categories(client, db_session, bill_factory):
+    a = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=False)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, a.id, ollama_tag_slugs=["housing"])
+
+    assert client.get("/bills/tags").json() == []
+
+
+def test_patch_bill_tag_requires_auth(client, db_session, bill_factory):
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+
+    resp = client.patch(f"/bills/tags/{created[0].id}", json={"active": False})
+    assert resp.status_code == 401
+
+
+def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+
+    resp = client.patch(
+        f"/bills/tags/{created[0].id}", json={"active": False}, auth=("testadmin", "testpass")
+    )
+    assert resp.status_code == 200
+    assert resp.json()["active"] is False
+
+    events = db_session.query(Event).filter(Event.entity_id == entity.id, Event.event_type == "tag_hidden").all()
+    assert len(events) == 1
+
+
+def test_patch_bill_tag_not_found(client):
+    resp = client.patch(f"/bills/tags/{uuid.uuid4()}", json={"active": False}, auth=("testadmin", "testpass"))
+    assert resp.status_code == 404

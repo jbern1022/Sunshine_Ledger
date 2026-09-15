@@ -42,6 +42,7 @@ const baseBill: BillDetail = {
   source_count: 1,
   full_text_url: "https://example.com/bill",
   primary_sponsor: "Jane Smith",
+  tags: [],
   last_action: "Referred to committee",
   sponsors: [],
   claims: [],
@@ -69,6 +70,16 @@ describe("BillPage", () => {
     expect(screen.getByText("An Act Relating to Something")).toBeInTheDocument();
     expect(screen.getByText("FL")).toBeInTheDocument();
     expect(screen.getByText("House")).toBeInTheDocument();
+  });
+
+  it("renders topic badges when the bill has tags", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      tags: [{ bill_tag_id: "bt1", slug: "housing", label: "Housing", tag_source: "legiscan", active: true }],
+    });
+    await renderBillPage();
+
+    expect(screen.getByRole("link", { name: "Housing" })).toHaveAttribute("href", "/?tag=housing");
   });
 
   it("only renders 'What it does' when a summary exists", async () => {

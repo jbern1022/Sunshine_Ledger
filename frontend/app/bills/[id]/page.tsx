@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getBill } from "@/lib/server-api";
+import TagBadges from "@/components/TagBadges";
 
 /** Permalink for a single bill.
  *
@@ -76,6 +77,7 @@ export default async function BillPage({ params }: Props) {
         </div>
         <h1 className="mt-1 text-2xl font-bold text-ledger-900">{bill.bill_number}</h1>
         <p className="mt-1 text-sm text-slate-600">{bill.name}</p>
+        <TagBadges tags={bill.tags} />
       </header>
 
       {bill.what_it_does && (

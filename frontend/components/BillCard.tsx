@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { fetchBill, submitFlag } from "@/lib/api";
 import type { BillDetail, BillListItem, SourceOut } from "@/lib/types";
+import TagBadges from "@/components/TagBadges";
 
 const STATUS_COLORS: Record<string, string> = {
   Introduced: "bg-slate-100 text-slate-700",
@@ -106,6 +107,8 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
         </div>
         <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(bill.status)}`}>{bill.status}</span>
       </div>
+
+      <TagBadges tags={bill.tags} />
 
       {bill.what_it_does ? (
         <p className="mt-3 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>

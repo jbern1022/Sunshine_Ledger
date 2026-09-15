@@ -6,6 +6,7 @@ from app.models.spatial_context import SpatialContext
 from app.models.bill import Bill
 from app.models.claim import Claim, ClaimSource
 from app.models.flag import Flag
+from app.models.tag import BillTag, SubjectMapping, Tag
 
 __all__ = [
     "Entity",
@@ -17,4 +18,7 @@ __all__ = [
     "Claim",
     "ClaimSource",
     "Flag",
+    "Tag",
+    "SubjectMapping",
+    "BillTag",
 ]

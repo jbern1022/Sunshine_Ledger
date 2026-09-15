@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBills, fetchStatuses } from "@/lib/api";
-import type { BillListItem, StatusCount } from "@/lib/types";
+import { fetchBills, fetchStatuses, fetchTags } from "@/lib/api";
+import type { BillListItem, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
 
@@ -25,6 +25,8 @@ function BrowsePageInner() {
   const [autoDetected, setAutoDetected] = useState(() => searchParams.get("auto") === "1");
   const [status, setStatus] = useState("");
   const [statuses, setStatuses] = useState<StatusCount[]>([]);
+  const [tag, setTag] = useState(() => searchParams.get("tag") ?? "");
+  const [tags, setTags] = useState<TagCount[]>([]);
   const [offset, setOffset] = useState(0);
   const [bills, setBills] = useState<BillListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -35,7 +37,19 @@ function BrowsePageInner() {
   // an offset past the end of a newly-narrowed result set.
   useEffect(() => {
     setOffset(0);
-  }, [q, jurisdiction, status, geoFilter]);
+  }, [q, jurisdiction, status, tag, geoFilter]);
+
+  // Tag badges aren't jurisdiction-scoped in the API (unlike statuses), so
+  // this fetches once rather than re-running when jurisdiction changes.
+  useEffect(() => {
+    let cancelled = false;
+    fetchTags()
+      .then((t) => !cancelled && setTags(t))
+      .catch(() => !cancelled && setTags([]));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Options follow the jurisdiction filter: showing Jacksonville's
   // municipal statuses while browsing state bills would offer filters that
@@ -67,6 +81,7 @@ function BrowsePageInner() {
       q: q || undefined,
       jurisdiction_name: jurisdiction || undefined,
       status: status || undefined,
+      tag: tag || undefined,
       geo_scope_name: geoFilter || undefined,
       limit: PAGE_SIZE,
       offset,
@@ -86,7 +101,7 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, jurisdiction, status, geoFilter, offset]);
+  }, [q, jurisdiction, status, tag, geoFilter, offset]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -161,6 +176,19 @@ function BrowsePageInner() {
           {statuses.map((s) => (
             <option key={s.status} value={s.status}>
               {s.status} ({s.count})
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter by topic"
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
+        >
+          <option value="">All topics</option>
+          {tags.map((t) => (
+            <option key={t.slug} value={t.slug}>
+              {t.label} ({t.count})
             </option>
           ))}
         </select>

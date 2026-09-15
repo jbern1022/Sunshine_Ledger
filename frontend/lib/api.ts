@@ -8,6 +8,7 @@ import type {
   PersonDetail,
   PersonListResponse,
   StatusCount,
+  TagCount,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -18,6 +19,7 @@ export interface BillSearchParams {
   jurisdiction_level?: string;
   status?: string;
   geo_scope_name?: string;
+  tag?: string;
   limit?: number;
   offset?: number;
 }
@@ -92,5 +94,11 @@ export async function fetchStatuses(jurisdictionName?: string): Promise<StatusCo
   const qs = jurisdictionName ? `?jurisdiction_name=${encodeURIComponent(jurisdictionName)}` : "";
   const res = await fetch(`${API_URL}/bills/statuses${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch statuses: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchTags(): Promise<TagCount[]> {
+  const res = await fetch(`${API_URL}/bills/tags`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch tags: ${res.status}`);
   return res.json();
 }

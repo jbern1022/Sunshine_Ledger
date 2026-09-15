@@ -22,6 +22,7 @@ from app.config import settings
 from app.models import Bill, Entity, Event, Relationship, Source
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
+from app.pipeline.topic_tagging import assign_tags_for_bill
 
 logger = logging.getLogger(__name__)
 
@@ -266,6 +267,27 @@ def _sync_bill_votes(
     return roll_calls_fetched
 
 
+def _extract_subjects(detail: dict) -> list[str]:
+    """Raw FL Subject Index strings from a getBill response.
+
+    Per LegiScan's documented API shape, `subjects` is a list of
+    {"subject_id": int, "subject_name": str}. NOT verified by hand against a
+    live response (unlike the votes field this pipeline already consumes --
+    see tests/test_legiscan_votes.py's docstring) since no LEGISCAN_API_KEY
+    was available while writing this. Defensive against the field being
+    absent or shaped unexpectedly so a wrong guess here degrades to "no
+    tags assigned" rather than breaking bill ingestion.
+    """
+    subjects = detail.get("subjects")
+    if not isinstance(subjects, list):
+        return []
+    names = []
+    for s in subjects:
+        if isinstance(s, dict) and s.get("subject_name"):
+            names.append(s["subject_name"])
+    return names
+
+
 def _get_or_create_bill_entity(db: Session, *, legiscan_bill_id: int) -> Entity | None:
     return db.execute(
         select(Entity).where(
@@ -413,6 +435,21 @@ def ingest_state_bills(
                 people_by_id=people_by_id,
                 fetch_individual=True,
             )
+
+        subjects = _extract_subjects(detail)
+        if subjects:
+            try:
+                assign_tags_for_bill(db, entity.id, raw_subjects=subjects)
+            except RuntimeError:
+                # Governance tag not seeded (run topic_tagging_seed) -- log
+                # and keep going rather than failing the whole ingestion run
+                # over a tagging problem. Bills/sponsors/votes above are
+                # already committed-worthy on their own.
+                logger.warning(
+                    "Skipping topic tagging for bill %s: tag seed data missing "
+                    "(run `python -m app.pipeline.topic_tagging_seed`)",
+                    entity.id,
+                )
 
         written.append(entity)
 
