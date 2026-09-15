@@ -33,6 +33,7 @@ const baseBill: BillListItem = {
 const baseDetail: BillDetail = {
   ...baseBill,
   last_action: "Referred to committee",
+  full_text: null,
   sponsors: [{ entity_id: "p1", name: "Jane Smith", relationship_type: "sponsor" }],
   claims: [
     {

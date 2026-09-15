@@ -41,6 +41,7 @@ const baseBill: BillDetail = {
   what_it_does: null,
   source_count: 0,
   full_text_url: null,
+  full_text: null,
   primary_sponsor: null,
   tags: [],
   last_action: null,

@@ -392,6 +392,7 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
     return BillDetail(
         **list_item.model_dump(),
         last_action=bill.last_action,
+        full_text=bill.full_text,
         sponsors=sponsors_out,
         claims=claims_out,
         news=news_out,

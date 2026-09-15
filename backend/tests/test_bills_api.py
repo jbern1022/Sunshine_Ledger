@@ -114,6 +114,24 @@ def test_get_bill_detail(client, bill_factory):
     assert body["votes"] == []
 
 
+def test_get_bill_detail_includes_full_text_when_present(client, db_session, bill_factory):
+    entity = bill_factory()
+    entity.bill.full_text = "Section 1. This act shall be known as..."
+    db_session.commit()
+
+    resp = client.get(f"/bills/{entity.id}")
+    body = resp.json()
+    assert body["full_text"] == "Section 1. This act shall be known as..."
+
+
+def test_get_bill_detail_full_text_is_null_when_absent(client, bill_factory):
+    entity = bill_factory()
+
+    resp = client.get(f"/bills/{entity.id}")
+    body = resp.json()
+    assert body["full_text"] is None
+
+
 def test_get_bill_not_found(client):
     resp = client.get(f"/bills/{uuid.uuid4()}")
     assert resp.status_code == 404

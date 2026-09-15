@@ -41,6 +41,7 @@ const baseBill: BillDetail = {
   what_it_does: "This bill does a thing.",
   source_count: 1,
   full_text_url: "https://example.com/bill",
+  full_text: null,
   primary_sponsor: "Jane Smith",
   tags: [],
   last_action: "Referred to committee",
@@ -217,6 +218,23 @@ describe("BillPage", () => {
 
     expect(screen.getByText("Local paper covers the bill")).toBeInTheDocument();
     expect(screen.getByText(/not a claim about the bill/i)).toBeInTheDocument();
+  });
+
+  it("shows the full bill text collapsed behind a details toggle when present", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      full_text: "Section 1. This act shall be known as the Test Act.",
+    });
+    await renderBillPage();
+
+    expect(screen.getByText("Full bill text")).toBeInTheDocument();
+    expect(screen.getByText(/Section 1\. This act shall be known as/)).toBeInTheDocument();
+  });
+
+  it("does not render a full bill text section when absent", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
+    await renderBillPage();
+    expect(screen.queryByText("Full bill text")).not.toBeInTheDocument();
   });
 });
 

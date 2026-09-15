@@ -94,6 +94,9 @@ class BillListItem(BaseModel):
 
 class BillDetail(BillListItem):
     last_action: str | None
+    # Full bill text, when we have it -- kept off BillListItem since it can
+    # run tens of thousands of characters and the list view never needs it.
+    full_text: str | None
     sponsors: list[SponsorOut]
     claims: list[ClaimOut]
     news: list[NewsItemOut]

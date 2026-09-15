@@ -227,6 +227,19 @@ export default async function BillPage({ params }: Props) {
         </p>
       )}
 
+      {bill.full_text && (
+        <section className="mt-4">
+          <details>
+            <summary className="cursor-pointer text-sm font-semibold text-ledger-900">
+              Full bill text
+            </summary>
+            <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">
+              {bill.full_text}
+            </p>
+          </details>
+        </section>
+      )}
+
       {bill.full_text_url && (
         <p className="mt-3 text-sm">
           <a href={bill.full_text_url} target="_blank" rel="noreferrer" className="text-sunshine-600 underline">

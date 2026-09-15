@@ -88,6 +88,7 @@ export interface RollCallOut {
 
 export interface BillDetail extends BillListItem {
   last_action: string | null;
+  full_text: string | null;
   sponsors: SponsorOut[];
   claims: ClaimOut[];
   news: NewsItemOut[];
