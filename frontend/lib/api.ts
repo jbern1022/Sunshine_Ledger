@@ -20,6 +20,7 @@ export interface BillSearchParams {
   status?: string;
   geo_scope_name?: string;
   tag?: string;
+  sponsor_entity_id?: string;
   limit?: number;
   offset?: number;
 }

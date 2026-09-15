@@ -58,13 +58,13 @@ def test_districts_empty(client):
 def test_districts_counts_sponsored_bills(client, db_session, bill_factory):
     _add_district(db_session, "HD-120")
     bill = bill_factory(bill_number="HB 1")
-    _add_sponsor(db_session, bill, name="Jim Mooney", district="HD-120")
+    person = _add_sponsor(db_session, bill, name="Jim Mooney", district="HD-120")
 
     feature = client.get("/map/districts").json()["features"][0]
     assert feature["properties"]["scope_name"] == "HD-120"
     assert feature["properties"]["bill_count"] == 1
     assert feature["properties"]["chamber"] == "State House"
-    assert feature["properties"]["legislators"] == ["Jim Mooney"]
+    assert feature["properties"]["legislators"] == [{"entity_id": str(person.id), "name": "Jim Mooney"}]
 
 
 def test_districts_label_senate_chamber(client, db_session):

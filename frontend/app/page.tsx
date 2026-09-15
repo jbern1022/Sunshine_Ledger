@@ -19,6 +19,8 @@ const PAGE_SIZE = 50;
 function BrowsePageInner() {
   const searchParams = useSearchParams();
   const geoFilter = searchParams.get("geo") ?? "";
+  const sponsorFilter = searchParams.get("sponsor") ?? "";
+  const sponsorName = searchParams.get("sponsorName") ?? "";
 
   const [q, setQ] = useState("");
   const [jurisdiction, setJurisdiction] = useState(() => searchParams.get("jurisdiction") ?? "");
@@ -37,7 +39,7 @@ function BrowsePageInner() {
   // an offset past the end of a newly-narrowed result set.
   useEffect(() => {
     setOffset(0);
-  }, [q, jurisdiction, status, tag, geoFilter]);
+  }, [q, jurisdiction, status, tag, geoFilter, sponsorFilter]);
 
   // Tag badges aren't jurisdiction-scoped in the API (unlike statuses), so
   // this fetches once rather than re-running when jurisdiction changes.
@@ -83,6 +85,7 @@ function BrowsePageInner() {
       status: status || undefined,
       tag: tag || undefined,
       geo_scope_name: geoFilter || undefined,
+      sponsor_entity_id: sponsorFilter || undefined,
       limit: PAGE_SIZE,
       offset,
     })
@@ -101,7 +104,7 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, jurisdiction, status, tag, geoFilter, offset]);
+  }, [q, jurisdiction, status, tag, geoFilter, sponsorFilter, offset]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -118,6 +121,13 @@ function BrowsePageInner() {
             <>
               {" "}
               Filtered to <span className="font-medium text-ledger-900">{geoFilter}</span>.
+            </>
+          )}
+          {sponsorFilter && (
+            <>
+              {" "}
+              Filtered to bills sponsored by{" "}
+              <span className="font-medium text-ledger-900">{sponsorName || "this legislator"}</span>.
             </>
           )}
         </p>

@@ -172,15 +172,27 @@ export default function MapView() {
                 }}
                 onEachFeature={(feature, layer: Layer) => {
                   const props = feature.properties as DistrictFeatureProperties;
-                  const who = props.legislators.length
-                    ? props.legislators.join(", ")
-                    : "no tracked sponsor";
-                  // No click handler: there's no sponsor filter on the browse
-                  // page yet, so a click would lead nowhere. Tooltip only.
+                  const names = props.legislators.map((l) => l.name);
+                  const who = names.length ? names.join(", ") : "no tracked sponsor";
                   layer.bindTooltip(
                     `${props.chamber} ${props.scope_name} — ${who}: ` +
-                      `sponsored ${props.bill_count} tracked bill${props.bill_count === 1 ? "" : "s"}`,
+                      `sponsored ${props.bill_count} tracked bill${props.bill_count === 1 ? "" : "s"}` +
+                      (props.legislators.length ? " (click to see their bills)" : ""),
                   );
+                  // A district can list more than one tracked legislator (a
+                  // mid-session replacement, or a data hiccup) -- click
+                  // filters to the first, alphabetically, same as the
+                  // tooltip's lead name. No legislator means no filter to
+                  // link to, so the district stays tooltip-only.
+                  const primary = props.legislators[0];
+                  if (primary) {
+                    layer.on("click", () => {
+                      router.push(
+                        `/?sponsor=${encodeURIComponent(primary.entity_id)}` +
+                          `&sponsorName=${encodeURIComponent(primary.name)}`,
+                      );
+                    });
+                  }
                 }}
               />
             )}

@@ -73,6 +73,7 @@ def districts_geojson(db: Session = Depends(get_db)) -> dict:
     rows = db.execute(
         select(
             district_expr,
+            Entity.id,
             Entity.name,
             # distinct: a legislator sponsoring the same bill as both sponsor
             # and co-sponsor must not be double-counted.
@@ -84,16 +85,19 @@ def districts_geojson(db: Session = Depends(get_db)) -> dict:
             Relationship.relationship_type.in_(["sponsor", "co_sponsor"]),
             district_expr.isnot(None),
         )
-        .group_by(district_expr, Entity.name)
+        .group_by(district_expr, Entity.id, Entity.name)
     ).all()
 
     counts: Counter = Counter()
-    legislators: defaultdict[str, list[str]] = defaultdict(list)
-    for district, name, bill_count in rows:
+    # entity_id carried alongside name so the frontend can link a district
+    # click straight to that legislator's sponsored bills (GET
+    # /bills?sponsor_entity_id=...) rather than just displaying a name.
+    legislators: defaultdict[str, list[dict]] = defaultdict(list)
+    for district, entity_id, name, bill_count in rows:
         if not district:
             continue
         counts[district] += bill_count
-        legislators[district].append(name)
+        legislators[district].append({"entity_id": str(entity_id), "name": name})
 
     features = []
     for boundary in boundaries:
@@ -108,7 +112,7 @@ def districts_geojson(db: Session = Depends(get_db)) -> dict:
                     "scope_name": boundary.scope_name,
                     "chamber": CHAMBER_BY_PREFIX.get(prefix, prefix),
                     "bill_count": counts.get(boundary.scope_name, 0),
-                    "legislators": sorted(legislators.get(boundary.scope_name, [])),
+                    "legislators": sorted(legislators.get(boundary.scope_name, []), key=lambda l: l["name"]),
                     "source": boundary.geom_source,
                 },
             }

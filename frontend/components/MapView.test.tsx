@@ -106,7 +106,7 @@ const districtsFixture: DistrictFeatureCollection = {
         scope_name: "District 10",
         chamber: "House",
         bill_count: 20,
-        legislators: ["Jane Smith"],
+        legislators: [{ entity_id: "p1", name: "Jane Smith" }],
         source: "tiger",
       },
     },
@@ -244,5 +244,19 @@ describe("MapView", () => {
 
     await user.click(emptyDistrict);
     expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the sponsor-filtered browse page when a district with a tracked legislator is clicked", async () => {
+    vi.mocked(api.fetchCountyGeoJSON).mockResolvedValueOnce(countiesFixture);
+    vi.mocked(api.fetchDistrictGeoJSON).mockResolvedValueOnce(districtsFixture);
+    const user = userEvent.setup();
+    render(<MapView />);
+    await screen.findByTestId("geojson");
+
+    await user.click(screen.getByRole("button", { name: /sponsorship by district/i }));
+    const district = await screen.findByText(/sponsored 20 tracked bills/i);
+
+    await user.click(district);
+    expect(pushMock).toHaveBeenCalledWith("/?sponsor=p1&sponsorName=Jane%20Smith");
   });
 });

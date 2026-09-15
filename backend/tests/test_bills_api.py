@@ -52,6 +52,56 @@ def test_list_bills_filters_by_geo_scope_name(client, bill_factory):
     assert body["items"][0]["bill_number"] == "HB 1"
 
 
+def _add_sponsor(db, bill_entity, *, name: str, rel_type: str = "sponsor"):
+    person = Entity(
+        entity_type="person",
+        name=name,
+        jurisdiction_level="state",
+        jurisdiction_name="FL",
+        external_ids={"legiscan_people_id": name},
+        attributes={},
+    )
+    db.add(person)
+    db.flush()
+    db.add(
+        Relationship(
+            from_entity_id=person.id,
+            to_entity_id=bill_entity.id,
+            relationship_type=rel_type,
+        )
+    )
+    db.commit()
+    return person
+
+
+def test_list_bills_filters_by_sponsor_entity_id(client, db_session, bill_factory):
+    sponsored = bill_factory(bill_number="HB 1")
+    bill_factory(bill_number="HB 2")
+    sponsor = _add_sponsor(db_session, sponsored, name="Jim Mooney")
+
+    resp = client.get("/bills", params={"sponsor_entity_id": str(sponsor.id)})
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["bill_number"] == "HB 1"
+
+
+def test_list_bills_sponsor_filter_includes_co_sponsors(client, db_session, bill_factory):
+    bill = bill_factory(bill_number="HB 1")
+    co_sponsor = _add_sponsor(db_session, bill, name="Co Sponsor", rel_type="co_sponsor")
+
+    resp = client.get("/bills", params={"sponsor_entity_id": str(co_sponsor.id)})
+    body = resp.json()
+    assert body["total"] == 1
+
+
+def test_list_bills_sponsor_filter_no_matches(client, bill_factory):
+    bill_factory(bill_number="HB 1")
+
+    resp = client.get("/bills", params={"sponsor_entity_id": str(uuid.uuid4())})
+    body = resp.json()
+    assert body["total"] == 0
+
+
 def test_get_bill_detail(client, bill_factory):
     entity = bill_factory()
 

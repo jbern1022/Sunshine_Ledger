@@ -109,12 +109,17 @@ export interface CountyFeatureProperties {
 /** Sponsorship activity per legislative district — NOT geographic impact.
  *  `bill_count` is how many tracked bills that district's legislator filed.
  *  See the /map/districts docstring before reusing this anywhere. */
+export interface DistrictLegislator {
+  entity_id: string;
+  name: string;
+}
+
 export interface DistrictFeatureProperties {
   scope_type: string;
   scope_name: string;
   chamber: string;
   bill_count: number;
-  legislators: string[];
+  legislators: DistrictLegislator[];
   source: string | null;
 }
 

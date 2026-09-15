@@ -115,6 +115,9 @@ def list_bills(
     status: str | None = Query(None),
     geo_scope_name: str | None = Query(None, description="e.g. 'Miami-Dade County' -- matches Bill.geo_scope_names"),
     tag: str | None = Query(None, description="Tag slug, e.g. 'housing' -- matches bills with that active badge"),
+    sponsor_entity_id: uuid.UUID | None = Query(
+        None, description="Only bills sponsored or co-sponsored by this legislator entity"
+    ),
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -142,6 +145,12 @@ def list_bills(
                 .where(Tag.slug == tag, BillTag.active.is_(True))
             )
         )
+    if sponsor_entity_id:
+        sponsored_bill_ids = select(Relationship.to_entity_id).where(
+            Relationship.from_entity_id == sponsor_entity_id,
+            Relationship.relationship_type.in_(["sponsor", "co_sponsor"]),
+        )
+        stmt = stmt.where(Entity.id.in_(sponsored_bill_ids))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Entity.name.ilike(like), Bill.bill_number.ilike(like)))
