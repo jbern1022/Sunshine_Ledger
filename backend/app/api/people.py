@@ -58,7 +58,7 @@ def list_people(
             or_(Entity.name.ilike(like), Entity.attributes["district"].as_string().ilike(like))
         )
 
-    total = len(db.execute(stmt).all())
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
         stmt.order_by(func.coalesce(sponsored.c.n, 0).desc(), Entity.name).offset(offset).limit(limit)
     ).all()

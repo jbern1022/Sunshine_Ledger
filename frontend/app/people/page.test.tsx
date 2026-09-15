@@ -67,12 +67,14 @@ describe("PeoplePage", () => {
     const user = userEvent.setup();
     render(<PeoplePage />);
 
-    await waitFor(() => expect(api.fetchPeople).toHaveBeenCalledWith({ q: undefined, limit: 100 }));
+    await waitFor(() =>
+      expect(api.fetchPeople).toHaveBeenCalledWith({ q: undefined, limit: 100, offset: 0 }),
+    );
 
     await user.type(screen.getByLabelText(/search sponsors/i), "Smith");
 
     await waitFor(() =>
-      expect(api.fetchPeople).toHaveBeenLastCalledWith({ q: "Smith", limit: 100 }),
+      expect(api.fetchPeople).toHaveBeenLastCalledWith({ q: "Smith", limit: 100, offset: 0 }),
     );
   });
 
@@ -102,5 +104,56 @@ describe("PeoplePage", () => {
 
     expect(screen.getByText("Person fresh")).toBeInTheDocument();
     expect(screen.queryByText("Person stale")).not.toBeInTheDocument();
+  });
+});
+
+describe("PeoplePage pagination", () => {
+  beforeEach(() => {
+    vi.mocked(api.fetchPeople).mockReset();
+  });
+
+  it("shows pagination and advances to the next page on click", async () => {
+    vi.mocked(api.fetchPeople).mockResolvedValueOnce({ total: 250, items: [makePerson("p1")] });
+    const user = userEvent.setup();
+    render(<PeoplePage />);
+
+    expect(await screen.findByText(/250 sponsors — page 1 of 3/i)).toBeInTheDocument();
+
+    vi.mocked(api.fetchPeople).mockResolvedValueOnce({ total: 250, items: [makePerson("p2")] });
+    await user.click(screen.getByRole("button", { name: /next/i }));
+
+    await waitFor(() =>
+      expect(api.fetchPeople).toHaveBeenLastCalledWith({ q: undefined, limit: 100, offset: 100 }),
+    );
+    expect(await screen.findByText(/250 sponsors — page 2 of 3/i)).toBeInTheDocument();
+  });
+
+  it("disables Previous on the first page and doesn't show pagination when everything fits on one page", async () => {
+    vi.mocked(api.fetchPeople).mockResolvedValueOnce({ total: 5, items: [makePerson("p1")] });
+    render(<PeoplePage />);
+
+    await screen.findByText("5 sponsors");
+    expect(screen.queryByRole("button", { name: /previous/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /next/i })).not.toBeInTheDocument();
+  });
+
+  it("resets to the first page when the search text changes", async () => {
+    vi.mocked(api.fetchPeople).mockResolvedValueOnce({ total: 250, items: [makePerson("p1")] });
+    const user = userEvent.setup();
+    render(<PeoplePage />);
+
+    await screen.findByText(/250 sponsors/i);
+    vi.mocked(api.fetchPeople).mockResolvedValueOnce({ total: 250, items: [makePerson("p2")] });
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() =>
+      expect(api.fetchPeople).toHaveBeenLastCalledWith({ q: undefined, limit: 100, offset: 100 }),
+    );
+
+    vi.mocked(api.fetchPeople).mockResolvedValue({ total: 1, items: [makePerson("p3")] });
+    await user.type(screen.getByLabelText(/search sponsors/i), "Smith");
+
+    await waitFor(() =>
+      expect(api.fetchPeople).toHaveBeenLastCalledWith({ q: "Smith", limit: 100, offset: 0 }),
+    );
   });
 });
