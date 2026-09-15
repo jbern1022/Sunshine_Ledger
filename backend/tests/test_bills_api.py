@@ -394,6 +394,41 @@ def test_bill_detail_overlay_empty_for_a_badge_with_no_table_mapping(client, db_
     assert body["demographic_overlays"] == []
 
 
+def test_bill_detail_overlay_empty_for_labor_employment_on_a_state_bill(client, db_session, bill_factory):
+    """Deliberate, documented consequence of the BLS-is-county-only decision:
+    Labor/Employment has no ACS table mapping (BLS-only), and BLS data is
+    only ever stored at county granularity -- but a state bill's geography
+    always resolves to its sponsor's DISTRICT, never a county. So a state
+    bill tagged Labor/Employment can never match an overlay row, by design.
+    This pins that as an intentional empty result, not a crash or a silent
+    bug regression."""
+    entity = bill_factory()
+    sponsor = Entity(
+        entity_type="person", name="Jane Smith", jurisdiction_level="state", jurisdiction_name="FL",
+        external_ids={}, attributes={"district": "HD-101"},
+    )
+    db_session.add(sponsor)
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=sponsor.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    tag = Tag(slug="labor_employment", label="Labor/Employment", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["labor_employment"])
+    # Even if a labor_employment row somehow existed at county grain, it
+    # still shouldn't match -- only a "district" row would match this bill.
+    db_session.add(
+        DemographicOverlay(
+            geography_type="county", geography_id="Miami-Dade County", badge_slug="labor_employment",
+            source="bls", metrics=[{"label": "Unemployment rate", "estimate": 2.5, "margin_of_error": None, "unit": "percent"}],
+            as_of="2024-12",
+        )
+    )
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+    assert body["demographic_overlays"] == []
+
+
 def test_bill_detail_overlay_renders_multiple_badges_without_breaking(client, db_session, bill_factory):
     """Multi-tag bill: every applicable overlay shows, per the Roadmap
     decision (no priority pick)."""

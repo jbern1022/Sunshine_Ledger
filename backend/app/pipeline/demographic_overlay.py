@@ -204,13 +204,18 @@ def _acs_metrics(values: dict[str, str], table: list[tuple[str, str, str]]) -> l
     ]
 
 
-def load_acs_district_overlays(db: Session, *, badge_slug: str, client: ACSClient | None = None) -> int:
-    """Load one ACS badge's table for every FL House and Senate district."""
+def _acs_table_and_variables(badge_slug: str) -> tuple[list[tuple[str, str, str]], list[str]]:
     if badge_slug not in ACS_TABLES:
         raise ValueError(f"No ACS table mapping for badge {badge_slug!r}")
-    client = client or ACSClient()
     table = ACS_TABLES[badge_slug]
     variables = [f"{var}{suffix}" for var, _label, _unit in table for suffix in ("E", "M")]
+    return table, variables
+
+
+def load_acs_district_overlays(db: Session, *, badge_slug: str, client: ACSClient | None = None) -> int:
+    """Load one ACS badge's table for every FL House and Senate district."""
+    table, variables = _acs_table_and_variables(badge_slug)
+    client = client or ACSClient()
 
     count = 0
     for prefix in ("HD", "SD"):
@@ -233,11 +238,8 @@ def load_acs_district_overlays(db: Session, *, badge_slug: str, client: ACSClien
 
 def load_acs_county_overlays(db: Session, *, badge_slug: str, client: ACSClient | None = None) -> int:
     """Load one ACS badge's table for every county this app covers (local bills)."""
-    if badge_slug not in ACS_TABLES:
-        raise ValueError(f"No ACS table mapping for badge {badge_slug!r}")
+    table, variables = _acs_table_and_variables(badge_slug)
     client = client or ACSClient()
-    table = ACS_TABLES[badge_slug]
-    variables = [f"{var}{suffix}" for var, _label, _unit in table for suffix in ("E", "M")]
 
     count = 0
     for county_name, fips in COUNTY_FIPS.items():
