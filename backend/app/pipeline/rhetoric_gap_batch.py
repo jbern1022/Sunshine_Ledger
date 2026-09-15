@@ -41,6 +41,14 @@ def _check_ollama_reachable() -> None:
             f"Ollama not reachable at {settings.ollama_host} -- check it's awake and OLLAMA_HOST is correct: {exc}"
         ) from exc
 
+    models = [m["name"] for m in resp.json().get("models", [])]
+    if models and not any(settings.ollama_model in m for m in models):
+        logger.warning(
+            "Configured OLLAMA_MODEL=%s not found in Ollama's model list %s -- check for a typo/tag mismatch.",
+            settings.ollama_model,
+            models,
+        )
+
 
 def select_bills_needing_rhetoric_gap_check(db, *, limit: int | None = None) -> list[Entity]:
     """Bills with full_text and no rhetoric_gap claim yet. No DB writes and
