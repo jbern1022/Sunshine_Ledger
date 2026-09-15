@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.auth import require_admin
 from app.db import get_db
 from app.models import Bill, BillTag, Claim, Entity, Event, Relationship, Tag
 from app.pipeline.topic_tagging import set_bill_tag_active
@@ -62,6 +63,16 @@ def _to_list_item(
     )
 
 
+def _tag_out(bill_tag: BillTag, tag: Tag) -> TagOut:
+    return TagOut(
+        bill_tag_id=bill_tag.id,
+        slug=tag.slug,
+        label=tag.label,
+        tag_source=bill_tag.tag_source,
+        active=bill_tag.active,
+    )
+
+
 def _active_tags_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[TagOut]]:
     """One batched query for a whole page of bills, rather than one query per
     bill. Only active (non-hidden) badges are returned -- callers rendering
@@ -75,15 +86,7 @@ def _active_tags_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[uuid.
     )
     result: dict[uuid.UUID, list[TagOut]] = {}
     for bill_tag, tag in db.execute(stmt).all():
-        result.setdefault(bill_tag.bill_entity_id, []).append(
-            TagOut(
-                bill_tag_id=bill_tag.id,
-                slug=tag.slug,
-                label=tag.label,
-                tag_source=bill_tag.tag_source,
-                active=bill_tag.active,
-            )
-        )
+        result.setdefault(bill_tag.bill_entity_id, []).append(_tag_out(bill_tag, tag))
     return result
 
 
@@ -172,21 +175,22 @@ def list_tags(db: Session = Depends(get_db)) -> list[TagCount]:
 
 
 @router.patch("/tags/{bill_tag_id}", response_model=TagOut)
-def update_bill_tag(bill_tag_id: uuid.UUID, body: BillTagUpdate, db: Session = Depends(get_db)) -> TagOut:
-    """Toggle one badge's visibility on a bill (hide/reactivate). Logs a
+def update_bill_tag(
+    bill_tag_id: uuid.UUID,
+    body: BillTagUpdate,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(require_admin),
+) -> TagOut:
+    """Toggle one badge's visibility on a bill (hide/reactivate). Admin-only,
+    same as the flag-review endpoints in app/api/flags.py -- this controls
+    what badge is publicly shown on a bill, not a read-only action. Logs a
     tag_hidden/tag_reactivated Event; never deletes the assignment."""
     try:
         bill_tag = set_bill_tag_active(db, bill_tag_id, active=body.active)
     except ValueError:
         raise HTTPException(status_code=404, detail="Bill tag not found")
 
-    return TagOut(
-        bill_tag_id=bill_tag.id,
-        slug=bill_tag.tag.slug,
-        label=bill_tag.tag.label,
-        tag_source=bill_tag.tag_source,
-        active=bill_tag.active,
-    )
+    return _tag_out(bill_tag, bill_tag.tag)
 
 
 # Declared before /{entity_id}: FastAPI matches routes in definition order,

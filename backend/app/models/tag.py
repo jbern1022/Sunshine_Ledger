@@ -74,7 +74,7 @@ class BillTag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     raw_subject: Mapped[str | None] = mapped_column(String(200))  # set when tag_source="legiscan"
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    bill_entity: Mapped["Entity"] = relationship()
+    bill_entity: Mapped["Entity"] = relationship(back_populates="bill_tags")
     tag: Mapped["Tag"] = relationship()
 
     __table_args__ = (

@@ -263,7 +263,7 @@ def test_list_tags_endpoint_excludes_inactive_tag_categories(client, db_session,
     assert client.get("/bills/tags").json() == []
 
 
-def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
+def test_patch_bill_tag_requires_auth(client, db_session, bill_factory):
     entity = bill_factory()
     tag = Tag(slug="housing", label="Housing", active=True)
     db_session.add(tag)
@@ -271,6 +271,19 @@ def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
     created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
 
     resp = client.patch(f"/bills/tags/{created[0].id}", json={"active": False})
+    assert resp.status_code == 401
+
+
+def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
+    entity = bill_factory()
+    tag = Tag(slug="housing", label="Housing", active=True)
+    db_session.add(tag)
+    db_session.commit()
+    created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+
+    resp = client.patch(
+        f"/bills/tags/{created[0].id}", json={"active": False}, auth=("testadmin", "testpass")
+    )
     assert resp.status_code == 200
     assert resp.json()["active"] is False
 
@@ -279,5 +292,5 @@ def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
 
 
 def test_patch_bill_tag_not_found(client):
-    resp = client.patch(f"/bills/tags/{uuid.uuid4()}", json={"active": False})
+    resp = client.patch(f"/bills/tags/{uuid.uuid4()}", json={"active": False}, auth=("testadmin", "testpass"))
     assert resp.status_code == 404
