@@ -7,11 +7,13 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.models import Bill, Claim, Entity, Event, Relationship
+from app.models import Bill, BillTag, Claim, Entity, Event, Relationship, Tag
+from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
     BillDetail,
     BillListItem,
     BillListResponse,
+    BillTagUpdate,
     ClaimOut,
     IndividualVoteOut,
     NewsItemOut,
@@ -19,6 +21,8 @@ from app.schemas.bill import (
     SourceOut,
     SponsorOut,
     StatusCount,
+    TagCount,
+    TagOut,
 )
 
 router = APIRouter(prefix="/bills", tags=["bills"])
@@ -31,7 +35,9 @@ def _what_it_does(claims: list[Claim]) -> str | None:
     return None
 
 
-def _to_list_item(entity: Entity, *, primary_sponsor: str | None = None) -> BillListItem:
+def _to_list_item(
+    entity: Entity, *, primary_sponsor: str | None = None, tags: list[TagOut] | None = None
+) -> BillListItem:
     bill = entity.bill
     claims = entity.claims
     source_count = len({s.source_id for c in claims for s in c.source_links})
@@ -52,7 +58,33 @@ def _to_list_item(entity: Entity, *, primary_sponsor: str | None = None) -> Bill
         source_count=source_count,
         full_text_url=bill.full_text_url,
         primary_sponsor=primary_sponsor,
+        tags=tags or [],
     )
+
+
+def _active_tags_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[uuid.UUID, list[TagOut]]:
+    """One batched query for a whole page of bills, rather than one query per
+    bill. Only active (non-hidden) badges are returned -- callers rendering
+    a bill's public badges should never see a hidden one."""
+    if not entity_ids:
+        return {}
+    stmt = (
+        select(BillTag, Tag)
+        .join(Tag, Tag.id == BillTag.tag_id)
+        .where(BillTag.bill_entity_id.in_(entity_ids), BillTag.active.is_(True))
+    )
+    result: dict[uuid.UUID, list[TagOut]] = {}
+    for bill_tag, tag in db.execute(stmt).all():
+        result.setdefault(bill_tag.bill_entity_id, []).append(
+            TagOut(
+                bill_tag_id=bill_tag.id,
+                slug=tag.slug,
+                label=tag.label,
+                tag_source=bill_tag.tag_source,
+                active=bill_tag.active,
+            )
+        )
+    return result
 
 
 def _primary_sponsors_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
@@ -77,6 +109,7 @@ def list_bills(
     jurisdiction_level: str | None = Query(None, description="state | city"),
     status: str | None = Query(None),
     geo_scope_name: str | None = Query(None, description="e.g. 'Miami-Dade County' -- matches Bill.geo_scope_names"),
+    tag: str | None = Query(None, description="Tag slug, e.g. 'housing' -- matches bills with that active badge"),
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -96,6 +129,14 @@ def list_bills(
         stmt = stmt.where(Bill.status == status)
     if geo_scope_name:
         stmt = stmt.where(Bill.geo_scope_names.any(geo_scope_name))
+    if tag:
+        stmt = stmt.where(
+            Entity.id.in_(
+                select(BillTag.bill_entity_id)
+                .join(Tag, Tag.id == BillTag.tag_id)
+                .where(Tag.slug == tag, BillTag.active.is_(True))
+            )
+        )
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Entity.name.ilike(like), Bill.bill_number.ilike(like)))
@@ -105,9 +146,47 @@ def list_bills(
     entities = db.execute(stmt).scalars().all()
 
     sponsors_by_bill = _primary_sponsors_by_bill(db, [e.id for e in entities])
-    items = [_to_list_item(e, primary_sponsor=sponsors_by_bill.get(e.id)) for e in entities]
+    tags_by_bill = _active_tags_by_bill(db, [e.id for e in entities])
+    items = [
+        _to_list_item(e, primary_sponsor=sponsors_by_bill.get(e.id), tags=tags_by_bill.get(e.id))
+        for e in entities
+    ]
 
     return BillListResponse(total=total, items=items)
+
+
+# Declared before /{entity_id} for the same route-ordering reason as /statuses.
+@router.get("/tags", response_model=list[TagCount])
+def list_tags(db: Session = Depends(get_db)) -> list[TagCount]:
+    """Active badge categories with counts of (active-tagged) bills carrying
+    each, for building a filter UI. Only active Tags are listed -- a
+    deactivated badge category shouldn't appear as a filter option."""
+    stmt = (
+        select(Tag.slug, Tag.label, func.count(BillTag.id).label("n"))
+        .join(BillTag, BillTag.tag_id == Tag.id)
+        .where(Tag.active.is_(True), BillTag.active.is_(True))
+        .group_by(Tag.slug, Tag.label)
+        .order_by(func.count(BillTag.id).desc(), Tag.label)
+    )
+    return [TagCount(slug=slug, label=label, count=n) for slug, label, n in db.execute(stmt).all()]
+
+
+@router.patch("/tags/{bill_tag_id}", response_model=TagOut)
+def update_bill_tag(bill_tag_id: uuid.UUID, body: BillTagUpdate, db: Session = Depends(get_db)) -> TagOut:
+    """Toggle one badge's visibility on a bill (hide/reactivate). Logs a
+    tag_hidden/tag_reactivated Event; never deletes the assignment."""
+    try:
+        bill_tag = set_bill_tag_active(db, bill_tag_id, active=body.active)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Bill tag not found")
+
+    return TagOut(
+        bill_tag_id=bill_tag.id,
+        slug=bill_tag.tag.slug,
+        label=bill_tag.tag.label,
+        tag_source=bill_tag.tag_source,
+        active=bill_tag.active,
+    )
 
 
 # Declared before /{entity_id}: FastAPI matches routes in definition order,
@@ -182,7 +261,8 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         for r, e in db.execute(sponsor_stmt).all()
     ]
     primary_sponsor = next((s.name for s in sponsors_out if s.relationship_type == "sponsor"), None)
-    list_item = _to_list_item(entity, primary_sponsor=primary_sponsor)
+    tags_out = _active_tags_by_bill(db, [entity_id]).get(entity_id, [])
+    list_item = _to_list_item(entity, primary_sponsor=primary_sponsor, tags=tags_out)
 
     news_out = [
         NewsItemOut(id=e.id, title=e.title, url=e.source.url, publisher=e.source.publisher, published_date=e.event_date)

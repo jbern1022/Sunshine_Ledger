@@ -89,6 +89,7 @@ class BillListItem(BaseModel):
     source_count: int
     full_text_url: str | None
     primary_sponsor: str | None
+    tags: list["TagOut"]
 
 
 class BillDetail(BillListItem):
@@ -109,3 +110,23 @@ class StatusCount(BaseModel):
 
     status: str
     count: int
+
+
+class TagOut(BaseModel):
+    bill_tag_id: uuid.UUID
+    slug: str
+    label: str
+    tag_source: str
+    active: bool
+
+
+class TagCount(BaseModel):
+    """One badge and how many (active-tagged) bills carry it, for a filter UI."""
+
+    slug: str
+    label: str
+    count: int
+
+
+class BillTagUpdate(BaseModel):
+    active: bool
