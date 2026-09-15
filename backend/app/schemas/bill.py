@@ -98,6 +98,7 @@ class BillDetail(BillListItem):
     claims: list[ClaimOut]
     news: list[NewsItemOut]
     votes: list[RollCallOut]
+    demographic_overlays: list["DemographicOverlayOut"]
 
 
 class BillListResponse(BaseModel):
@@ -130,3 +131,28 @@ class TagCount(BaseModel):
 
 class BillTagUpdate(BaseModel):
     active: bool
+
+
+class DemographicMetricOut(BaseModel):
+    label: str
+    estimate: float | None
+    # Always present (never omitted) for an ACS-sourced metric, per BRD 7.
+    # Null for BLS metrics -- BLS doesn't publish one for this series.
+    margin_of_error: float | None
+    unit: str
+
+
+class DemographicOverlayOut(BaseModel):
+    """ACS/BLS "who it affects" context for one badge on this bill.
+    `geography_type`/`geography_id` say exactly what geography the numbers
+    describe -- a sponsor's district for a state bill, a county for a local
+    one -- so the frontend can (and must) label it honestly rather than
+    imply the number describes the bill's full reach."""
+
+    badge_slug: str
+    badge_label: str
+    source: str  # acs | bls
+    geography_type: str  # district | county
+    geography_id: str
+    as_of: str
+    metrics: list[DemographicMetricOut]
