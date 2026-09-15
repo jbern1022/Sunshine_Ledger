@@ -98,6 +98,19 @@ def test_search_matches_name_and_district(client, db_session, bill_factory):
     assert client.get("/people", params={"q": "nobody"}).json()["total"] == 0
 
 
+def test_total_reflects_full_match_count_not_just_the_page(client, db_session, bill_factory):
+    """total must be a real count of every match, not len() of the paginated
+    page -- otherwise a client paging through results sees `total` shrink to
+    `limit` and never knows there's more to fetch."""
+    for i in range(5):
+        person = _add_person(db_session, name=f"Legislator {i}")
+        _sponsor(db_session, person, bill_factory(bill_number=f"HB {i}"))
+
+    body = client.get("/people", params={"limit": 2}).json()
+    assert body["total"] == 5
+    assert len(body["items"]) == 2
+
+
 def test_detail_lists_bills_with_relationship_type(client, db_session, bill_factory):
     bill = bill_factory(bill_number="HB 7", name="A Test Bill")
     person = _add_person(db_session, name="Jane Smith", district="HD-120")

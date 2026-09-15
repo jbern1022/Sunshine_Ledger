@@ -18,17 +18,26 @@ import type { PersonListItem } from "@/lib/types";
  *  good nor bad, and the page says so rather than letting a leaderboard
  *  imply otherwise.
  */
+const PAGE_SIZE = 100;
+
 export default function PeoplePage() {
   const [people, setPeople] = useState<PersonListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
+  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // A new search starts back at page 1 -- otherwise a narrowed search could
+  // land on an offset past the end of the new, smaller result set.
+  useEffect(() => {
+    setOffset(0);
+  }, [q]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchPeople({ q: q || undefined, limit: 100 })
+    fetchPeople({ q: q || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
         if (cancelled) return;
         setPeople(res.items);
@@ -40,7 +49,12 @@ export default function PeoplePage() {
     return () => {
       cancelled = true;
     };
-  }, [q]);
+  }, [q, offset]);
+
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const hasPrev = offset > 0;
+  const hasNext = offset + PAGE_SIZE < total;
 
   return (
     <div>
@@ -69,7 +83,10 @@ export default function PeoplePage() {
 
       {!error && !loading && people.length > 0 && (
         <>
-          <p className="mt-4 text-xs text-slate-400">{total} sponsors</p>
+          <p className="mt-4 text-xs text-slate-400">
+            {total} sponsor{total === 1 ? "" : "s"}
+            {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
+          </p>
           <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {people.map((p) => (
               <li key={p.entity_id} className="flex items-baseline justify-between gap-3 px-4 py-3">
@@ -90,6 +107,28 @@ export default function PeoplePage() {
               </li>
             ))}
           </ul>
+
+          {(hasPrev || hasNext) && (
+            <div className="mt-6 flex items-center justify-between">
+              <button
+                onClick={() => setOffset((o) => Math.max(o - PAGE_SIZE, 0))}
+                disabled={!hasPrev}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Previous
+              </button>
+              <span className="text-xs text-slate-400">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+                disabled={!hasNext}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>
