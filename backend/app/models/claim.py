@@ -24,7 +24,7 @@ class Claim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     bill_entity_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    claim_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # what_it_does | who_it_affects | status_update
+    claim_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)  # what_it_does | who_it_affects | status_update | rhetoric_gap
     claim_text: Mapped[str] = mapped_column(Text, nullable=False)
     generated_by: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "llm:llama3.1" or "manual_review"
 
