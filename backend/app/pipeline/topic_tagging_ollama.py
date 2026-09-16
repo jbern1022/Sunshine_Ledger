@@ -42,7 +42,7 @@ Description:
 {description}
 \"\"\"
 
-Choose every badge category below that clearly applies. A bill can have more than one. If nothing fits clearly, choose only "governance".
+Choose every badge category below that clearly applies. A bill can have more than one. Do NOT include "governance" alongside another category just because the bill is a piece of local legislation -- every bill is that. Choose "governance" only when nothing more specific applies, and choose it alone in that case.
 
 Categories (respond using the slug, not the label):
 {category_list}
