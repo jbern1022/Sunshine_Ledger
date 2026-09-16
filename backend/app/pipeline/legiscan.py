@@ -270,13 +270,16 @@ def _sync_bill_votes(
 def _extract_subjects(detail: dict) -> list[str]:
     """Raw FL Subject Index strings from a getBill response.
 
-    Per LegiScan's documented API shape, `subjects` is a list of
-    {"subject_id": int, "subject_name": str}. NOT verified by hand against a
-    live response (unlike the votes field this pipeline already consumes --
-    see tests/test_legiscan_votes.py's docstring) since no LEGISCAN_API_KEY
-    was available while writing this. Defensive against the field being
-    absent or shaped unexpectedly so a wrong guess here degrades to "no
-    tags assigned" rather than breaking bill ingestion.
+    Shape verified by hand 2026-09-16 against live getBill responses (63
+    bills across FL, CA, NY): `subjects` is present as documented --
+    {"subject_id": int, "subject_name": str} -- but was empty on every bill
+    tested, in every state tested, on this API key's tier. This is a data
+    availability limit, not a parsing bug: LegiScan simply isn't returning
+    subject data here, so tag coverage from this source will be zero until
+    that's resolved (see the LegiScan getBill verification ticket). Still
+    defensive against the field being absent or shaped unexpectedly so a
+    wrong guess degrades to "no tags assigned" rather than breaking
+    ingestion.
     """
     subjects = detail.get("subjects")
     if not isinstance(subjects, list):
