@@ -39,7 +39,24 @@ docker compose -f docker-compose.yml cp sl_migrate:/app/migrations/versions/<fil
 docker compose -f docker-compose.yml rm -f sl_migrate
 docker compose -f docker-compose.yml build backend   # bake the migration file in
 docker compose -f docker-compose.yml run --rm backend alembic upgrade head
+
+# after a migration that ADDS a lookup/seed table (e.g. bill topic tagging's
+# `tags` table) -- run the matching seed script once, or every row it
+# depends on stays silently empty. tag_local_bill/assign_tags_for_bill do
+# NOT raise on an empty Tag table; they just insert zero tags, so nothing
+# errors and nothing warns you -- confirmed the hard way 2026-09-18, when a
+# fresh deploy ran the topic-tagging backfill and silently wrote 0 tags for
+# 20 bills before anyone noticed:
+docker compose -f docker-compose.yml exec backend python -m app.pipeline.topic_tagging_seed
 ```
+
+**`--project-name`/`-p` matters if your local checkout's folder name differs
+from `sunshineledger`.** Compose derives the project name from the working
+directory by default, so a differently-named clone (e.g. a scratch checkout)
+silently targets a *different*, parallel stack instead of the real one —
+`docker compose ... ps` would show nothing instead of the live containers.
+Always pass `-p sunshineledger` explicitly, or verify with `docker compose -f
+docker-compose.yml -p sunshineledger ps` before any `up -d` against prod.
 
 **Important**: `docker compose -f docker-compose.yml ...` (explicit `-f`) skips
 `docker-compose.override.yml`, which is local-dev-only (bind mounts +
