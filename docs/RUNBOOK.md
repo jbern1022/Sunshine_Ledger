@@ -96,6 +96,37 @@ container before using the file, it's gone. Do the download and the work
 that needs it in the same `docker compose exec` session, or write to a
 mounted volume instead.
 
+## Branching workflow
+
+**Gitea `main` is canonical.** It's what production is deployed from.
+GitHub is a mirror, pushed in the same step.
+
+1. **Start every piece of work from a fresh fetch**, on a branch:
+   ```bash
+   git fetch --all
+   git switch -c feature/<name> gitea/main
+   ```
+2. **Never commit directly to local `main`.** Merge a branch into `main`
+   only right before pushing, and push in the same sitting:
+   ```bash
+   git switch main && git merge --ff-only gitea/main   # refuse to proceed if main has drifted
+   git merge --no-ff feature/<name>
+   git push gitea main && git push github main
+   ```
+3. **Deploy only a `main` that matches `gitea/main`.** Before running
+   `scripts/deploy.sh`, `git rev-parse main gitea/main` should print the
+   same hash twice.
+4. **Don't leave unpushed work sitting across sessions.** If a branch isn't
+   ready to merge, push the branch itself (`git push gitea feature/<name>`)
+   so it's visible and can't silently fork from what's deployed.
+
+Why: in the 2026-09-20 outage, local `main` (9 unpushed commits) and
+`gitea/main` (20 commits, the deployed code) had diverged from a common
+ancestor, and each had built its own incompatible version of bill topic
+tagging with different DB schemas. Deploying local `main` mid-fix caused a
+second outage (`column bill_tags.category does not exist`). Every rule above
+would have caught that before it reached production.
+
 ## Scheduled ingestion
 
 `/home/joe/scripts/run-ingestion.sh` runs on Omen itself (not from the Mac)
