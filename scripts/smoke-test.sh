@@ -18,9 +18,19 @@ BAD_PATTERNS=("localhost:8010" "localhost:8000" "localhost:3010" "http://backend
 fail=0
 
 echo "==> Checking $PUBLIC_API_URL/health"
-api_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$PUBLIC_API_URL/health" 2>/dev/null || echo "000")"
+# A freshly-recreated container's `docker compose up -d` returns as soon as
+# the process starts, not once it's actually accepting connections through
+# the tunnel -- running the check immediately after a real redeploy can hit
+# a transient 502 before the container (and cloudflared's routing to it)
+# has settled. Retry briefly rather than fail the whole deploy on that race.
+api_status="000"
+for _ in 1 2 3 4 5 6; do
+  api_status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$PUBLIC_API_URL/health" 2>/dev/null || echo "000")"
+  [[ "$api_status" == "200" ]] && break
+  sleep 5
+done
 if [[ "$api_status" != "200" ]]; then
-  echo "FAIL: API health check returned $api_status" >&2
+  echo "FAIL: API health check returned $api_status (after retries)" >&2
   fail=1
 else
   echo "OK: API is up"
