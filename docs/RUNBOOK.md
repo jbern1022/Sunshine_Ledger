@@ -18,6 +18,32 @@ this covers what to do when something needs attention.
 
 ## Deploy / redeploy
 
+**Standard path: `scripts/deploy.sh`.** Run it from anywhere, on the local
+Mac, with a clean repo checkout:
+
+```bash
+scripts/deploy.sh
+```
+
+It resolves the compose file and `.env` relative to its own location (never
+the caller's `cwd`), refuses to run if either is missing, refuses to build if
+`NEXT_PUBLIC_API_URL` isn't a real public `https://` origin, always passes
+`-p sunshineledger -f docker-compose.yml --env-file .env` against the
+`sunshine-vm` docker context, and finishes by running `scripts/smoke-test.sh`
+against the live site. This exists because the 2026-09-20 outage was caused
+by an ad hoc `docker compose` invocation that picked up a stale scratchpad
+clone's compose file and `.env` instead of the repo's own — a build that
+succeeded and deployed clean, then silently pointed every visitor's browser
+at `localhost`. Prefer this script over typing `docker compose` commands by
+hand; use the manual commands below only for the cases it doesn't cover
+(migrations) or for debugging.
+
+**Smoke test only** (no deploy): `scripts/smoke-test.sh` — checks
+`GET /health` on the public API and scans the frontend's served JS chunks
+for a hardcoded `localhost` API URL, the exact failure mode from that outage.
+
+### Manual commands (migrations, or debugging a deploy.sh failure)
+
 All commands run from the repo root on the local Mac, targeting the remote host via the `sunshine-vm` docker context:
 
 ```bash
