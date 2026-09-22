@@ -195,6 +195,12 @@ docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.summ
 
 # GDELT headlines (slow -- ~8s/bill minimum due to rate limiting, see gotcha below)
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.gdelt
+
+# FL staff bill analyses (legislative-intent context, per-committee-stop --
+# a bill can pick up several over its life). One getBill call per already-
+# ingested bill plus one getSupplement call per not-yet-stored analysis, so
+# it spends real LegiScan quota; safe to re-run, only fetches new ones.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.staff_analysis
 ```
 
 ## Secrets / rotation

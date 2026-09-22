@@ -98,6 +98,15 @@ class LegiScanClient:
         not confirmed, until a real amendment_id has been run through it."""
         return self._call("getAmendment", id=str(amendment_id))["amendment"]
 
+    def get_supplement(self, supplement_id: int) -> dict:
+        """Full supplement document (base64 doc + mime) -- same shape family
+        as getBillText/getAmendment. Used for staff bill analyses (see
+        pipeline/staff_analysis.py): a supplement's own `state_link` 404s
+        into a soft-404 HTML page for older/rotated links rather than
+        serving the PDF directly (confirmed 2026-09-21), so the document is
+        always fetched through this op instead of that URL."""
+        return self._call("getSupplement", id=str(supplement_id))["supplement"]
+
 
 def _person_attributes(*, district: str | None, role: str | None, party: str | None) -> dict:
     """Only the fields LegiScan actually populates -- omitting empties keeps
