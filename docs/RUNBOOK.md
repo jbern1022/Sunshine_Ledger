@@ -377,14 +377,30 @@ ingestion" above). Each script pings on success and failure; a *missing*
 ping is itself an alert, which catches the job not running at all, not
 just a job that ran and failed.
 
-**This is not live yet.** Every ping is a silent no-op until
-`scripts/monitoring.env` exists on Omen with real Uptime Kuma Push-monitor
-URLs in it (see `scripts/monitoring.env.example` for the exact steps —
-Kuma is already running on this host for other services). That setup has
-to happen in the Kuma UI, so it can't be done from here; it's tracked as
-the remaining step on the "add uptime monitoring" / "cron jobs fail
-silently" tickets. Until it's done, treat this section as if it still said
-"no alerting" for anything not covered by the two endpoints below.
+**State as of 2026-09-22 (audited from Kuma's own database):**
+`~/scripts/monitoring.env` exists on Omen, and Kuma has a Push monitor for
+the nightly backup ("Sunshine Ledger nightly backup"). There's no Push
+monitor for ingestion yet, and the frontend has an HTTP monitor but the API
+doesn't.
+
+**Push URLs must use `http://localhost:3001/api/push/<token>`, never the
+public `https://uptime.josephbernal.com/...` URL Kuma displays.** The public
+hostname sits behind Authelia, so a cron job's unauthenticated `curl` gets a
+302 to the login page and never reaches Kuma. `monitor_ping` swallows the
+failure by design, so nothing logs it. That's exactly what happened: backups
+succeeded every night, while Kuma recorded "No heartbeat in the time window"
+and marked the backup monitor DOWN every day, at least 2026-09-18 → 09-22.
+Kuma runs on the same host as cron, so `localhost` skips the auth proxy
+entirely.
+
+**A DOWN monitor still pages nobody unless Kuma has a notification
+channel.** As of this audit it had none. ntfy runs on the same host
+(`http://192.168.4.20:8095`). Add it under Settings → Notifications with
+"Default enabled" and "Apply on all existing monitors" ticked, then check it
+with a test notification.
+
+Point the API's HTTP monitor at `/health/data`, not `/health`. See below for
+why.
 
 Two endpoints exist, and they answer different questions:
 

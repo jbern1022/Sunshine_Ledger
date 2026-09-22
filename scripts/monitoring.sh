@@ -14,8 +14,8 @@
 #
 # CONFIGURATION -- put the push URLs in monitoring.env beside this file:
 #
-#   BACKUP_PUSH_URL="https://uptime.example.com/api/push/aBcDeF"
-#   INGESTION_PUSH_URL="https://uptime.example.com/api/push/GhIjKl"
+#   BACKUP_PUSH_URL="http://localhost:3001/api/push/aBcDeF"
+#   INGESTION_PUSH_URL="http://localhost:3001/api/push/GhIjKl"
 #
 # Until that file exists with a URL set, every ping is a silent no-op and
 # the jobs behave exactly as they do today. Nothing here can turn a working
