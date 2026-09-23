@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { getBill } from "@/lib/server-api";
 import TagBadges from "@/components/TagBadges";
 import AmendmentDiff from "@/components/AmendmentDiff";
+import BillLayers from "@/components/BillLayers";
+import { hasAnyLayer } from "@/lib/layers";
 
 /** Permalink for a single bill.
  *
@@ -81,18 +83,24 @@ export default async function BillPage({ params }: Props) {
         <TagBadges tags={bill.tags} />
       </header>
 
-      {bill.what_it_does && (
-        <section className="mt-5">
-          <h2 className="text-sm font-semibold text-ledger-900">What it does</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
-        </section>
-      )}
+      {hasAnyLayer(bill.layers) ? (
+        <BillLayers layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} />
+      ) : (
+        <>
+          {bill.what_it_does && (
+            <section className="mt-5">
+              <h2 className="text-sm font-semibold text-ledger-900">What it does</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
+            </section>
+          )}
 
-      {whoItAffects && (
-        <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate-700">{whoItAffects}</p>
-        </section>
+          {whoItAffects && (
+            <section className="mt-4">
+              <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
+              <p className="mt-1 text-sm leading-relaxed text-slate-700">{whoItAffects}</p>
+            </section>
+          )}
+        </>
       )}
 
       {bill.sponsors.length > 0 && (

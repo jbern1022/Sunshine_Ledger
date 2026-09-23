@@ -6,13 +6,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.bill_layers_admin import review_state
 from app.auth import require_admin
 from app.db import get_db
-from app.models import Bill, BillTag, Claim, DemographicOverlay, Entity, Event, Relationship, Tag
+from app.models import (
+    Bill,
+    BillLayer,
+    BillLayerSource,
+    BillTag,
+    Claim,
+    DemographicOverlay,
+    Entity,
+    Event,
+    Relationship,
+    StaffAnalysis,
+    Tag,
+)
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
     AmendmentOut,
     BillDetail,
+    BillLayersOut,
     BillListItem,
     BillListResponse,
     BillTagUpdate,
@@ -20,6 +34,9 @@ from app.schemas.bill import (
     DemographicMetricOut,
     DemographicOverlayOut,
     IndividualVoteOut,
+    LayerBlockOut,
+    LayerItemOut,
+    LayerVersionOut,
     NewsItemOut,
     RollCallOut,
     SourceOut,
@@ -299,6 +316,44 @@ def _demographic_overlays_for_bill(
     ]
 
 
+_ORIGIN_ORDER = {"bill_text": 0, "legislative_staff": 1, "sunshine_ledger_ai": 2}
+
+
+def _layer_version_out(row: BillLayer) -> LayerVersionOut:
+    status, reviewed_at = review_state(row)
+    return LayerVersionOut(
+        id=row.id, version=row.version, evidence_state=row.evidence_state,
+        review_status=status, reviewed_at=reviewed_at, scope_note=row.scope_note,
+        items=[LayerItemOut(**i) for i in row.items], generated_by=row.generated_by,
+        method_version=row.method_version, created_at=row.created_at, superseded_at=row.superseded_at,
+        sources=[SourceOut.model_validate(link.source) for link in row.source_links],
+    )
+
+
+def _layers_for_bill(db: Session, entity_id: uuid.UUID) -> BillLayersOut:
+    rows = db.execute(
+        select(BillLayer)
+        .where(BillLayer.bill_entity_id == entity_id)
+        .options(selectinload(BillLayer.source_links).selectinload(BillLayerSource.source), selectinload(BillLayer.reviews))
+        .order_by(BillLayer.version.desc())
+    ).scalars().all()
+    grouped: dict[tuple[str, str], list[BillLayer]] = {}
+    for row in rows:
+        grouped.setdefault((row.layer, row.origin), []).append(row)
+
+    out = BillLayersOut()
+    for (layer, origin), versions in sorted(grouped.items(), key=lambda kv: _ORIGIN_ORDER[kv[0][1]]):
+        current = next((v for v in versions if v.superseded_at is None), None)
+        if current is None:
+            continue
+        getattr(out, layer).append(LayerBlockOut(
+            origin=origin,
+            current=_layer_version_out(current),
+            earlier_versions=[_layer_version_out(v) for v in versions if v.id != current.id],
+        ))
+    return out
+
+
 @router.get("/{entity_id}", response_model=BillDetail)
 def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
     stmt = (
@@ -415,4 +470,12 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         votes=votes_out,
         demographic_overlays=_demographic_overlays_for_bill(db, entity, bill, tags_out),
         amendments=amendments_out,
+        layers=_layers_for_bill(db, entity_id),
+        has_staff_analysis=db.execute(
+            select(StaffAnalysis.id).where(
+                StaffAnalysis.entity_id == entity_id,
+                StaffAnalysis.text.isnot(None),
+                StaffAnalysis.text != "",
+            ).limit(1)
+        ).first() is not None,
     )

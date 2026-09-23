@@ -143,11 +143,14 @@ class OllamaClient:
         self.model = model or settings.ollama_model
         self._client = httpx.Client(timeout=120.0)
 
-    def generate(self, prompt: str) -> str:
-        resp = self._client.post(
-            f"{self.host}/api/generate",
-            json={"model": self.model, "prompt": prompt, "stream": False},
-        )
+    def generate(self, prompt: str, *, json_mode: bool = False) -> str:
+        # json_mode asks Ollama to constrain output to valid JSON (its
+        # `format: "json"` option). The bill layers pipeline needs structured
+        # items; the existing summary prompts don't pass it and are unchanged.
+        body = {"model": self.model, "prompt": prompt, "stream": False}
+        if json_mode:
+            body["format"] = "json"
+        resp = self._client.post(f"{self.host}/api/generate", json=body)
         resp.raise_for_status()
         data = resp.json()
         if "response" not in data:

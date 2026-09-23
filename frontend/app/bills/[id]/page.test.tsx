@@ -50,6 +50,8 @@ const baseBill: BillDetail = {
   news: [],
   votes: [],
   amendments: [],
+  layers: { bill_says: [], interpretation: [], expected_effect: [] },
+  has_staff_analysis: false,
 };
 
 describe("BillPage", () => {
@@ -88,6 +90,41 @@ describe("BillPage", () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce({ ...baseBill, what_it_does: null });
     await renderBillPage();
     expect(screen.queryByText("What it does")).not.toBeInTheDocument();
+  });
+
+  it("renders the layers view instead of What it does when a layer block is present", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      layers: {
+        bill_says: [],
+        interpretation: [
+          {
+            origin: "sunshine_ledger_ai",
+            current: {
+              id: "lv1",
+              version: 1,
+              evidence_state: "supported",
+              review_status: "not_reviewed",
+              reviewed_at: null,
+              scope_note: "",
+              items: [{ text: "Interp text", section_ref: null, quote: null, assumptions: [], affected_groups: [] }],
+              generated_by: "llm:llama3.1",
+              method_version: "v1",
+              created_at: "2026-02-01T00:00:00Z",
+              superseded_at: null,
+              sources: [],
+            },
+            earlier_versions: [],
+          },
+        ],
+        expected_effect: [],
+      },
+    });
+    await renderBillPage();
+
+    expect(screen.getByRole("heading", { name: "Interpretation" })).toBeInTheDocument();
+    expect(screen.getByText("Interp text")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "What it does" })).not.toBeInTheDocument();
   });
 
   it("shows the who-it-affects claim when present, distinct from what-it-does", async () => {

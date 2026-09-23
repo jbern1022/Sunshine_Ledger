@@ -56,6 +56,8 @@ const baseDetail: BillDetail = {
   news: [],
   votes: [],
   amendments: [],
+  layers: { bill_says: [], interpretation: [], expected_effect: [] },
+  has_staff_analysis: false,
 };
 
 describe("BillCard", () => {
