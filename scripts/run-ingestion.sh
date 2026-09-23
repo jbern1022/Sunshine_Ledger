@@ -9,8 +9,8 @@
 # Steps, in order: pull new/changed state bills (LegiScan), pull new
 # local matters (Legistar: Jacksonville only -- Miami's Legistar client
 # is stale, see docs/RUNBOOK.md), scrape Miami's real source (iQM2),
-# summarize anything new, purge expired flag reporter emails, then (GDELT
-# mode only) refresh news headlines.
+# summarize anything new, update bill page layers, purge expired flag
+# reporter emails, then (GDELT mode only) refresh news headlines.
 #
 # GDELT is deliberately NOT run on every invocation: it re-checks every
 # bill in the database against GDELT's free DOC API (~8s/bill minimum
@@ -72,6 +72,11 @@ print(f'Legistar (jaxcityc): {len(written)} bills upserted')
 step "Miami iQM2 scrape" docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2
 
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
+
+# Bill page layers (Bill Says / Interpretation / Expected Effect). Only
+# re-generates blocks whose inputs changed. Capped per night so a large
+# backlog (e.g. after a prompt change) can't run into the morning.
+step "Bill layers" docker exec "$CONTAINER" python -m app.pipeline.bill_layers_batch --limit 150
 
 # Not ingestion, but it needs to run daily and this is the daily job. Keeps
 # the privacy page's promise: reporter emails on flags resolved 90+ days ago
