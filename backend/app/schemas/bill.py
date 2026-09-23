@@ -107,6 +107,45 @@ class BillListItem(BaseModel):
     tags: list["TagOut"]
 
 
+class LayerItemOut(BaseModel):
+    text: str
+    section_ref: str | None = None
+    quote: str | None = None
+    assumptions: list[str] = []
+    affected_groups: list[str] = []
+
+
+class LayerVersionOut(BaseModel):
+    id: uuid.UUID
+    version: int
+    evidence_state: str
+    review_status: str
+    reviewed_at: datetime | None
+    scope_note: str
+    items: list[LayerItemOut]
+    generated_by: str
+    method_version: str
+    created_at: datetime
+    superseded_at: datetime | None
+    sources: list[SourceOut]
+
+
+class LayerBlockOut(BaseModel):
+    """One (layer, origin) block: its current version plus history, newest
+    first. `origin` is a fixed backend value; the frontend maps it to
+    display text through one lookup, never by position or content."""
+
+    origin: str
+    current: LayerVersionOut
+    earlier_versions: list[LayerVersionOut]
+
+
+class BillLayersOut(BaseModel):
+    bill_says: list[LayerBlockOut] = []
+    interpretation: list[LayerBlockOut] = []
+    expected_effect: list[LayerBlockOut] = []
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -118,6 +157,8 @@ class BillDetail(BillListItem):
     votes: list[RollCallOut]
     demographic_overlays: list["DemographicOverlayOut"]
     amendments: list[AmendmentOut]
+    layers: BillLayersOut
+    has_staff_analysis: bool
 
 
 class BillListResponse(BaseModel):
