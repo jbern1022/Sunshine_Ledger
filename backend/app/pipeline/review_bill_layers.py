@@ -2,7 +2,7 @@
 bills and print a markdown report. Writes NOTHING to the database -- the
 person reading the report decides whether the backfill goes ahead.
 
-Sample: half bills with a staff analysis, half without (state and local),
+Sample: half with staff analysis, quarter state without, quarter local,
 so both origins and both staff formats are exercised.
 
 Usage:
@@ -33,10 +33,25 @@ def _sample(db, n: int, bill_numbers: list[str]) -> list[Entity]:
     with_staff = db.execute(
         base.where(Bill.full_text.isnot(None), Entity.id.in_(has_staff)).order_by(func.random()).limit(n // 2)
     ).scalars().all()
-    without = db.execute(
-        base.where(Bill.full_text.isnot(None), Entity.id.not_in(has_staff)).order_by(func.random()).limit(n - n // 2)
+    state_without = db.execute(
+        base.where(
+            Bill.full_text.isnot(None),
+            Entity.id.not_in(has_staff),
+            Entity.jurisdiction_level == "state",
+        )
+        .order_by(func.random())
+        .limit(n // 4)
     ).scalars().all()
-    return list(with_staff) + list(without)
+    local = db.execute(
+        base.where(
+            Bill.full_text.isnot(None),
+            Entity.id.not_in(has_staff),
+            Entity.jurisdiction_level != "state",
+        )
+        .order_by(func.random())
+        .limit(n - n // 2 - n // 4)
+    ).scalars().all()
+    return list(with_staff) + list(state_without) + list(local)
 
 
 def _render(title: str, result: gen.LayerResult) -> list[str]:
@@ -47,7 +62,9 @@ def _render(title: str, result: gen.LayerResult) -> list[str]:
         for a in i.get("assumptions") or []:
             lines.append(f"  - assumption: {a}")
     for d in result.dropped:
-        lines.append(f"- ~~dropped~~: `{d}`")
+        text = d.get('text') or d.get('quote') or d
+        ref = f" ({d.get('section_ref')})" if isinstance(d, dict) and d.get('section_ref') else ""
+        lines.append(f"- ~~dropped~~: {text}{ref}")
     return lines
 
 
@@ -85,8 +102,8 @@ def main() -> None:
                                    gen.build_staff_interpretation(extract_effect_section(analysis.text), label, client))
                     out += _render("Expected Effect · staff",
                                    gen.build_staff_expected_effect(extract_fiscal_section(analysis.text), label, client))
-            except gen.LayerGenerationError as exc:
-                out.append(f"**Generation error:** {exc}")
+            except Exception as exc:  # noqa: BLE001 -- one bad bill shouldn't sink the report
+                out.append(f"**Generation error:** {type(exc).__name__}: {exc}")
             out.append("")
         total_q = kept_quotes + dropped_quotes
         total_e = kept_effects + dropped_effects
