@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +31,9 @@ class Flag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     reason_text: Mapped[str] = mapped_column(Text, nullable=False)
     reporter_email: Mapped[str | None] = mapped_column(String(320))
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)  # pending | reviewed | dismissed
+    # When the flag left "pending". The privacy page promises reporter emails
+    # are deleted 90 days after this -- see pipeline/purge_flag_emails.py.
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     bill_entity: Mapped["Entity"] = relationship()
     claim: Mapped["Claim | None"] = relationship()

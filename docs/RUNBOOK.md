@@ -160,6 +160,16 @@ cancelled the Miami scrape and the summarization run behind it — nightly
 ingestion was dead for four consecutive nights (Aug 21–24) and 45 bills sat
 ingested but unsummarized. If you edit this script, keep the isolation.
 
+**The daily run also purges flag reporter emails** (`purge_flag_emails`).
+The public privacy page promises emails left on "Flag this" reports are
+deleted within 90 days of the report being resolved (`flags.resolved_at`,
+set when a flag is marked reviewed/dismissed). This step is what keeps
+that promise; if it starts failing, the privacy page becomes untrue.
+Preview with `docker exec sunshineledger-backend-1 python -m
+app.pipeline.purge_flag_emails --dry-run`. `/home/joe/scripts/` on Omen is
+a hand-copied snapshot of `scripts/`, not a checkout -- after changing
+`run-ingestion.sh`, copy it over.
+
 **Nothing alerts on failure.** Both this and the backup script fail loudly
 to their logs, but cron discards the exit code, so "loud" still means
 "nobody finds out". Until a push monitor exists (tracked in Todoist):

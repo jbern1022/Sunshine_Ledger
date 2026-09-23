@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SECURITY_POLICY_URL } from "@/lib/links";
+
 export const metadata: Metadata = {
   title: "How this works — Sunshine Ledger",
   description:
@@ -121,7 +123,11 @@ export default function MethodologyPage() {
         <Link href="/privacy" className="underline hover:text-slate-600">
           privacy and terms
         </Link>{" "}
-        page.
+        page and the{" "}
+        <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-600">
+          security policy
+        </a>
+        .
       </p>
     </article>
   );

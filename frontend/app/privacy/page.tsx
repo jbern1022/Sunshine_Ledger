@@ -1,3 +1,7 @@
+import Link from "next/link";
+
+import { SECURITY_POLICY_URL, SECURITY_REPORT_URL } from "@/lib/links";
+
 export const metadata = {
   title: "Privacy & Terms — Sunshine Ledger",
 };
@@ -6,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-ledger-900">Privacy &amp; Terms</h1>
-      <p className="text-sm text-slate-500">Last updated August 2026.</p>
+      <p className="text-sm text-slate-500">Last updated September 2026.</p>
 
       <p className="mt-6 text-sm leading-relaxed text-slate-700">
         Sunshine Ledger is a Bernal Labs project that tracks Florida state and local
@@ -46,13 +50,37 @@ export default function PrivacyPage() {
         you across sites and isn&apos;t used for advertising.
       </p>
 
+      <h3 className="mt-4 font-semibold text-slate-800">Browser storage and analytics</h3>
+      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+        That cookie is the only thing the site stores in your browser. It doesn&apos;t use
+        local storage, doesn&apos;t load any analytics or tracking scripts, and doesn&apos;t
+        count or profile visitors.
+      </p>
+
+      <h3 className="mt-4 font-semibold text-slate-800">Map tiles</h3>
+      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+        The <Link href="/map" className="underline hover:text-slate-900">map page</Link> loads
+        its background map images directly from OpenStreetMap&apos;s servers, so your browser
+        sends them your IP address, as it would to any website. Their handling of it is
+        covered by the{" "}
+        <a
+          href="https://osmfoundation.org/wiki/Privacy_Policy"
+          className="underline hover:text-slate-900"
+        >
+          OpenStreetMap Foundation privacy policy
+        </a>
+        . No other page loads anything from a third party.
+      </p>
+
       <h3 className="mt-4 font-semibold text-slate-800">&quot;Flag this&quot; reports</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-700">
         If you report a suspected inaccuracy, the report text and (only if you choose
         to provide one) your email address are stored so the report can be reviewed.
         Providing an email is optional and only used to follow up on that specific
         report — it isn&apos;t used for marketing and isn&apos;t shown publicly anywhere on the
-        site.
+        site. The email is kept while the report is open, and deleted automatically
+        within 90 days after the report is resolved. The report text itself is kept as
+        part of the site&apos;s correction history.
       </p>
 
       <h3 className="mt-4 font-semibold text-slate-800">Standard server logs</h3>
@@ -75,11 +103,52 @@ export default function PrivacyPage() {
         reviewed.
       </p>
 
+      <h2 className="mt-8 text-lg font-semibold text-ledger-900">Terms of use</h2>
+      <ul className="mt-2 space-y-1 text-sm leading-relaxed text-slate-700">
+        <li>
+          <span className="font-medium">Informational only, not legal advice.</span> Nothing on
+          this site is legal advice or an official record. For anything that matters — a legal
+          question, a vote, a compliance decision — rely on the official source, which every
+          bill links to.
+        </li>
+        <li>
+          <span className="font-medium">No guarantee of accuracy.</span> The site is provided
+          as-is. Summaries are AI-generated, bill data can lag behind the official record, and
+          coverage is partial. See{" "}
+          <Link href="/methodology" className="underline hover:text-slate-900">
+            how this works
+          </Link>{" "}
+          for the known limits.
+        </li>
+        <li>
+          <span className="font-medium">Corrections.</span> Use &quot;Flag this&quot; on any bill.
+          Reports go to manual review, and corrections are made against the original source.
+        </li>
+        <li>
+          <span className="font-medium">Reusing the content.</span> The underlying bill records
+          are public government records. If you quote a summary, please link back to the bill
+          page so readers can see the source.
+        </li>
+      </ul>
+
+      <h2 className="mt-8 text-lg font-semibold text-ledger-900">Security</h2>
+      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+        Found a security problem? Please report it privately through{" "}
+        <a href={SECURITY_REPORT_URL} className="underline hover:text-slate-900">
+          GitHub&apos;s private vulnerability reporting
+        </a>{" "}
+        rather than a public issue. The{" "}
+        <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-900">
+          security policy
+        </a>{" "}
+        covers what&apos;s in scope.
+      </p>
+
       <h2 className="mt-8 text-lg font-semibold text-ledger-900">Contact</h2>
       <p className="mt-1 text-sm leading-relaxed text-slate-700">
-        Questions about this page or a specific report you submitted can be sent
-        through the &quot;Flag this&quot; form on any bill, with your email included if you&apos;d
-        like a reply.
+        Questions about this page, or a request to delete the email on a report you
+        submitted sooner, can be sent through the &quot;Flag this&quot; form on any bill, with
+        your email included if you&apos;d like a reply.
       </p>
     </div>
   );
