@@ -67,6 +67,43 @@ export default function MethodologyPage() {
       </section>
 
       <section className="mt-6">
+        <h2 className="text-base font-semibold text-ledger-900">Bill Says, Interpretation, Expected Effect</h2>
+        <p className="mt-2 text-sm text-slate-700">
+          Bill pages separate three kinds of statement so you always know which one you are reading.
+        </p>
+        <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
+          <li>
+            <span className="font-medium">Bill Says</span> — quotes from the bill itself. An AI model picks the
+            provisions, but every quote is checked word for word against the bill text, and any quote that doesn&apos;t
+            match is thrown out.
+          </li>
+          <li>
+            <span className="font-medium">Interpretation</span> — what the change means. Where Florida legislative
+            staff have published an analysis, their reading is shown first, condensed by AI and labeled with the
+            committee and date. Sunshine Ledger&apos;s own AI interpretation of the bill text is shown separately and
+            labeled as such, with the assumptions it depends on.
+          </li>
+          <li>
+            <span className="font-medium">Expected Effect</span> — what may happen. These are forecasts, not facts,
+            and not legal or financial advice. Staff fiscal findings are restated as staff wrote them, including
+            &ldquo;none&rdquo; or &ldquo;indeterminate&rdquo;. Sunshine Ledger only describes effects that a
+            specific section of the bill creates; each must cite that section and use words like &ldquo;may&rdquo;
+            or &ldquo;could&rdquo;, or it is not published.
+          </li>
+        </ul>
+        <p className="mt-2 text-sm text-slate-700">
+          Every AI-written block says whether it has been reviewed by a person. A new version starts unreviewed,
+          even if the one it replaced was reviewed. Earlier versions stay visible on the page rather than being
+          silently rewritten.
+        </p>
+        <p className="mt-2 text-sm text-slate-700">
+          <span className="font-medium">Not yet evaluated</span> means we haven&apos;t analyzed that part yet — not
+          that there is nothing to find. <span className="font-medium">Insufficient evidence</span> means we looked,
+          within the scope stated, and couldn&apos;t support a statement.
+        </p>
+      </section>
+
+      <section className="mt-6">
         <h2 className="text-base font-semibold text-ledger-900">Limits worth knowing</h2>
         <ul className="mt-2 space-y-1.5 text-sm text-slate-700">
           <li>
