@@ -103,7 +103,15 @@ class BillLayerReview(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """
 
     __tablename__ = "bill_layer_reviews"
-    __table_args__ = (CheckConstraint("decision IN ('approved')", name="ck_bill_layer_reviews_decision"),)
+    __table_args__ = (
+        CheckConstraint("decision IN ('approved')", name="ck_bill_layer_reviews_decision"),
+        Index(
+            "uq_bill_layer_reviews_one_approval",
+            "bill_layer_id",
+            unique=True,
+            postgresql_where=text("decision = 'approved'"),
+        ),
+    )
 
     bill_layer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("bill_layers.id", ondelete="CASCADE"), nullable=False, index=True

@@ -1,6 +1,10 @@
+import uuid
 from datetime import datetime, timezone
 
-from app.models import BillLayer
+import pytest
+from sqlalchemy.exc import IntegrityError
+
+from app.models import BillLayer, BillLayerReview
 
 AUTH = ("testadmin", "testpass")
 
@@ -57,3 +61,26 @@ def test_only_approved_decision_accepted(client, db_session, bill_factory):
     entity = bill_factory()
     row = _layer(db_session, entity)
     assert client.post(f"/bill-layers/admin/{row.id}/review", json={"decision": "rejected"}, auth=AUTH).status_code == 422
+
+
+def test_review_unknown_id_is_404(client):
+    resp = client.post(f"/bill-layers/admin/{uuid.uuid4()}/review", json={"decision": "approved"}, auth=AUTH)
+    assert resp.status_code == 404
+
+
+def test_review_without_auth_is_401(client, db_session, bill_factory):
+    entity = bill_factory()
+    row = _layer(db_session, entity)
+    resp = client.post(f"/bill-layers/admin/{row.id}/review", json={"decision": "approved"})
+    assert resp.status_code == 401
+
+
+def test_db_guard_rejects_second_approval_row(db_session, bill_factory):
+    entity = bill_factory()
+    row = _layer(db_session, entity)
+    db_session.add(BillLayerReview(bill_layer_id=row.id, decision="approved", reviewer="a", note=None))
+    db_session.commit()
+    db_session.add(BillLayerReview(bill_layer_id=row.id, decision="approved", reviewer="b", note=None))
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

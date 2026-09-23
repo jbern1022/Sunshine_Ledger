@@ -72,9 +72,14 @@ def upgrade() -> None:
         sa.CheckConstraint("decision IN ('approved')", name='ck_bill_layer_reviews_decision'),
     )
     op.create_index('ix_bill_layer_reviews_bill_layer_id', 'bill_layer_reviews', ['bill_layer_id'])
+    op.create_index(
+        'uq_bill_layer_reviews_one_approval', 'bill_layer_reviews', ['bill_layer_id'],
+        unique=True, postgresql_where=sa.text("decision = 'approved'"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index('uq_bill_layer_reviews_one_approval', table_name='bill_layer_reviews')
     op.drop_index('ix_bill_layer_reviews_bill_layer_id', table_name='bill_layer_reviews')
     op.drop_table('bill_layer_reviews')
     op.drop_table('bill_layer_sources')

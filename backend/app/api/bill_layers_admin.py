@@ -14,6 +14,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.auth import require_admin
@@ -107,6 +108,10 @@ def review_layer(
         raise HTTPException(status_code=409, detail="Already approved")
     review = BillLayerReview(bill_layer_id=layer.id, decision=payload.decision, reviewer=admin, note=payload.note)
     db.add(review)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Already approved")
     db.refresh(review)
     return ReviewOut(id=review.id, bill_layer_id=review.bill_layer_id, decision=review.decision, created_at=review.created_at)
