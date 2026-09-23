@@ -44,7 +44,6 @@ New table `bill_layers`, append-only:
 | `version` | int, increments per (bill, layer, origin), starting at 1 |
 | `superseded_at` | null = current |
 | `evidence_state` | `supported` \| `insufficient_evidence` |
-| `review_status` | `not_reviewed` \| `reviewed` (all rows `not_reviewed` in this spec) |
 | `scope_note` | human-readable scope, e.g. "Staff analysis, Appropriations Committee, 2026-09-12" or "First 12,000 characters of bill text" |
 | `items` | JSONB list of `{text, section_ref, quote, assumptions: [], affected_groups: []}`; unused fields null/empty |
 | `generated_by` | e.g. `llm:llama3.1:8b` |
@@ -62,6 +61,34 @@ Allowed (layer, origin) pairs: `bill_says/bill_text`; `interpretation/legislativ
 **"Not yet evaluated" is not stored.** It means no row exists. "No staff analysis published" also means no row exists and the bill has no `staff_analyses` rows. Absence of analysis is never written as a finding.
 
 **Append-only rule:** the pipeline only inserts. When an input hash changes, it inserts version N+1 and sets `superseded_at` on version N in the same transaction. No code path updates `items`, `evidence_state`, or `scope_note` on an existing row.
+
+## Human review
+
+Every AI-produced block shows one of two review labels, so readers can tell whether a person has checked it:
+
+- **AI-generated · not reviewed by a person**
+- **AI-generated · reviewed by a person on <date>**
+
+"AI-generated" stays in the reviewed label: review confirms the text, it doesn't change who wrote it.
+
+Which blocks carry a review label:
+- `sunshine_ledger_ai` blocks (Interpretation, Expected Effect).
+- `legislative_staff` blocks too, because their statements are condensed from the staff analysis by AI. Badge: "Legislative staff analysis · <committee>, <date> · condensed by AI · <review label>".
+- `bill_says` does not: its quotes are checked word for word by code. It shows "Quotes checked word for word against the bill text" instead.
+
+**Storage (keeps rows append-only).** Review is recorded in its own append-only table, never as an update to `bill_layers`:
+
+`bill_layer_reviews`: `id`, `bill_layer_id` (FK), `decision` (`approved` only in this spec), `reviewer` (admin username, internal only, never shown publicly), `note` (internal), `created_at`.
+
+A version counts as reviewed when it has an `approved` review. The API derives `review_status` (`not_reviewed` / `reviewed`) and `reviewed_at` from this table.
+
+**A new version starts unreviewed.** When the pipeline supersedes a reviewed version, the new current version shows "not reviewed" until a person reviews it. The earlier-versions list keeps the old version's "reviewed on <date>" label.
+
+**How a person reviews.** Admin-only endpoints, same HTTP Basic auth as the flag review queue (`require_admin`):
+- `GET /bill-layers/admin/unreviewed?limit=N`: current versions with no approval, oldest first, including the bill number, the items and the sources needed to check them.
+- `POST /bill-layers/admin/{id}/review` with `{decision: "approved", note?}`. Rejected with 409 if the version is superseded (review the current one instead).
+
+No rejection path in this spec: if a reviewer finds a problem, they file a flag, and the correction goes through the corrections spec (`6hWgXrmHJPmhfhQp`). A review UI is out of scope; the endpoints can be used with curl or a small admin page later.
 
 ## Pipeline
 
@@ -130,7 +157,7 @@ First backfill ≈ 2,500 bills × up to 5 model calls (one per block; staff bloc
 ```
 
 Block: `{origin, current: <version>, earlier_versions: [<version>, ...]}`.
-Version: `{version, evidence_state, review_status, scope_note, items, generated_by, method_version, created_at, superseded_at, sources: [...]}`.
+Version: `{version, evidence_state, review_status, reviewed_at, scope_note, items, generated_by, method_version, created_at, superseded_at, sources: [...]}`.
 
 Also `has_staff_analysis: bool`, so the page can distinguish "No staff analysis published" from "Not yet evaluated".
 
@@ -152,8 +179,9 @@ Each section:
 - Blocks stacked at every width: bill text / legislative staff first, Sunshine Ledger second.
 - Origin badge written in text:
   - "Bill text"
-  - "Legislative staff analysis · <committee>, <date>" (neutral style, links to the PDF)
-  - "Sunshine Ledger analysis · AI-generated · not reviewed by a person" (distinct style)
+  - "Legislative staff analysis · <committee>, <date> · condensed by AI" (neutral style, links to the PDF)
+  - "Sunshine Ledger analysis · AI-generated" (distinct style)
+  - Followed on every AI block by its review label (see "Human review"): "not reviewed by a person" or "reviewed by a person on <date>". The two review labels are visually distinct as well as worded differently.
 - Items: statement; `section_ref` (linked to the full-text disclosure where possible); quote in a blockquote for Bill Says; "Assumptions" list; "Affected groups" when present.
 - Block footer: model and method version, source date, last updated, and a `<details>` "N earlier versions" listing prior versions with dates.
 
@@ -175,12 +203,14 @@ Backend (pytest, model mocked):
 - Versioning: changed input → new version, old superseded; unchanged input → no write; one current row per (bill, layer, origin), enforced by the DB index too; no update path on existing rows.
 - States: no analysis → no staff rows; analysis without the section → `insufficient_evidence` with scope.
 - API: `layers` shape, earlier versions, `has_staff_analysis`, disallowed (layer, origin) pairs rejected.
+- Review: approving a current version makes it `reviewed` with a date; approving a superseded version returns 409; a new version supersedes a reviewed one and starts `not_reviewed` while the old version keeps its label; review endpoints require admin auth; `reviewer` and `note` never appear in the public API.
 
 Frontend (vitest):
 - Each block renders under its own layer heading and origin badge; a block keyed to one layer never appears under another.
 - Empty states render with the exact text.
 - Expected Effect disclaimer present.
 - Earlier-versions expander lists prior versions.
+- Review labels: an unreviewed AI block shows "not reviewed by a person"; a reviewed one shows "reviewed by a person on <date>"; Bill Says shows neither.
 - Bill with no layer rows renders the current page.
 
 Quality gate: `review_bill_layers.py` on ~20 real bills (mix of with/without staff analysis, state and local). The report includes quote pass rate and dropped effect statements. The user reviews it before the backfill.
@@ -189,12 +219,13 @@ Quality gate: `review_bill_layers.py` on ~20 real bills (mix of with/without sta
 
 1. Ship migration, pipeline, API, frontend, and methodology section together. No bill has rows yet, so nothing changes visibly.
 2. Run the quality-gate report; user signs off.
-3. Check mobile (375px) and accessibility in a browser on a bill with rows written by the gate run.
+3. Check mobile (375px) and accessibility in a browser against the local Docker stack, with layer rows (reviewed and unreviewed) seeded for a test bill. The gate run writes nothing to the DB, and anything written to production is immediately public.
 4. Backfill in `--limit` batches over several nights, then enable the nightly step (copy `run-ingestion.sh` to docker-host).
 
 ## Out of scope
 
-- Human review workflow (setting `review_status = reviewed`). Comes with the corrections spec.
+- A review UI (the admin endpoints are in scope; a page for them is not).
+- Rejecting a version during review. Problems go through flags and the corrections spec.
 - Correction change types and severity on versions.
 - Evidence graph beyond this table (evidence taxonomy task).
 - Behavioral/economic/systemic Expected Effects from Sunshine Ledger.
