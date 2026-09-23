@@ -7,7 +7,7 @@ describe("MethodologyPage", () => {
     render(<MethodologyPage />);
     expect(screen.getByRole("heading", { name: "Bill Says, Interpretation, Expected Effect" })).toBeInTheDocument();
     expect(screen.getByText(/checked word for word/)).toBeInTheDocument();
-    expect(screen.getAllByText(/reviewed by a person/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/A new version starts unreviewed/)).toBeInTheDocument();
     expect(screen.getByText(/Not yet evaluated/)).toBeInTheDocument();
   });
 });
