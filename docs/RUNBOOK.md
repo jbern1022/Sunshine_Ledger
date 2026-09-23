@@ -184,6 +184,25 @@ grep 'INGESTION FAILED' /home/joe/scripts/ingestion.log
 grep 'BACKUP FAILED' /home/joe/scripts/backup.log
 ```
 
+## Bill page layers (Bill Says / Interpretation / Expected Effect)
+
+Design: `docs/superpowers/specs/2026-09-23-bill-layers-design.md`.
+
+- Nightly step `bill_layers_batch --limit 150` in `run-ingestion.sh`. Only
+  blocks whose inputs changed are regenerated; each change inserts a new
+  version and never edits an old one.
+- Preview what would run: `docker exec sunshineledger-backend-1 python -m app.pipeline.bill_layers_batch --dry-run --limit 20`
+- Quality report (writes nothing): `docker exec sunshineledger-backend-1 python -m app.pipeline.review_bill_layers --sample 20 > layers-review.md`
+- Review queue (admin auth, same as flags):
+  ```bash
+  curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" https://sunshineledger-api.josephbernal.com/bill-layers/admin/unreviewed?limit=20
+  curl -u "$ADMIN_USERNAME:$ADMIN_PASSWORD" -X POST -H 'Content-Type: application/json' \
+    -d '{"decision":"approved"}' https://sunshineledger-api.josephbernal.com/bill-layers/admin/<id>/review
+  ```
+- Bumping a value in `METHOD_VERSIONS` (`app/pipeline/bill_layers.py`)
+  re-versions every block of that kind over the following nights, and
+  every new version starts "not reviewed". Don't bump for typo fixes.
+
 ## Running pipeline jobs manually
 
 For one-off/ad-hoc runs (backfills, testing changes) from the Mac against
