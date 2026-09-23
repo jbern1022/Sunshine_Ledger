@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -89,6 +91,12 @@ def update_flag_status(
     if flag is None:
         raise HTTPException(status_code=404, detail="Flag not found")
     flag.status = payload.status
+    # Starts the reporter-email retention clock (see purge_flag_emails.py).
+    # Reopening a flag stops it; re-resolving doesn't restart a running one.
+    if payload.status == "pending":
+        flag.resolved_at = None
+    elif flag.resolved_at is None:
+        flag.resolved_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(flag)
     return flag
