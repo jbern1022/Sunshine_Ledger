@@ -8,13 +8,18 @@ this covers what to do when something needs attention.
 
 | Thing | Location |
 |---|---|
-| Docker host (Omen, Proxmox VM) | `192.168.4.20` — SSH alias `docker` |
+| Docker host (`docker-host`, Proxmox VM) | `192.168.4.20` — SSH alias `docker` |
 | Ollama host (Powerstation) | `192.168.4.50:11434` at time of writing — **verify current IP first**, see "Powerstation IP drift" below |
 | Compose project name | `sunshineledger` (containers: `sunshineledger-{db,backend,frontend,cloudflared}-1`) |
 | Public frontend | https://sunshineledger.josephbernal.com |
 | Public API | https://sunshineledger-api.josephbernal.com |
 | Repos | GitHub `jbern1022/Sunshine_Ledger`, Gitea `gitea.josephbernal.com/joe/Sunshine_Ledger` (both kept in sync) |
 | Local working copy | This Mac, `docker --context sunshine-vm compose ...` runs commands against the remote host without SSHing in manually |
+
+Cron jobs, `~/scripts/`, logs and local backups all live on `docker-host`,
+as user `joe` (`ssh docker`). A root shell on the machine named `omen` is a
+different box -- `/home/joe/scripts` doesn't exist there. Check the prompt
+says `joe@docker-host` before running any host command in this runbook.
 
 ## Deploy / redeploy
 
@@ -129,7 +134,7 @@ would have caught that before it reached production.
 
 ## Scheduled ingestion
 
-`/home/joe/scripts/run-ingestion.sh` runs on Omen itself (not from the Mac)
+`/home/joe/scripts/run-ingestion.sh` runs on docker-host itself (not from the Mac)
 via cron, operating directly on the live `sunshineledger-backend-1`
 container with `docker exec` -- no repo checkout needed on that host.
 
@@ -149,7 +154,7 @@ bills that actually changed -- important given the 30,000 query/month
 free-tier cap. Legistar and Miami iQM2 don't have the same metering
 concern and just upsert every run.
 
-Logs land in `/home/joe/scripts/ingestion.log` on Omen (uncapped --
+Logs land in `/home/joe/scripts/ingestion.log` on docker-host (uncapped --
 worth an eye on size over time, no rotation configured yet).
 
 **Steps are deliberately isolated, and the script does not use `set -e`.**
@@ -166,7 +171,7 @@ deleted within 90 days of the report being resolved (`flags.resolved_at`,
 set when a flag is marked reviewed/dismissed). This step is what keeps
 that promise; if it starts failing, the privacy page becomes untrue.
 Preview with `docker exec sunshineledger-backend-1 python -m
-app.pipeline.purge_flag_emails --dry-run`. `/home/joe/scripts/` on Omen is
+app.pipeline.purge_flag_emails --dry-run`. `/home/joe/scripts/` on docker-host is
 a hand-copied snapshot of `scripts/`, not a checkout -- after changing
 `run-ingestion.sh`, copy it over.
 
@@ -388,7 +393,7 @@ ping is itself an alert, which catches the job not running at all, not
 just a job that ran and failed.
 
 **State as of 2026-09-22 (audited from Kuma's own database):**
-`~/scripts/monitoring.env` exists on Omen, and Kuma has a Push monitor for
+`~/scripts/monitoring.env` exists on docker-host, and Kuma has a Push monitor for
 the nightly backup ("Sunshine Ledger nightly backup"). There's no Push
 monitor for ingestion yet, and the frontend has an HTTP monitor but the API
 doesn't.
@@ -451,18 +456,18 @@ Automated, off-box, and restore-tested as of 2026-08-04.
 
 - **What**: `pg_dump -F c` (custom format, compressed) of the full
   database, run against the live `sunshineledger-db-1` container.
-- **Where**: `/home/joe/scripts/backup-db.sh` on the Omen host, cron'd
-  daily at 03:00 (`crontab -l` on Omen to confirm). Local copies land in
-  `/home/joe/sunshineledger-backups/` on Omen.
+- **Where**: `/home/joe/scripts/backup-db.sh` on docker-host, cron'd
+  daily at 03:00 (`crontab -l` on docker-host to confirm). Local copies land in
+  `/home/joe/sunshineledger-backups/` on docker-host.
 - **Off-box destination**: rsynced to the Pi (`192.168.4.2`,
   `/home/joe/backups/sunshineledger/`) — a separate physical device, so an
-  Omen disk failure doesn't take the backups with it. The rsync uses a
-  dedicated key (`~/.ssh/sunshineledger_backup_key` on Omen) restricted via
+  docker-host disk failure doesn't take the backups with it. The rsync uses a
+  dedicated key (`~/.ssh/sunshineledger_backup_key` on docker-host) restricted via
   `rrsync -wo` in the Pi's `authorized_keys` — that key can only write into
   that one directory, nothing else on the Pi is reachable with it.
-- **Retention**: 14 days, pruned automatically both on Omen (by the backup
+- **Retention**: 14 days, pruned automatically both on docker-host (by the backup
   script itself) and on the Pi (separate cron job there, since the
-  restricted key can't run arbitrary prune commands remotely). On Omen the
+  restricted key can't run arbitrary prune commands remotely). On docker-host the
   prune runs *before* the dump, deliberately — see below.
 - **Failure handling**: the script fails loudly (`BACKUP FAILED: <reason>`
   on stderr) and deletes its own partial dump, so the backup directory
@@ -483,7 +488,7 @@ Automated, off-box, and restore-tested as of 2026-08-04.
 ### Restoring
 
 ```bash
-# Get a dump onto the box you're restoring to (from Omen or the Pi copy),
+# Get a dump onto the box you're restoring to (from docker-host or the Pi copy),
 # then, against a target Postgres/PostGIS instance:
 docker cp sunshineledger-<timestamp>.dump <target-container>:/tmp/restore.dump
 docker exec <target-container> pg_restore -U sunshine -d sunshine_ledger --no-owner /tmp/restore.dump
