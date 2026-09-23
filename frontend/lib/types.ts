@@ -107,6 +107,8 @@ export interface BillDetail extends BillListItem {
   news: NewsItemOut[];
   votes: RollCallOut[];
   amendments: AmendmentOut[];
+  layers: BillLayers;
+  has_staff_analysis: boolean;
 }
 
 export interface BillListResponse {
@@ -242,3 +244,37 @@ export interface StatusCount {
   status: string;
   count: number;
 }
+
+export type LayerKey = "bill_says" | "interpretation" | "expected_effect";
+export type Origin = "bill_text" | "legislative_staff" | "sunshine_ledger_ai";
+
+export interface LayerItem {
+  text: string;
+  section_ref: string | null;
+  quote: string | null;
+  assumptions: string[];
+  affected_groups: string[];
+}
+
+export interface LayerVersion {
+  id: string;
+  version: number;
+  evidence_state: "supported" | "insufficient_evidence";
+  review_status: "not_reviewed" | "reviewed";
+  reviewed_at: string | null;
+  scope_note: string;
+  items: LayerItem[];
+  generated_by: string;
+  method_version: string;
+  created_at: string;
+  superseded_at: string | null;
+  sources: SourceOut[];
+}
+
+export interface LayerBlock {
+  origin: Origin;
+  current: LayerVersion;
+  earlier_versions: LayerVersion[];
+}
+
+export type BillLayers = Record<LayerKey, LayerBlock[]>;
