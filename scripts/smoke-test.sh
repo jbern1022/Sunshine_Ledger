@@ -37,20 +37,38 @@ else
 fi
 
 echo "==> Fetching $PUBLIC_FRONTEND_URL"
-homepage="$(curl -sL --max-time 10 "$PUBLIC_FRONTEND_URL" 2>/dev/null || true)"
-if [[ -z "$homepage" ]]; then
-  echo "FAIL: could not fetch $PUBLIC_FRONTEND_URL" >&2
+# Same restart race as the API check above, but worse if missed: right after
+# a redeploy the tunnel can serve a non-empty error page (e.g. Cloudflare's
+# 502) with no JS chunks in it. That used to pass as "frontend responded"
+# and silently skip the bundle scan below -- the one check that catches the
+# 09-20 outage -- as happened on the 2026-09-23 deploy. Retry until the page
+# is a real 200 that references chunks.
+homepage=""
+home_status="000"
+chunk_paths=""
+for _ in 1 2 3 4 5 6; do
+  response="$(curl -sL --max-time 10 -w '\n%{http_code}' "$PUBLIC_FRONTEND_URL" 2>/dev/null || true)"
+  home_status="${response##*$'\n'}"
+  homepage="${response%$'\n'*}"
+  # NEXT_PUBLIC_* values only ever show up in the compiled JS chunks, not
+  # the initial HTML, so the scan below needs every chunk the homepage
+  # references.
+  chunk_paths="$(grep -oE '/_next/static/chunks/[A-Za-z0-9._-]+\.js' <<<"$homepage" | sort -u)"
+  [[ "$home_status" == "200" && -n "$chunk_paths" ]] && break
+  sleep 5
+done
+if [[ "$home_status" != "200" ]]; then
+  echo "FAIL: $PUBLIC_FRONTEND_URL returned $home_status (after retries)" >&2
   fail=1
 else
   echo "OK: frontend responded"
 
-  # NEXT_PUBLIC_* values only ever show up in the compiled JS chunks, not
-  # the initial HTML, so pull every chunk the homepage references and scan
-  # each one for a hardcoded dev/internal URL that should never reach a
-  # browser.
-  chunk_paths="$(grep -oE '/_next/static/chunks/[A-Za-z0-9._-]+\.js' <<<"$homepage" | sort -u)"
+  # Scan each chunk for a hardcoded dev/internal URL that should never
+  # reach a browser. A real Next.js page always references chunks, so none
+  # at all means we're not looking at the app -- fail rather than skip.
   if [[ -z "$chunk_paths" ]]; then
-    echo "WARN: no /_next/static/chunks/*.js references found on the homepage -- skipping bundle scan" >&2
+    echo "FAIL: no /_next/static/chunks/*.js references found on the homepage -- cannot scan the bundle" >&2
+    fail=1
   else
     while IFS= read -r path; do
       [[ -z "$path" ]] && continue
