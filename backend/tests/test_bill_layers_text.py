@@ -4,6 +4,7 @@ from app.pipeline.bill_layers_text import (
     extract_fiscal_section,
     is_conditional,
     normalize_ws,
+    section_for_quote,
     section_number,
     states_no_or_unknown_impact,
     verify_quotes,
@@ -114,11 +115,41 @@ def test_section_number_parses_common_forms():
     assert section_number(None) is None
 
 
+def test_section_number_rejects_statute_citations():
+    assert section_number("Section 110.113, F.S.") is None
+    assert section_number("s. 20.19") is None
+
+
 def test_is_conditional():
     assert is_conditional("Employers may need to update payroll.")
     assert is_conditional("Counties are expected to save money.")
     assert not is_conditional("Employers will need to update payroll.")
     assert not is_conditional("The bill removes the requirement.")
+
+
+def test_is_conditional_excludes_month_may_with_day():
+    assert not is_conditional("Beginning May 1, 2027, employers will be required to file reports.")
+    assert is_conditional("Employers may need to update payroll.")
+
+
+def test_bill_section_case_insensitive():
+    assert bill_section_numbers("SECTION 1. Something.\nsection 2. Something else.\n") == {"1", "2"}
+
+
+def test_section_for_quote_uses_last_heading_before_quote():
+    text = (
+        "Section 1. Subsection (2) of section 110.113, Florida Statutes, is amended to read:\n"
+        "(2) Salary payments may be made by direct deposit.\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    assert section_for_quote("Salary payments may be made by direct deposit.", text) == "Section 1"
+    assert section_for_quote("This act shall take effect July 1, 2027.", text) == "Section 2"
+
+
+def test_section_for_quote_returns_none_before_any_heading_or_when_not_found():
+    text = "Preamble text.\nSection 1. Body text here.\n"
+    assert section_for_quote("Preamble text.", text) is None
+    assert section_for_quote("Nowhere in the text.", text) is None
 
 
 def test_states_no_or_unknown_impact():

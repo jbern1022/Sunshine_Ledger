@@ -72,7 +72,15 @@ def list_unreviewed(
     rows = db.execute(
         select(BillLayer, Entity)
         .join(Entity, Entity.id == BillLayer.bill_entity_id)
-        .where(BillLayer.superseded_at.is_(None), BillLayer.id.not_in(approved))
+        .where(
+            BillLayer.superseded_at.is_(None),
+            BillLayer.id.not_in(approved),
+            # Bill Says quotes are verbatim from the bill text and verified
+            # in code (see bill_layers_text.verify_quotes) -- there is
+            # nothing for a human reviewer to approve, so it carries no
+            # review label and never appears in this queue.
+            BillLayer.origin != "bill_text",
+        )
         .options(selectinload(BillLayer.source_links).selectinload(BillLayerSource.source), selectinload(Entity.bill))
         .order_by(BillLayer.created_at)
         .limit(limit)

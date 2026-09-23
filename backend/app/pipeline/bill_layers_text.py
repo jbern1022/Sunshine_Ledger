@@ -15,9 +15,11 @@ import re
 
 _WS = re.compile(r"\s+")
 _NAV_LINE = re.compile(r"(?m)^\s*JUMP TO SUMMARY ANALYSIS RELEVANT INFORMATION\s*$\n?")
-_BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.")
-_SECTION_REF = re.compile(r"\b(?:section|sec\.?|s\.)\s*(\d+)\b", re.IGNORECASE)
-_CONDITIONAL = re.compile(r"\b(may|might|could|would|(?:is|are) expected to)\b", re.IGNORECASE)
+_BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.", re.IGNORECASE)
+_SECTION_REF = re.compile(r"\b(?:section|sec\.?)\s*(\d+)(?!\.\d)\b", re.IGNORECASE)
+_CONDITIONAL = re.compile(
+    r"\bmay\b(?!\s+\d{1,2}\b)|\b(?:might|could|would|(?:is|are) expected to)\b", re.IGNORECASE
+)
 _NO_OR_UNKNOWN = re.compile(r"\b(none|no fiscal impact|no impact|indeterminate|insignificant)\b", re.IGNORECASE)
 
 # (start, end) pairs, tried in order. Patterns are matched per line.
@@ -63,6 +65,25 @@ def section_number(ref: str | None) -> str | None:
         return None
     m = _SECTION_REF.search(ref)
     return m.group(1) if m else None
+
+
+def section_for_quote(quote: str, text: str) -> str | None:
+    """The last bill section heading ("Section N.") before `quote` in `text`.
+
+    The quote is located in `text` tolerating whitespace differences (as it
+    was during verification), but the search runs against the original
+    (non-normalized) text so the line-anchored `_BILL_SECTION` heading
+    pattern still means what it says.
+    """
+    q = normalize_ws(quote)
+    if not q:
+        return None
+    quote_pattern = re.compile(r"\s+".join(re.escape(word) for word in q.split()))
+    m = quote_pattern.search(text)
+    if not m:
+        return None
+    headings = _BILL_SECTION.findall(text[: m.start()])
+    return f"Section {headings[-1]}" if headings else None
 
 
 def is_conditional(statement: str) -> bool:

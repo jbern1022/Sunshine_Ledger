@@ -9,12 +9,12 @@ from app.models import BillLayer, BillLayerReview
 AUTH = ("testadmin", "testpass")
 
 
-def _layer(db, entity, version=1, superseded=False):
+def _layer(db, entity, version=1, superseded=False, layer="interpretation", origin="sunshine_ledger_ai"):
     row = BillLayer(
-        bill_entity_id=entity.id, layer="interpretation", origin="sunshine_ledger_ai", version=version,
+        bill_entity_id=entity.id, layer=layer, origin=origin, version=version,
         superseded_at=datetime.now(timezone.utc) if superseded else None, evidence_state="supported",
         scope_note="Bill text", items=[{"text": "t", "section_ref": "Section 1", "quote": None, "assumptions": [], "affected_groups": []}],
-        generated_by="llm:test", method_version="interpretation/sunshine_ledger_ai/1", input_hash=f"h{version}",
+        generated_by="llm:test", method_version=f"{layer}/{origin}/1", input_hash=f"h{layer}{origin}{version}",
     )
     db.add(row)
     db.commit()
@@ -32,6 +32,14 @@ def test_unreviewed_lists_current_unapproved_only(client, db_session, bill_facto
     body = client.get("/bill-layers/admin/unreviewed", auth=AUTH).json()
     assert [b["id"] for b in body] == [str(current.id)]
     assert body[0]["bill_number"] == "HB 123"
+
+
+def test_unreviewed_excludes_bill_text_origin(client, db_session, bill_factory):
+    entity = bill_factory()
+    _layer(db_session, entity, layer="bill_says", origin="bill_text")
+    other = _layer(db_session, entity, layer="interpretation", origin="sunshine_ledger_ai")
+    body = client.get("/bill-layers/admin/unreviewed", auth=AUTH).json()
+    assert [b["id"] for b in body] == [str(other.id)]
 
 
 def test_approve_current_version(client, db_session, bill_factory):

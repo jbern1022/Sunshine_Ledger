@@ -472,6 +472,10 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         amendments=amendments_out,
         layers=_layers_for_bill(db, entity_id),
         has_staff_analysis=db.execute(
-            select(StaffAnalysis.id).where(StaffAnalysis.entity_id == entity_id).limit(1)
+            select(StaffAnalysis.id).where(
+                StaffAnalysis.entity_id == entity_id,
+                StaffAnalysis.text.isnot(None),
+                StaffAnalysis.text != "",
+            ).limit(1)
         ).first() is not None,
     )

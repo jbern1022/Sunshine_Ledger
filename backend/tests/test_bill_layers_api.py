@@ -65,3 +65,13 @@ def test_has_staff_analysis(client, db_session, bill_factory):
                                  analysis_date=date(2026, 3, 1), source_url="https://x/a.pdf", text="III. Effect"))
     db_session.commit()
     assert client.get(f"/bills/{entity.id}").json()["has_staff_analysis"] is True
+
+
+def test_has_staff_analysis_false_for_empty_text_only(client, db_session, bill_factory):
+    entity = bill_factory()
+    db_session.add(StaffAnalysis(entity_id=entity.id, legiscan_supplement_id=78, committee="Rules",
+                                 analysis_date=date(2026, 3, 1), source_url="https://x/b.pdf", text=""))
+    db_session.add(StaffAnalysis(entity_id=entity.id, legiscan_supplement_id=79, committee="Rules",
+                                 analysis_date=date(2026, 3, 2), source_url="https://x/c.pdf", text=None))
+    db_session.commit()
+    assert client.get(f"/bills/{entity.id}").json()["has_staff_analysis"] is False

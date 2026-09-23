@@ -51,11 +51,27 @@ def test_bill_says_with_no_verified_quotes_is_insufficient():
     assert r.scope_note == "Quotes could not be verified against the bill text"
 
 
+def test_bill_says_with_no_verified_quotes_notes_truncation():
+    long_text = BILL + ("x" * 20_000)
+    client = FakeClient({"items": [{"section_ref": "Section 1", "quote": "Invented."}]})
+    r = build_bill_says("HB 1", "Pay", long_text, client)
+    assert r.evidence_state == "insufficient_evidence"
+    assert r.scope_note == "Quotes could not be verified against the bill text in the first part of a long bill"
+
+
 def test_bill_says_notes_truncation():
     long_text = BILL + ("x" * 20_000)
     client = FakeClient({"items": [{"section_ref": "Section 2", "quote": "This act shall take effect July 1, 2027."}]})
     r = build_bill_says("HB 1", "Pay", long_text, client)
     assert r.scope_note == "Drawn from the first part of a long bill"
+
+
+def test_bill_says_corrects_wrong_model_section_ref_from_text():
+    client = FakeClient({"items": [
+        {"section_ref": "Section 99", "quote": "This act shall take effect July 1, 2027."},
+    ]})
+    r = build_bill_says("HB 1", "Pay", BILL, client)
+    assert r.items[0]["section_ref"] == "Section 2"
 
 
 def test_ai_interpretation_normalizes_items():
@@ -88,6 +104,14 @@ def test_ai_expected_effect_all_dropped_is_insufficient():
     r = build_ai_expected_effect("HB 1", "Pay", BILL, client)
     assert r.evidence_state == "insufficient_evidence"
     assert r.scope_note == "No effects traceable to a specific bill section"
+
+
+def test_ai_expected_effect_all_dropped_notes_truncation():
+    long_text = BILL + ("x" * 20_000)
+    client = FakeClient({"items": [{"text": "Payroll will change.", "section_ref": "Section 1"}]})
+    r = build_ai_expected_effect("HB 1", "Pay", long_text, client)
+    assert r.evidence_state == "insufficient_evidence"
+    assert r.scope_note == "No effects traceable to a specific bill section in the first part of a long bill"
 
 
 def test_staff_interpretation_without_section_is_insufficient_and_skips_model():

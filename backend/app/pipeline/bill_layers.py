@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from app.pipeline.bill_layers_text import (
     bill_section_numbers,
     is_conditional,
+    section_for_quote,
     section_number,
     states_no_or_unknown_impact,
     verify_quotes,
@@ -171,10 +172,18 @@ def build_bill_says(bill_number: str, title: str, full_text: str, client) -> Lay
     ))
     kept, dropped = verify_quotes(raw, text)
     if not kept:
-        return LayerResult("insufficient_evidence", "Quotes could not be verified against the bill text", [], dropped)
+        note = "Quotes could not be verified against the bill text"
+        if truncated:
+            note += " in the first part of a long bill"
+        return LayerResult("insufficient_evidence", note, [], dropped)
     items = [_item(k, quote=k["quote"]) for k in kept[:4]]
     for i in items:
+        # _item() would use the model's own "text" field if it supplied one
+        # instead of the quote; force it back to the verified quote. The
+        # model's section_ref is unverified too, so derive it from where the
+        # (now-verified) quote actually sits in the text.
         i["text"] = i["quote"]
+        i["section_ref"] = section_for_quote(i["quote"], text)
     scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
     return LayerResult("supported", scope, items, dropped)
 
@@ -187,7 +196,10 @@ def build_ai_interpretation(bill_number: str, title: str, full_text: str, client
     items = [_item(r, assumptions_required=True) for r in raw if str(r.get("text") or "").strip()][:5]
     scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
     if not items:
-        return LayerResult("insufficient_evidence", "No interpretation could be drawn from the bill text", [], raw)
+        note = "No interpretation could be drawn from the bill text"
+        if truncated:
+            note += " in the first part of a long bill"
+        return LayerResult("insufficient_evidence", note, [], raw)
     return LayerResult("supported", scope, items)
 
 
@@ -206,7 +218,10 @@ def build_ai_expected_effect(bill_number: str, title: str, full_text: str, clien
         else:
             dropped.append(r)
     if not kept:
-        return LayerResult("insufficient_evidence", "No effects traceable to a specific bill section", [], dropped)
+        note = "No effects traceable to a specific bill section"
+        if truncated:
+            note += " in the first part of a long bill"
+        return LayerResult("insufficient_evidence", note, [], dropped)
     scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
     return LayerResult("supported", scope, kept[:4], dropped)
 

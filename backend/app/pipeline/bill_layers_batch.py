@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -139,10 +141,21 @@ def _bills(db: Session) -> list[Entity]:
     ).scalars().all())
 
 
-def process_bills(db: Session, client, *, limit: int | None = None) -> tuple[int, int]:
+def process_bills(
+    db: Session,
+    client,
+    *,
+    limit: int | None = None,
+    max_minutes: float | None = None,
+    clock=time.monotonic,
+) -> tuple[int, int]:
     """Returns (block versions written, bills failed). `limit` caps bills
-    that have work, not bills scanned."""
+    that have work, not bills scanned. `max_minutes`, if given, is a wall
+    clock budget: once elapsed time (measured with `clock`, injectable for
+    tests) reaches it, no new bill is started -- a bill already started
+    still finishes. `max_minutes=0` starts no bill at all."""
     written = failed = processed = 0
+    start = clock()
     for entity in _bills(db):
         if not entity.bill:
             continue
@@ -150,6 +163,8 @@ def process_bills(db: Session, client, *, limit: int | None = None) -> tuple[int
         if not jobs:
             continue
         if limit is not None and processed >= limit:
+            break
+        if max_minutes is not None and (clock() - start) >= max_minutes * 60:
             break
         processed += 1
         analysis = latest_staff_analysis(db, entity.id)
@@ -164,10 +179,18 @@ def process_bills(db: Session, client, *, limit: int | None = None) -> tuple[int
     return written, failed
 
 
+def exit_code(*, written: int, failed: int) -> int:
+    """Non-zero only when the run failed entirely (failures with nothing
+    written), so run-ingestion.sh's step recording catches a wholly-failed
+    run rather than treating "some model calls flaked" as success."""
+    return 1 if failed > 0 and written == 0 else 0
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None, help="Max bills with work to process this run.")
+    parser.add_argument("--max-minutes", type=float, default=180, help="Wall clock budget in minutes; no new bill starts once elapsed.")
     parser.add_argument("--dry-run", action="store_true", help="List planned jobs; no model calls, no writes.")
     args = parser.parse_args()
 
@@ -184,7 +207,8 @@ if __name__ == "__main__":
                         break
             print(f"\n{n} bill(s) with work.")
         else:
-            ok, bad = process_bills(db, OllamaClient(), limit=args.limit)
+            ok, bad = process_bills(db, OllamaClient(), limit=args.limit, max_minutes=args.max_minutes)
             print(f"\nDone: {ok} block version(s) written, {bad} bill(s) failed.")
+            sys.exit(exit_code(written=ok, failed=bad))
     finally:
         db.close()

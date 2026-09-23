@@ -2,7 +2,7 @@ import json
 from datetime import date
 
 from app.models import BillLayer, StaffAnalysis
-from app.pipeline.bill_layers_batch import plan_jobs, process_bills
+from app.pipeline.bill_layers_batch import exit_code, plan_jobs, process_bills
 
 BILL_TEXT = "Section 1. Salary payments may be made by direct deposit.\nSection 2. This act shall take effect July 1, 2027.\n"
 ANALYSIS = """III. Effect of Proposed Changes:
@@ -93,6 +93,35 @@ def test_new_staff_analysis_versions_only_staff_blocks(db_session, bill_factory)
     assert len(ai) == 1
 
 
+def test_max_minutes_zero_processes_nothing(db_session, bill_factory):
+    entity = bill_factory()
+    _with_text(db_session, entity)
+    written, failed = process_bills(db_session, RoutingClient(), max_minutes=0)
+    assert (written, failed) == (0, 0)
+    assert db_session.query(BillLayer).count() == 0
+
+
+def test_max_minutes_stops_starting_new_bills_once_budget_elapsed(db_session, bill_factory):
+    first = bill_factory(bill_number="HB 1")
+    second = bill_factory(bill_number="HB 2")
+    _with_text(db_session, first)
+    _with_text(db_session, second)
+
+    # Injectable clock: the start-time call and the budget check before
+    # bill 1 both return 0 (within budget); every call after (the check
+    # before bill 2) returns past the 1-minute budget.
+    calls = {"n": 0}
+
+    def fake_clock():
+        calls["n"] += 1
+        return 0.0 if calls["n"] <= 2 else 120.0
+
+    written, failed = process_bills(db_session, RoutingClient(), max_minutes=1, clock=fake_clock)
+    assert failed == 0
+    assert written == 3  # only the first bill's three blocks got written
+    assert db_session.query(BillLayer).filter_by(bill_entity_id=second.id).count() == 0
+
+
 def test_one_bad_bill_does_not_stop_the_batch(db_session, bill_factory):
     good = bill_factory(bill_number="HB 1")
     bad = bill_factory(bill_number="HB 2")
@@ -107,3 +136,9 @@ def test_one_bad_bill_does_not_stop_the_batch(db_session, bill_factory):
 
     written, failed = process_bills(db_session, FlakyClient())
     assert written == 3 and failed == 1
+
+
+def test_exit_code_is_nonzero_only_when_everything_failed():
+    assert exit_code(written=0, failed=2) == 1
+    assert exit_code(written=3, failed=1) == 0
+    assert exit_code(written=0, failed=0) == 0
