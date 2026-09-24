@@ -32,7 +32,9 @@ _CONDITIONAL = re.compile(
     r"|\b(?:might|could|would|(?:is|are) expected to)\b",
     re.IGNORECASE,
 )
-_NO_OR_UNKNOWN = re.compile(r"\b(none|no fiscal impact|no impact|indeterminate|insignificant)\b", re.IGNORECASE)
+_BARE_FINDING_TOKENS = frozenset({"none", "n/a", "na", "indeterminate", "insignificant"})
+
+_DEFINITIONS_LEAD_IN = re.compile(r"Definitions\.—")
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 _CONTENT_WORD = re.compile(r"[A-Za-z']+")
@@ -92,8 +94,24 @@ def law_as_amended(text: str) -> str:
     return _DOUBLE_SPACE.sub(" ", text)
 
 
+def _is_substantive_quote(quote: str) -> bool:
+    """False for a quote that carries no substance on its own: a bare
+    section/definitions lead-in ("393.063 Definitions.—For the purposes of
+    this chapter, the term:") or anything else that trails off with a colon,
+    or a fragment too short to stand as a provision by itself.
+    """
+    if quote.endswith(":") or quote.endswith(":—"):
+        return False
+    if _DEFINITIONS_LEAD_IN.search(quote) and quote.rstrip().endswith(":"):
+        return False
+    if len(quote.split()) < 6:
+        return False
+    return True
+
+
 def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[dict]]:
-    """Keep only quotes that appear verbatim (modulo whitespace) in `text`.
+    """Keep only quotes that appear verbatim (modulo whitespace) in `text`
+    and that carry enough substance to stand as a provision on their own.
 
     `text` must be exactly what the model was shown (the truncated text), so
     a quote from beyond the truncation point is dropped too.
@@ -103,7 +121,7 @@ def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[d
     dropped: list[dict] = []
     for c in candidates:
         quote = normalize_ws(c.get("quote") or "")
-        if quote and quote in haystack:
+        if quote and quote in haystack and _is_substantive_quote(quote):
             kept.append({**c, "quote": quote})
         else:
             dropped.append(c)
@@ -193,8 +211,27 @@ def restates_bill(statement: str, text: str) -> bool:
     return False
 
 
-def states_no_or_unknown_impact(statement: str) -> bool:
-    return bool(_NO_OR_UNKNOWN.search(statement))
+def is_substantive_finding(statement: str) -> bool:
+    """True when `statement` is a real staff finding rather than a bare token.
+
+    Staff findings (unlike Sunshine Ledger's own effects) are attributed to
+    legislative staff, so they don't need conditional wording -- a plain
+    "The bill will have a significant, negative fiscal impact ..." is a real
+    finding worth keeping. What isn't worth keeping is a template artifact
+    like a bare "None." or "Indeterminate." left over from a fiscal
+    statement's category list. A finding counts as substantive when it has
+    at least 4 words and isn't just one of those bare tokens.
+    """
+    if not statement:
+        return False
+    text = normalize_ws(statement)
+    if not text:
+        return False
+    if len(text.split()) < 4:
+        return False
+    if text.rstrip(".").strip().lower() in _BARE_FINDING_TOKENS:
+        return False
+    return True
 
 
 def _between(text: str, patterns: list[tuple[str, str]]) -> str | None:

@@ -3,12 +3,12 @@ from app.pipeline.bill_layers_text import (
     extract_effect_section,
     extract_fiscal_section,
     is_conditional,
+    is_substantive_finding,
     law_as_amended,
     normalize_ws,
     restates_bill,
     section_for_quote,
     section_number,
-    states_no_or_unknown_impact,
     verify_quotes,
 )
 
@@ -105,6 +105,25 @@ def test_verify_quotes_drops_paraphrase_and_invention():
     assert kept == [] and len(dropped) == 3
 
 
+def test_verify_quotes_drops_definitions_lead_in_and_short_fragments():
+    text = (
+        "Section 1. 393.063 Definitions.—For the purposes of this chapter, the term:\n"
+        "(1) \"Agency\" means the Agency for Persons with Disabilities.\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    kept, dropped = verify_quotes(
+        [
+            {"section_ref": "Section 1",
+             "quote": "393.063 Definitions.—For the purposes of this chapter, the term:"},
+            {"section_ref": "Section 1", "quote": "Short bit here:"},
+            {"section_ref": "Section 2", "quote": "This act shall take effect July 1, 2027."},
+        ],
+        text,
+    )
+    assert [c["quote"] for c in kept] == ["This act shall take effect July 1, 2027."]
+    assert len(dropped) == 2
+
+
 def test_bill_section_numbers():
     assert bill_section_numbers(BILL) == {"1", "2"}
 
@@ -154,10 +173,23 @@ def test_section_for_quote_returns_none_before_any_heading_or_when_not_found():
     assert section_for_quote("Nowhere in the text.", text) is None
 
 
-def test_states_no_or_unknown_impact():
-    assert states_no_or_unknown_impact("Staff found the private sector impact indeterminate.")
-    assert states_no_or_unknown_impact("Staff found no fiscal impact on state government.")
-    assert not states_no_or_unknown_impact("Counties save money.")
+def test_is_substantive_finding_keeps_real_statements():
+    assert is_substantive_finding(
+        "The bill will have a significant, negative fiscal impact to residential "
+        "facilities and adult day training programs who must conduct level 2 "
+        "background screenings on all employees."
+    )
+    assert is_substantive_finding("Staff found no private sector impact.")
+    assert is_substantive_finding("Staff found the private sector impact indeterminate.")
+
+
+def test_is_substantive_finding_drops_bare_tokens():
+    assert not is_substantive_finding("None")
+    assert not is_substantive_finding("None.")
+    assert not is_substantive_finding("N/A")
+    assert not is_substantive_finding("Indeterminate.")
+    assert not is_substantive_finding("")
+    assert not is_substantive_finding(None)
 
 
 def test_extract_senate_effect_section():

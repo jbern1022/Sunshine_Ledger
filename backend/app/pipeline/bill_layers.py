@@ -7,8 +7,9 @@ prompt alone:
 - Bill Says quotes must appear word for word in the text shown to the model.
 - Sunshine Ledger expected effects must cite a bill section that exists and
   use conditional wording.
-- Staff expected effects must use conditional wording or report staff's own
-  "none" / "indeterminate" finding.
+- Staff expected effects must be a real finding -- not a bare "None" /
+  "Indeterminate" / "N/A" token left over from a fiscal statement's
+  category list.
 
 Design: docs/superpowers/specs/2026-09-23-bill-layers-design.md
 """
@@ -21,11 +22,11 @@ from dataclasses import dataclass, field
 from app.pipeline.bill_layers_text import (
     bill_section_numbers,
     is_conditional,
+    is_substantive_finding,
     law_as_amended,
     restates_bill,
     section_for_quote,
     section_number,
-    states_no_or_unknown_impact,
     verify_quotes,
 )
 from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
@@ -33,10 +34,10 @@ from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 # Bump a value when its prompt or guard changes in a way that should
 # regenerate stored versions. Part of each block's input hash.
 METHOD_VERSIONS: dict[tuple[str, str], str] = {
-    ("bill_says", "bill_text"): "bill_says/bill_text/2",
+    ("bill_says", "bill_text"): "bill_says/bill_text/3",
     ("interpretation", "legislative_staff"): "interpretation/legislative_staff/1",
-    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/3",
-    ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/2",
+    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/4",
+    ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/3",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/3",
 }
 
@@ -85,6 +86,7 @@ Write 2 to 5 plain-language statements of what this bill changes in the law. Rul
 - No words implying a value judgment (e.g. "harmful", "beneficial", "important").
 - For each statement list the assumptions your reading depends on -- what would have to be true for the statement to hold. If there are none, use an empty list.
 - List affected groups ONLY if the text names them; otherwise an empty list.
+- Keep the bill's modal strength: "shall"/"must" is a requirement, "should"/"may" is not -- never describe a "should" or "may" provision as a requirement.
 
 Respond with JSON only: {{"items": [{{"text": "...", "section_ref": "Section N", "assumptions": ["..."], "affected_groups": ["..."]}}]}}"""
 
@@ -129,9 +131,9 @@ STAFF_EXPECTED_EFFECT_PROMPT = """Below is the fiscal impact section of a nonpar
 \"\"\"
 
 Restate each fiscal finding as one plain-language statement. For each, give the category it belongs to: "tax_fee", "state_government", "local_government", "private_sector", or "other" for anything that does not fit those. Rules:
-- Use conditional wording ("may", "could", "is expected to") for any projected effect.
+- These are staff's own findings, not predictions -- state them plainly, without conditional wording, even a significant negative impact.
 - The fiscal text may print a list of options for a category (e.g. "None / Indeterminate / Insignificant"). Report ONLY the option staff actually selected for that category -- never restate the whole list.
-- If staff say "None", "Indeterminate", or "Insignificant", say so literally, e.g. "Staff found the private sector impact indeterminate." Do not guess.
+- If staff say "None", "Indeterminate", or "Insignificant" for a category, write it as a full sentence naming the category, e.g. "Staff found no fiscal impact on local governments." or "Staff found the private sector impact indeterminate." Never report a bare "None" or "Indeterminate" on its own.
 - List any assumptions staff state. Add nothing that is not in the text above.
 
 Respond with JSON only: {{"items": [{{"category": "tax_fee", "text": "...", "assumptions": ["..."]}}]}}"""
@@ -294,7 +296,7 @@ def build_staff_expected_effect(fiscal_section: str | None, staff_label: str, cl
     seen_categories: set[str] = set()
     for r in raw:
         item = _item(r)
-        if not (item["text"] and (is_conditional(item["text"]) or states_no_or_unknown_impact(item["text"]))):
+        if not is_substantive_finding(item["text"]):
             dropped.append(r)
             continue
         # When the fiscal analysis template prints every option for a
