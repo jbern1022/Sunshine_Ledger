@@ -46,15 +46,18 @@ _SIGNIFICANT = re.compile(r"\bsignificant\b", re.IGNORECASE)
 
 # Modal strength: a statement worded as a requirement, and bill wording that
 # does / doesn't impose one.
+# Negated forms ("is not required", "no longer required") state the absence
+# of a requirement and don't count.
 _REQUIREMENT_WORDING = re.compile(
-    r"\b(?:must|shall|required|requires?|requiring|mandates?|mandatory|obligated)\b", re.IGNORECASE
+    r"(?<!\bnot )(?<!\bno longer )\b(?:must|shall|required|requires?|requiring|mandates?|mandatory|obligated)\b",
+    re.IGNORECASE,
 )
 # "may not" is how bills state a prohibition -- binding, not permissive.
-_BILL_MANDATORY = re.compile(r"\b(?:shall|must|required|requires?|requiring|may\s+not)\b", re.IGNORECASE)
+_BILL_MANDATORY = re.compile(r"\b(?:shall|must|required|requires?|requiring|requirements?|may\s+not)\b", re.IGNORECASE)
 # A weaker match than this is as likely to be the wrong sentence as the right
 # one; 3-4 shared words produced false flags on H0091 and H1139 (2026-09-24).
 _MODAL_MIN_OVERLAP = 5
-_CLAUSE_SPLIT = re.compile(r";\s*|,?\s+and\s+(?=(?:any|all|each|the|a|an|can|may|must|shall|should|will|is|are|also)\b)", re.IGNORECASE)
+_CLAUSE_SPLIT = re.compile(r";\s*|,\s*(?:after which|but|while|whereas|unless|except)\b|,?\s+and\s+(?=(?:any|all|each|the|a|an|can|may|must|shall|should|will|is|are|also)\b)", re.IGNORECASE)
 _BILL_PERMISSIVE = re.compile(r"\b(?:should|may(?!\s+not\b))\b", re.IGNORECASE)
 _TOKEN = re.compile(r"[A-Za-z']+|\d+")
 

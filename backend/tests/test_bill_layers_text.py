@@ -535,3 +535,32 @@ def test_overstates_modal_splits_clauses_before_a_modal():
         "an action in the circuit court.",
         text,
     )
+
+
+def test_overstates_modal_ignores_negated_requirement():
+    text = (
+        "Section 1. For speed detection systems installed before July 1, 2026, capturing the beacon "
+        "status in photographic or video evidence is not required for proof of the beacon status "
+        "until January 1, 2028. A county may provide proof of the school zone speed limit in force "
+        "at the time of violation without evidence of the beacon status.\n"
+    )
+    assert not overstates_modal(
+        "Proof of beacon status is not required until January 1, 2028, for speed detection systems "
+        "installed before July 1, 2026.",
+        text,
+    )
+
+
+def test_overstates_modal_splits_after_which_clause():
+    text = (
+        "Section 6. (a) A unit of blood or blood component collected as an autologous or directed "
+        "donation for a specific patient must be reserved for that patient until one of the following "
+        "occurs. (b) When a reserved unit is no longer needed or medically appropriate for the "
+        "designated patient, the unit may revert to general inventory and be used for other patients.\n"
+    )
+    assert not overstates_modal(
+        "A unit of blood or blood component collected for a specific patient must be reserved for that "
+        "patient until it is no longer needed or medically appropriate, after which it may revert to "
+        "general inventory for other patients if still suitable.",
+        text,
+    )
