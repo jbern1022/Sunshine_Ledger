@@ -25,6 +25,11 @@ async function renderBillPage(id = "bill-1") {
   render(element);
 }
 
+async function renderBillPageWithContainer(id = "bill-1") {
+  const element = await BillPage({ params: Promise.resolve({ id }) });
+  return render(element);
+}
+
 const baseBill: BillDetail = {
   entity_id: "bill-1",
   bill_number: "HB 123",
@@ -336,6 +341,28 @@ describe("BillPage", () => {
 
     expect(screen.getByText("Full bill text")).toBeInTheDocument();
     expect(screen.getByText(/Section 1\. This act shall be known as/)).toBeInTheDocument();
+  });
+
+  it("renders change markers in the full bill text as <del>/<ins>, labelled for screen readers", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      full_text: "Section 1. An [deleted: No] agency or [added: a] state official.",
+    });
+    const { container } = await renderBillPageWithContainer();
+
+    const del = container.querySelector("del");
+    const ins = container.querySelector("ins");
+    expect(del).not.toBeNull();
+    expect(ins).not.toBeNull();
+    expect(del).toHaveTextContent("No");
+    expect(ins).toHaveTextContent("a");
+    // Not colour-only: a title and visually-hidden label say what changed.
+    expect(del).toHaveAttribute("title", "removed");
+    expect(ins).toHaveAttribute("title", "added");
+    expect(del?.querySelector(".sr-only")).toHaveTextContent("removed");
+    expect(ins?.querySelector(".sr-only")).toHaveTextContent("added");
+    // The raw bracket syntax is not shown as visible text.
+    expect(screen.queryByText(/\[deleted: No\]/)).not.toBeInTheDocument();
   });
 
   it("does not render a full bill text section when absent", async () => {
