@@ -199,7 +199,7 @@ if __name__ == "__main__":
         if args.dry_run:
             n = 0
             for entity in _bills(db):
-                jobs = plan_jobs(db, entity, settings.ollama_model) if entity.bill else []
+                jobs = plan_jobs(db, entity, settings.ollama_layers_model) if entity.bill else []
                 if jobs:
                     n += 1
                     print(f"{entity.bill.bill_number}: " + ", ".join(f"{j.layer}/{j.origin}" for j in jobs))
@@ -207,7 +207,8 @@ if __name__ == "__main__":
                         break
             print(f"\n{n} bill(s) with work.")
         else:
-            ok, bad = process_bills(db, OllamaClient(), limit=args.limit, max_minutes=args.max_minutes)
+            client = OllamaClient(model=settings.ollama_layers_model, timeout=300)
+            ok, bad = process_bills(db, client, limit=args.limit, max_minutes=args.max_minutes)
             print(f"\nDone: {ok} block version(s) written, {bad} bill(s) failed.")
             sys.exit(exit_code(written=ok, failed=bad))
     finally:

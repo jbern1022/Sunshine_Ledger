@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +37,20 @@ class Settings(BaseSettings):
     # the measurements behind the default and when turning this on is
     # actually worth it.
     ollama_model_fast: str = ""
+
+    # Bill layers (Bill Says / Interpretation / Expected Effect) can run a
+    # different, larger model than summaries -- see the 2026-09-24 bill
+    # layers quality plan. Empty means "use ollama_model" (the historical
+    # behavior for deployments that never set this), resolved below rather
+    # than defaulted statically so it still tracks an overridden
+    # ollama_model.
+    ollama_layers_model: str = ""
+
+    @model_validator(mode="after")
+    def _default_layers_model(self) -> "Settings":
+        if not self.ollama_layers_model:
+            self.ollama_layers_model = self.ollama_model
+        return self
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000

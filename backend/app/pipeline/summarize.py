@@ -142,10 +142,12 @@ class OllamaError(RuntimeError):
 
 
 class OllamaClient:
-    def __init__(self, host: str | None = None, model: str | None = None) -> None:
+    def __init__(
+        self, host: str | None = None, model: str | None = None, *, timeout: float = 120.0
+    ) -> None:
         self.host = (host or settings.ollama_host).rstrip("/")
         self.model = model or settings.ollama_model
-        self._client = httpx.Client(timeout=120.0)
+        self._client = httpx.Client(timeout=timeout)
 
     def generate(self, prompt: str, *, json_mode: bool = False) -> str:
         # json_mode asks Ollama to constrain output to valid JSON (its
@@ -154,7 +156,14 @@ class OllamaClient:
         body = {"model": self.model, "prompt": prompt, "stream": False}
         if json_mode:
             body["format"] = "json"
-        resp = self._client.post(f"{self.host}/api/generate", json=body)
+        # Retry once on a transport-level error (connection refused/reset,
+        # etc.) -- the 2026-09-23 quality report hit three of these when
+        # Ollama restarted mid-run. Not retried: HTTP error statuses
+        # (raise_for_status below), since a 404/500 just repeats.
+        try:
+            resp = self._client.post(f"{self.host}/api/generate", json=body)
+        except httpx.TransportError:
+            resp = self._client.post(f"{self.host}/api/generate", json=body)
         resp.raise_for_status()
         data = resp.json()
         if "response" not in data:
