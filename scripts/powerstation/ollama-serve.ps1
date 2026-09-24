@@ -10,8 +10,20 @@
 # Settings come from machine-level environment variables, not from here:
 #   OLLAMA_HOST=0.0.0.0:11434        (listen on the LAN for docker-host)
 #   OLLAMA_CONTEXT_LENGTH=8192       (bill prompts need more than the 4096 default)
+#   OLLAMA_MODELS=D:\OllamaModels    (where llama3.1:8b and qwen2.5:14b live)
+#
+# The task runs as the user, so a USER-level variable of the same name
+# overrides the machine one. On 2026-09-23 a stale user-level
+# OLLAMA_MODELS=C:\OllamaModels made this server look in the wrong folder:
+# llama3.1:8b "disappeared" and summaries would have failed that night. The
+# machine values are therefore re-applied explicitly below.
 
 $ErrorActionPreference = "Stop"
+
+foreach ($name in "OLLAMA_MODELS", "OLLAMA_HOST", "OLLAMA_CONTEXT_LENGTH") {
+    $machineValue = [Environment]::GetEnvironmentVariable($name, "Machine")
+    if ($machineValue) { Set-Item -Path "Env:$name" -Value $machineValue }
+}
 
 $Ollama = Join-Path $env:LOCALAPPDATA "Programs\Ollama\ollama.exe"
 $LogDir = Join-Path $env:LOCALAPPDATA "Ollama"
@@ -25,11 +37,23 @@ if ((Test-Path $Log) -and ((Get-Item $Log).Length -gt $MaxLogBytes)) {
     Move-Item -Force $Log "$Log.1"
 }
 
-Add-Content -Path $Log -Value "=== ollama-serve.ps1 starting $(Get-Date -Format o) ==="
+Add-Content -Path $Log -Value "=== ollama-serve.ps1 starting $(Get-Date -Format o) as $env:USERNAME; OLLAMA_MODELS=$env:OLLAMA_MODELS ==="
 
 # 2>&1 so Ollama's log lines (it logs to stderr) are captured too. In Windows
 # PowerShell 5.1, redirected native stderr arrives as error records, and with
 # ErrorActionPreference=Stop the first one would kill this wrapper; Continue
 # lets every line through to the log.
+#
+# The log is written through a stream opened with FileShare.ReadWrite and
+# flushed per line. Add-Content in a long-running pipeline holds the file
+# with no read sharing for as long as Ollama runs, which silently blinded the
+# watchdog's CPU-fallback check (found 2026-09-24).
 $ErrorActionPreference = "Continue"
-& $Ollama serve 2>&1 | ForEach-Object { "$_" } | Add-Content -Path $Log
+$stream = [System.IO.File]::Open($Log, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+$writer = New-Object System.IO.StreamWriter($stream)
+$writer.AutoFlush = $true
+try {
+    & $Ollama serve 2>&1 | ForEach-Object { $writer.WriteLine("$_") }
+} finally {
+    $writer.Dispose()
+}
