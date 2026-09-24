@@ -199,3 +199,34 @@ def test_sequence_resyncs_when_next_number_is_a_few_ahead():
 def test_sequence_does_not_resync_across_a_large_gap():
     raw = "\n".join(["first line 1", "the fee shall not exceed 500"])
     assert clean_legislative_text(raw).split("\n")[1] == "the fee shall not exceed 500"
+
+
+def test_digit_hyphen_citation_is_not_treated_as_a_glued_line_number():
+    """A hyphen only counts as the "Phelan-32" separator when it follows a
+    letter. "2026-3" and "316-2" are real statutory citations whose
+    trailing digits happen to fall inside the 1-3 resync window -- they
+    must survive intact, not get read as a line number and stripped."""
+    raw = "\n".join(
+        [
+            "first line 1",  # sets expected = 1
+            "as provided by chapter 2026-3",  # 3 - 1 = 2: inside the window
+        ]
+    )
+    assert clean_legislative_text(raw) == "\n".join(
+        ["first line", "as provided by chapter 2026-3"]
+    )
+
+    raw2 = "\n".join(
+        [
+            "first line 1",  # sets expected = 1
+            "the exemption under s. 316-2 applies",  # 2 - 1 = 1: inside the window
+        ]
+    )
+    assert clean_legislative_text(raw2).split("\n")[1] == "the exemption under s. 316-2 applies"
+
+
+def test_hyphen_glued_number_still_stripped_after_a_letter():
+    """The original fix target -- a hyphenated word broken by a glued
+    margin number -- must keep working alongside the digit-hyphen guard."""
+    raw = "\n".join(["first line 1", "Down syndrome, Phelan-2"])
+    assert clean_legislative_text(raw) == "\n".join(["first line", "Down syndrome, Phelan-"])

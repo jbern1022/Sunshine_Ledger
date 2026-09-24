@@ -60,10 +60,12 @@ _BOILERPLATE = re.compile(
 
 # Trailing line number on a content line, e.g. "...effective date. 9". The
 # separator is usually whitespace, but pypdf sometimes glues the number
-# straight onto a hyphenated word ("Phelan-32"), so a hyphen counts too --
-# `match.start(1)` (not the whole match) is what gets sliced off below, so
-# the hyphen itself survives.
-_TRAILING_LINE_NUMBER = re.compile(r"[\s-](\d{1,3})\s*$")
+# straight onto a hyphenated *word* ("Phelan-32"), so a hyphen counts too --
+# but only when it follows a letter. A hyphen following a digit is a real
+# citation ("chapter 2026-12", "s. 316-1"), not a broken word, and must not
+# be treated as a separator. `match.start(1)` (not the whole match) is what
+# gets sliced off below, so the hyphen itself survives.
+_TRAILING_LINE_NUMBER = re.compile(r"(?:\s|(?<=[A-Za-z])-)(\d{1,3})\s*$")
 
 # HTML bill text numbers lines at the START instead, e.g.
 # "    2         A resolution designating February 3, 2026..."
@@ -81,11 +83,14 @@ _DRAFT_STAMP = re.compile(r"^\s*\d+-\d+-\d+\s+\d+_*\s*$")
 def clean_legislative_text(raw: str) -> str:
     """Strip print furniture from extracted bill-PDF text.
 
-    Line numbers are only removed when they continue the expected sequence.
-    A blunt "strip any trailing number" rule would corrupt real content --
-    statutory references, dollar amounts and dates routinely end a line --
-    whereas legislative line numbering runs 1..N in order, so requiring the
-    successor value makes a false positive require a genuine coincidence.
+    Line numbers are only removed when they continue the expected sequence:
+    the next line number found must be 1 to 3 more than the last one seen,
+    which resyncs across a line that lost its own number in extraction
+    without requiring the exact successor every time. A blunt "strip any
+    trailing number" rule would corrupt real content -- statutory
+    references, dollar amounts and dates routinely end a line -- so a
+    false positive still requires a genuine coincidence with that narrow
+    window, not just any nearby number.
 
     Pure function: no network, no DB, so the parsing rules stay testable
     without hitting LegiScan.
@@ -181,10 +186,6 @@ def extract_html_text(html_bytes: bytes) -> str:
     """
     return html_to_marked_text(html_bytes.decode("utf-8", errors="replace"))
 
-
-# Marker syntax used by both the PDF (mark_words) and HTML (html_to_marked_text)
-# paths, exactly: "[deleted: <text>]" and "[added: <text>]".
-_MARKER_KINDS = ("deleted", "added")
 
 # A word carrying a strike/underline that got wrapped across a PDF's hard
 # line break (a mid-word hyphen at the right margin, most often) comes back
