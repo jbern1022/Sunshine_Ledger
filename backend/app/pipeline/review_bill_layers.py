@@ -9,8 +9,9 @@ Usage:
     python -m app.pipeline.review_bill_layers --sample 20 > layers-review.md
     python -m app.pipeline.review_bill_layers --bill "HB 123" --bill "SB 7"
 
-To compare two models on the exact same bills, run this twice with --model
-and --bills-from pointed at the first run's report:
+To compare two models on the exact same bills, run this twice: the first
+run picks the sample, the second reuses it via --bills-from with no
+--sample of its own, so both runs cover identical bills:
     python -m app.pipeline.review_bill_layers --model llama3.1:8b --sample 20 > r1.md
     python -m app.pipeline.review_bill_layers --model qwen2.5:14b --bills-from r1.md > r2.md
 """
@@ -23,6 +24,7 @@ import re
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.db import SessionLocal
 from app.models import Bill, Entity, StaffAnalysis
 from app.pipeline import bill_layers as gen
@@ -77,6 +79,14 @@ def _sample(db, n: int, bill_numbers: list[str], *, exclude: list[str] = ()) -> 
     return list(with_staff) + list(state_without) + list(local)
 
 
+def build_client(args: argparse.Namespace) -> OllamaClient:
+    """The client this run uses: `--model` overrides the configured layers
+    model, and this always gets the longer layers timeout (300s), matching
+    the batch job (see bill_layers_batch.py) so a manual review run isn't
+    more timeout-prone than the nightly one."""
+    return OllamaClient(model=args.model or settings.ollama_layers_model, timeout=300)
+
+
 def _render(title: str, result: gen.LayerResult) -> list[str]:
     lines = [f"#### {title}", f"- state: `{result.evidence_state}` · scope: {result.scope_note}"]
     for i in result.items:
@@ -104,7 +114,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    client = OllamaClient(model=args.model) if args.model else OllamaClient()
+    client = build_client(args)
     db = SessionLocal()
     kept_quotes = dropped_quotes = kept_effects = dropped_effects = 0
     out: list[str] = [f"# Bill layers quality review ({client.model})", ""]

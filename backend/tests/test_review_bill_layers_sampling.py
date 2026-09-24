@@ -5,7 +5,10 @@ earlier report ran, so the two are comparable; --sample N on top of it
 draws N *additional* random bills, excluding the ones already listed.
 """
 
-from app.pipeline.review_bill_layers import _sample, parse_bills_from_report
+import argparse
+
+from app import config as config_module
+from app.pipeline.review_bill_layers import _sample, build_client, parse_bills_from_report
 
 REPORT = """# Bill layers quality review (llama3.1:8b)
 
@@ -51,6 +54,26 @@ def test_sample_skips_unknown_bill_numbers(db_session, bill_factory):
     entities = _sample(db_session, 0, ["H0565", "S9999"])
 
     assert [e.bill.bill_number for e in entities] == ["H0565"]
+
+
+def test_build_client_defaults_to_layers_model_and_300s_timeout(monkeypatch):
+    monkeypatch.setattr(config_module.settings, "ollama_layers_model", "qwen2.5:14b")
+    args = argparse.Namespace(model=None)
+
+    client = build_client(args)
+
+    assert client.model == "qwen2.5:14b"
+    assert client._client.timeout.read == 300
+
+
+def test_build_client_model_flag_overrides_layers_model(monkeypatch):
+    monkeypatch.setattr(config_module.settings, "ollama_layers_model", "qwen2.5:14b")
+    args = argparse.Namespace(model="llama3.1:8b")
+
+    client = build_client(args)
+
+    assert client.model == "llama3.1:8b"
+    assert client._client.timeout.read == 300
 
 
 def test_sample_exclude_omits_listed_bills_from_random_draw(db_session, bill_factory):

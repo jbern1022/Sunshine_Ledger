@@ -1,8 +1,10 @@
 import json
 from datetime import date
 
+from app.config import settings
 from app.models import BillLayer, StaffAnalysis
 from app.pipeline.bill_layers_batch import exit_code, plan_jobs, process_bills
+from app.pipeline.summarize import OllamaClient
 
 BILL_TEXT = "Section 1. Salary payments may be made by direct deposit.\nSection 2. This act shall take effect July 1, 2027.\n"
 ANALYSIS = """III. Effect of Proposed Changes:
@@ -54,6 +56,28 @@ def test_plan_without_staff_analysis_has_only_ai_and_bill_text_jobs(db_session, 
         ("interpretation", "sunshine_ledger_ai"),
         ("expected_effect", "sunshine_ledger_ai"),
     }
+
+
+def test_dry_run_and_live_path_hash_the_same_model(db_session, bill_factory, monkeypatch):
+    """--dry-run plans with settings.ollama_layers_model directly; the live
+    path plans with client.model, where client is built from
+    settings.ollama_layers_model too (see review_bill_layers.build_client
+    and bill_layers_batch's __main__). They must produce identical
+    input hashes for the same bill, or a dry-run preview could show jobs
+    the live run wouldn't actually do (or vice versa)."""
+    monkeypatch.setattr(settings, "ollama_layers_model", "qwen2.5:14b")
+    entity = bill_factory()
+    _with_text(db_session, entity)
+
+    dry_run_jobs = plan_jobs(db_session, entity, settings.ollama_layers_model)
+
+    live_client = OllamaClient(model=settings.ollama_layers_model, timeout=300)
+    live_jobs = plan_jobs(db_session, entity, live_client.model)
+
+    assert {(j.layer, j.origin, j.input_hash) for j in dry_run_jobs} == {
+        (j.layer, j.origin, j.input_hash) for j in live_jobs
+    }
+    assert dry_run_jobs  # sanity: the bill actually has jobs to compare
 
 
 def test_plan_with_staff_analysis_adds_staff_jobs(db_session, bill_factory):
