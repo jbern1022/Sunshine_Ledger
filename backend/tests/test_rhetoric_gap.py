@@ -22,6 +22,18 @@ class FakeOllamaClient:
 # --- generate_rhetoric_gap (pure function) ----------------------------------
 
 
+def test_prompt_explains_the_change_markers():
+    """full_text carries [deleted: ...]/[added: ...] markers; the prompt must
+    say what they mean so the model doesn't read deleted wording as law."""
+    client = FakeOllamaClient("NO_GAP")
+    generate_rhetoric_gap("HB 1", "Title", "Desc", "An [deleted: old] [added: new] rule.", client=client)
+    assert (
+        "In the text, [deleted: …] marks wording the bill removes and "
+        "[added: …] marks wording it adds." in client.calls[0]
+    )
+
+
+
 def test_generate_rhetoric_gap_returns_none_for_no_gap_sentinel():
     client = FakeOllamaClient("NO_GAP")
     result = generate_rhetoric_gap("HB 1", "Renames a Bridge", "Renames a bridge.", "Full text.", client=client)

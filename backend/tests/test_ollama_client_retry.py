@@ -3,15 +3,26 @@
 The 2026-09-23 quality report hit one ReadTimeout on a long bill at the
 default 120s timeout, and three ConnectErrors when Ollama restarted
 mid-run. Layers callers use a longer timeout; `generate` retries exactly
-once on a transport-level error (connection refused, reset, etc.) and does
-not retry on an HTTP error status, since retrying a 404/500 just repeats
-the same failure.
+once, after a short (patchable) sleep, on a connection-level error
+(ConnectError, RemoteProtocolError, ReadError). It does not retry on a
+timeout -- a request that timed out would most likely time out again --
+nor on an HTTP error status, since retrying a 404/500 just repeats the
+same failure.
 """
 
 import httpx
 import pytest
 
+from app.pipeline import summarize
 from app.pipeline.summarize import OllamaClient
+
+
+@pytest.fixture(autouse=True)
+def no_sleep(monkeypatch):
+    """Record retry pauses instead of really sleeping."""
+    slept: list[float] = []
+    monkeypatch.setattr(summarize, "_sleep", slept.append)
+    return slept
 
 
 class _FakeResponse:
@@ -55,20 +66,54 @@ def test_custom_timeout_is_passed_through(monkeypatch):
     assert captured["timeout"] == 300.0
 
 
-def test_generate_retries_once_on_connect_error_then_succeeds(monkeypatch):
+@pytest.mark.parametrize(
+    "error",
+    [
+        httpx.ConnectError("connection refused"),
+        httpx.RemoteProtocolError("server disconnected without sending a response"),
+        httpx.ReadError("connection reset by peer"),
+    ],
+)
+def test_generate_retries_once_on_connection_error_then_succeeds(monkeypatch, no_sleep, error):
     client = OllamaClient()
     calls = {"n": 0}
 
     def flaky_post(url, json=None):
         calls["n"] += 1
         if calls["n"] == 1:
-            raise httpx.ConnectError("connection refused")
+            raise error
         return _FakeResponse(200, {"response": "hello"})
 
     monkeypatch.setattr(client._client, "post", flaky_post)
     result = client.generate("prompt")
     assert result == "hello"
     assert calls["n"] == 2
+    assert no_sleep == [summarize.RETRY_DELAY_SECONDS]
+    assert summarize.RETRY_DELAY_SECONDS == 5.0
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        httpx.ReadTimeout("timed out"),
+        httpx.ConnectTimeout("timed out"),
+        httpx.WriteTimeout("timed out"),
+        httpx.PoolTimeout("timed out"),
+    ],
+)
+def test_generate_does_not_retry_on_timeout(monkeypatch, no_sleep, error):
+    client = OllamaClient()
+    calls = {"n": 0}
+
+    def times_out(url, json=None):
+        calls["n"] += 1
+        raise error
+
+    monkeypatch.setattr(client._client, "post", times_out)
+    with pytest.raises(type(error)):
+        client.generate("prompt")
+    assert calls["n"] == 1
+    assert no_sleep == []
 
 
 def test_generate_raises_after_second_connect_error(monkeypatch):

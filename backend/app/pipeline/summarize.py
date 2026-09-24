@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 
 import httpx
 from sqlalchemy import select
@@ -141,6 +142,15 @@ class OllamaError(RuntimeError):
     pass
 
 
+# Connection-level failures worth one retry: Ollama restarting (refused),
+# or dropping the connection mid-response. Deliberately excludes every
+# httpx.TimeoutException subclass.
+_RETRYABLE_ERRORS = (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError)
+RETRY_DELAY_SECONDS = 5.0
+# Module-level so tests can patch it out instead of really sleeping.
+_sleep = time.sleep
+
+
 class OllamaClient:
     def __init__(
         self, host: str | None = None, model: str | None = None, *, timeout: float = 120.0
@@ -156,13 +166,16 @@ class OllamaClient:
         body = {"model": self.model, "prompt": prompt, "stream": False}
         if json_mode:
             body["format"] = "json"
-        # Retry once on a transport-level error (connection refused/reset,
-        # etc.) -- the 2026-09-23 quality report hit three of these when
-        # Ollama restarted mid-run. Not retried: HTTP error statuses
+        # Retry once, after a short pause, on a connection-level failure
+        # (refused, dropped, reset) -- the 2026-09-23 quality report hit
+        # three of these when Ollama restarted mid-run. Not retried:
+        # timeouts (a request that timed out would most likely time out
+        # again, doubling the wait for nothing) and HTTP error statuses
         # (raise_for_status below), since a 404/500 just repeats.
         try:
             resp = self._client.post(f"{self.host}/api/generate", json=body)
-        except httpx.TransportError:
+        except _RETRYABLE_ERRORS:
+            _sleep(RETRY_DELAY_SECONDS)
             resp = self._client.post(f"{self.host}/api/generate", json=body)
         resp.raise_for_status()
         data = resp.json()

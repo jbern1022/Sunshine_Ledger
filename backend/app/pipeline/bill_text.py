@@ -109,6 +109,15 @@ def clean_legislative_text(raw: str) -> str:
             # extracted text) can put the sequence briefly behind without
             # meaning the next number isn't real -- resync as long as it's
             # a small hop ahead rather than requiring the exact successor.
+            #
+            # Trade-off: the wider the window, the more real content it can
+            # eat. With a window of 3, a line genuinely ending in a number
+            # 1-3 above the last line number (e.g. "...subsection 14" read
+            # right after line 12) is taken for a line number and stripped.
+            # A window of 1 (exact successor only) never does that, but
+            # then one missed number desyncs the rest of the page and
+            # leaves every following line number in the text. 3 is the
+            # smallest window that resynced every sample we checked.
             diff = int(match.group(1)) - expected
             if 1 <= diff <= 3:
                 expected = int(match.group(1))
@@ -164,16 +173,26 @@ def html_to_marked_text(html: str) -> str:
 
     def _wrap(css_class: str, kind: str) -> None:
         for el in soup.find_all(class_=css_class):
+            raw = el.get_text()
             # Whitespace inside markers is single spaces (some Insert/Remove
             # spans hold only a run of whitespace -- an added or deleted
             # space -- which shouldn't produce an empty "[added: ]").
-            text = " ".join(el.get_text().split())
-            el.replace_with(f"[{kind}: {text}]" if text else " ")
+            text = " ".join(raw.split())
+            if not text:
+                el.replace_with(" " if raw else "")
+                continue
+            # An element's own leading/trailing whitespace is a word
+            # boundary, so it stays OUTSIDE the marker: "of<u> receiving</u>"
+            # must become "of [added: receiving]", not "of[added: receiving]"
+            # (which law_as_amended would read as "ofreceiving").
+            lead = " " if raw[:1].isspace() else ""
+            trail = " " if raw[-1:].isspace() else ""
+            el.replace_with(f"{lead}[{kind}: {text}]{trail}")
 
     _wrap("Remove", "deleted")
     _wrap("Insert", "added")
 
-    return clean_html_legislative_text(soup.get_text())
+    return _merge_adjacent_markers(clean_html_legislative_text(soup.get_text()))
 
 
 def extract_html_text(html_bytes: bytes) -> str:
@@ -187,22 +206,34 @@ def extract_html_text(html_bytes: bytes) -> str:
     return html_to_marked_text(html_bytes.decode("utf-8", errors="replace"))
 
 
-# A word carrying a strike/underline that got wrapped across a PDF's hard
-# line break (a mid-word hyphen at the right margin, most often) comes back
-# from `mark_words` as two separate, adjacent markers of the same kind --
-# one closing at the end of a line, the next opening at the start of the
-# following line. Fold those back into a single marker so a quote or search
-# doesn't see it interrupted by "]\n[added: ".
-_ADJACENT_MARKER = re.compile(r"\[(deleted|added): ([^\]]*)\]\n\[\1: ")
+# Two markers of the same kind separated only by whitespace -- or by
+# nothing at all -- are one change that the source happened to split: a
+# PDF word carrying a strike/underline that wrapped across a hard line break
+# (one marker closes a line, the next opens the following one), or Senate
+# HTML that wraps consecutive words in separate `<u class="Insert">`
+# elements ("purpose of</u><u> receiving"). Fold those back into a single
+# marker so a quote or search doesn't see it interrupted by "] [added: ".
+#
+# Exception: a marker that *opens* with a "Section N." heading keeps its own
+# line, so law_as_amended still finds that heading at a line start.
+_ADJACENT_MARKER = re.compile(
+    r"\[(deleted|added): ([^\]]*)\]([ \t]*\n?[ \t]*)\[\1: (?!Section\s+\d+\.(?!\d))"
+)
 
 
 def _merge_adjacent_markers(text: str) -> str:
     def _join(match: re.Match[str]) -> str:
-        kind, prefix = match.group(1), match.group(2).rstrip()
-        # A hyphenated word broken across the line ("Tatton-Brown-" /
-        # "Rahman") continues with no space; anything else gets one.
-        sep = "" if prefix.endswith("-") else " "
-        return f"[{kind}: {prefix}{sep}"
+        kind, prefix, gap = match.group(1), match.group(2), match.group(3)
+        if not gap:
+            # Directly abutting ("aid][added: .]") -- no space was there.
+            sep = ""
+        elif "\n" in gap and prefix.rstrip().endswith("-"):
+            # A hyphenated word broken across the line ("Tatton-Brown-" /
+            # "Rahman") continues with no space.
+            sep = ""
+        else:
+            sep = " "
+        return f"[{kind}: {prefix.rstrip()}{sep}"
 
     while True:
         new_text = _ADJACENT_MARKER.sub(_join, text)
@@ -221,15 +252,25 @@ def mark_words(
     strike-through/underline -- need `x0, x1, top, bottom`) so the layout
     rules are testable without opening a PDF.
 
-    Words are grouped into lines by `top` (within 2pt), left-margin line
-    numbers are dropped by position rather than pattern-matched after the
-    fact, and each word is classified by whether segments crossing its
-    vertical middle (struck) or running along its bottom (underlined/
-    added) cover at least half of its width -- summed across however many
-    segments touch it, so a rule that merely grazes a word's edge (e.g. a
-    neighbor's underline overrunning by a point or two) doesn't pull an
-    unrelated word into the marker. Consecutive words of the same kind
-    become one marker.
+    Words are grouped into lines by `top` (within 2pt) and then put in
+    reading order by `x0`: an underlined word can sit a fraction of a point
+    higher than its unmarked neighbours, so ordering by `top` alone would
+    pull it to the front of its line (H1171 came out as
+    "[added: This act ...] Section 1."). Left-margin line numbers are
+    dropped by position rather than pattern-matched after the fact, and
+    each word is classified by whether segments crossing its vertical
+    middle (struck) or running along its bottom (underlined/added) cover at
+    least half of its width -- summed across however many segments touch
+    it, so a rule that merely grazes a word's edge (e.g. a neighbor's
+    underline overrunning by a point or two) doesn't pull an unrelated word
+    into the marker. Consecutive words of the same kind become one marker.
+
+    A word may also carry its pdfplumber `chars` (`extract_words(
+    return_chars=True)`). When its characters disagree -- a renumbering
+    such as "2.1." where "2." is underlined and "1." struck, printed with
+    no space between -- the word is split where the classification
+    changes, giving "[added: 2.][deleted: 1.]" rather than one marker (or
+    none) over both numbers.
     """
     # Only thin, roughly-horizontal marks count as strike/underline rules --
     # a tall page-margin rule (drawn as a rect spanning the whole column)
@@ -237,17 +278,17 @@ def mark_words(
     # filtering it out up front is cheaper and more obviously correct.
     thin_segments = [s for s in segments if abs(s["bottom"] - s["top"]) <= 5]
 
-    def _classify(word: dict) -> str | None:
-        width = word["x1"] - word["x0"]
+    def _classify(box: dict) -> str | None:
+        width = box["x1"] - box["x0"]
         if width <= 0:
             return None
-        mid = (word["top"] + word["bottom"]) / 2
-        bottom = word["bottom"]
+        mid = (box["top"] + box["bottom"]) / 2
+        bottom = box["bottom"]
         deleted_coverage = added_coverage = 0.0
         for seg in thin_segments:
-            overlap = min(seg["x1"], word["x1"]) - max(seg["x0"], word["x0"])
+            overlap = min(seg["x1"], box["x1"]) - max(seg["x0"], box["x0"])
             if overlap <= 0:
-                continue  # no horizontal overlap with this word
+                continue  # no horizontal overlap with this box
             center = (seg["top"] + seg["bottom"]) / 2
             if abs(center - mid) <= 2.5:
                 deleted_coverage += overlap
@@ -259,6 +300,25 @@ def mark_words(
             return "added"
         return None
 
+    def _pieces(word: dict) -> list[tuple[str | None, str]]:
+        """(kind, text) pieces of one word -- usually just one."""
+        chars = [c for c in word.get("chars") or [] if c.get("text", "").strip()]
+        if chars:
+            kinds = [_classify(c) for c in chars]
+            # Split only on a genuine struck/underlined disagreement. A word
+            # whose characters are merely partly covered (a short rule under
+            # "syndrome;" missing the ";") keeps its whole-word verdict, so
+            # punctuation doesn't spill outside a marker.
+            if "deleted" in kinds and "added" in kinds:
+                pieces: list[tuple[str | None, str]] = []
+                for char, kind in zip(chars, kinds):
+                    if pieces and pieces[-1][0] == kind:
+                        pieces[-1] = (kind, pieces[-1][1] + char["text"])
+                    else:
+                        pieces.append((kind, char["text"]))
+                return pieces
+        return [(_classify(word), word["text"])]
+
     lines: list[list[dict]] = []
     for word in sorted(words, key=lambda w: (w["top"], w["x0"])):
         if lines and abs(word["top"] - lines[-1][0]["top"]) <= 2:
@@ -268,34 +328,30 @@ def mark_words(
 
     result: list[str] = []
     for line_words in lines:
+        line_words.sort(key=lambda w: w["x0"])
         kept = [
             w
             for w in line_words
             if not (w["x0"] < margin_x and w["text"].strip().isdigit())
         ]
 
-        parts: list[str] = []
-        run_kind: str | None = None
-        run_text: list[str] = []
-
-        def _flush() -> None:
-            if not run_text:
-                return
-            joined = " ".join(run_text)
-            if run_kind:
-                parts.append(f"[{run_kind}: {joined}]")
-            else:
-                parts.append(joined)
-
+        # Runs of same-kind text; `glued` means no space before the run
+        # (the run continues the previous word, split by classification).
+        runs: list[tuple[str | None, str, bool]] = []
         for w in kept:
-            kind = _classify(w)
-            if kind != run_kind:
-                _flush()
-                run_kind, run_text = kind, []
-            run_text.append(w["text"])
-        _flush()
+            for i, (kind, text) in enumerate(_pieces(w)):
+                glued = i > 0
+                if runs and runs[-1][0] == kind:
+                    prev_kind, prev_text, prev_glued = runs[-1]
+                    runs[-1] = (kind, prev_text + ("" if glued else " ") + text, prev_glued)
+                else:
+                    runs.append((kind, text, glued))
 
-        result.append(" ".join(parts))
+        out = ""
+        for kind, text, glued in runs:
+            piece = f"[{kind}: {text}]" if kind else text
+            out += piece if (glued or not out) else " " + piece
+        result.append(out)
 
     return result
 
@@ -333,9 +389,14 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         lines: list[str] = []
         with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
             for page in pdf.pages:
-                words = page.extract_words()
+                words = page.extract_words(return_chars=True)
                 segments = list(page.lines) + list(page.rects)
                 lines.extend(mark_words(words, segments))
+                # pdfplumber caches every parsed layout object on the page
+                # until the document closes; releasing each page as we go
+                # took a 100-page House bill (H5003) from ~607 MB to
+                # ~107 MB peak with identical output.
+                page.close()
     except Exception:
         logger.warning("pdfplumber extraction failed -- falling back to pypdf", exc_info=True)
         return _extract_pdf_text_pypdf(pdf_bytes)
@@ -406,7 +467,24 @@ def fetch_legistar_bill_text(client_name: str, matter_id: int, *, timeout: float
         logger.warning("Legistar attachment for matter %s is not a PDF -- skipping", matter_id)
         return None
 
-    return extract_pdf_text(resp.content)
+    # Deliberately the pypdf path (no change markers), not extract_pdf_text.
+    # Jacksonville ordinances are laid out unlike Florida House bills:
+    # italic/bold runs sit in boxes shifted a point or two off the baseline,
+    # so pdfplumber's top-based line grouping scrambles and splits lines;
+    # underlines are read as strike-throughs (e.g. "shall not be construed"
+    # came back as [deleted: ...]); and the signature-block rules mark whole
+    # lines. Switching Legistar to the marker extractor needs a
+    # baseline-aware line grouping first, tested against Legistar fixtures.
+    return _extract_pdf_text_pypdf(resp.content)
+
+
+def _legistar_text_for(entity: Entity) -> str | None:
+    """Fetch (without storing) the current text for one Legistar bill."""
+    ids = entity.external_ids or {}
+    matter_id, client_name = ids.get("legistar_matter_id"), ids.get("legistar_client")
+    if not matter_id or not client_name:
+        return None
+    return fetch_legistar_bill_text(client_name, int(matter_id))
 
 
 def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:
@@ -434,14 +512,9 @@ def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: b
 
     fetched = failed = 0
     for entity in entities:
-        ids = entity.external_ids or {}
-        matter_id, client_name = ids.get("legistar_matter_id"), ids.get("legistar_client")
-        if not matter_id or not client_name:
-            failed += 1
-            continue
-
+        matter_id = (entity.external_ids or {}).get("legistar_matter_id")
         try:
-            text = fetch_legistar_bill_text(client_name, int(matter_id))
+            text = _legistar_text_for(entity)
             if not text:
                 failed += 1
                 continue
@@ -455,6 +528,19 @@ def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: b
 
     logger.info("Legistar bill text: %d fetched, %d skipped/failed", fetched, failed)
     return fetched, failed
+
+
+def _legiscan_text_for(client: LegiScanClient, entity: Entity) -> str | None:
+    """Fetch (without storing) the current text for one LegiScan bill."""
+    legiscan_id = (entity.external_ids or {}).get("legiscan_id")
+    if not legiscan_id:
+        return None
+    docs = client.get_bill(int(legiscan_id)).get("texts") or []
+    if not docs:
+        return None
+    # Last entry is the most recent version (LegiScan orders them
+    # oldest-first), which is what should be summarized.
+    return fetch_bill_text(client, int(docs[-1]["doc_id"]))
 
 
 def backfill_bill_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:
@@ -485,21 +571,8 @@ def backfill_bill_texts(db: Session, *, limit: int | None = None, refresh: bool 
     fetched = failed = 0
     for entity in entities:
         bill = entity.bill
-        legiscan_id = (entity.external_ids or {}).get("legiscan_id")
-        if not legiscan_id:
-            failed += 1
-            continue
-
         try:
-            detail = client.get_bill(int(legiscan_id))
-            docs = detail.get("texts") or []
-            if not docs:
-                failed += 1
-                continue
-
-            # Last entry is the most recent version (LegiScan orders them
-            # oldest-first), which is what should be summarized.
-            text = fetch_bill_text(client, int(docs[-1]["doc_id"]))
+            text = _legiscan_text_for(client, entity)
             if not text:
                 failed += 1
                 continue
@@ -514,6 +587,119 @@ def backfill_bill_texts(db: Session, *, limit: int | None = None, refresh: bool 
 
     logger.info("Bill text: %d fetched, %d skipped/failed", fetched, failed)
     return fetched, failed
+
+
+# A line-start bill section heading, same rule as bill_layers_text's
+# `_BILL_SECTION` ("Section 316.1895" is a citation, not a heading).
+_HEADING_LINE = re.compile(r"(?m)^\s*Section\s+\d+\.(?!\d)", re.IGNORECASE)
+_DELETED_SPAN = re.compile(r"\[deleted: [^\]]*\]")
+_NUMBER_ONLY_LINE = re.compile(r"(?m)^\s*\d+\s*$")
+
+# Thresholds for flagging a re-extraction for a human look before it is
+# written: a big length swing, text that is mostly "deleted", section
+# headings that vanished, or left-margin line numbers leaking through.
+COMPARE_MAX_LENGTH_CHANGE = 0.15
+COMPARE_MAX_DELETED_PCT = 60.0
+
+
+def compare_texts(old: str, new: str) -> dict:
+    """Compare a bill's stored text with a fresh re-extraction.
+
+    Pure function behind `--compare`. Lengths and heading counts are taken
+    on the law-as-amended view, so the markers themselves don't count as a
+    change; the deleted share is measured on the new marked text.
+    """
+    from app.pipeline.bill_layers_text import law_as_amended
+
+    old_amended, new_amended = law_as_amended(old or ""), law_as_amended(new or "")
+    old_len, new_len = len(old_amended), len(new_amended)
+    length_ratio = new_len / old_len if old_len else None
+
+    deleted_chars = sum(len(m) for m in _DELETED_SPAN.findall(new or ""))
+    deleted_pct = 100.0 * deleted_chars / len(new) if new else 0.0
+
+    old_headings = len(_HEADING_LINE.findall(old_amended))
+    new_headings = len(_HEADING_LINE.findall(new_amended))
+    number_only_lines = len(_NUMBER_ONLY_LINE.findall(new or ""))
+
+    reasons: list[str] = []
+    if length_ratio is None:
+        if new_len:
+            reasons.append("length")
+    elif abs(length_ratio - 1) > COMPARE_MAX_LENGTH_CHANGE:
+        reasons.append("length")
+    if deleted_pct > COMPARE_MAX_DELETED_PCT:
+        reasons.append("deleted")
+    if new_headings < old_headings:
+        reasons.append("headings")
+    if number_only_lines > 0:
+        reasons.append("numbers")
+
+    return {
+        "old_len": old_len,
+        "new_len": new_len,
+        "length_ratio": length_ratio,
+        "deleted_pct": deleted_pct,
+        "old_headings": old_headings,
+        "new_headings": new_headings,
+        "number_only_lines": number_only_lines,
+        "flag": bool(reasons),
+        "reasons": reasons,
+    }
+
+
+def compare_bill_texts(db: Session, *, source: str = "legiscan", limit: int | None = None) -> list[dict]:
+    """Re-extract stored bills' text WITHOUT writing it, and compare.
+
+    Only bills that already have `full_text` are considered (there is
+    nothing to compare otherwise). Returns one row per bill:
+    `compare_texts(...)` plus `bill_number`, or `error` if the fetch failed.
+    """
+    sources = ("legiscan", "legistar") if source == "all" else (source,)
+    stmt = (
+        select(Entity)
+        .join(Bill, Bill.entity_id == Entity.id)
+        .where(Entity.entity_type == "bill", Bill.source_system.in_(sources))
+        .options(selectinload(Entity.bill))
+    )
+    entities = [e for e in db.execute(stmt).scalars().all() if e.bill and e.bill.full_text]
+    if limit:
+        entities = entities[:limit]
+
+    legiscan_client = LegiScanClient() if "legiscan" in sources else None
+    rows: list[dict] = []
+    for entity in entities:
+        bill = entity.bill
+        try:
+            if bill.source_system == "legistar":
+                new = _legistar_text_for(entity)
+            else:
+                new = _legiscan_text_for(legiscan_client, entity)
+        except Exception as exc:  # noqa: BLE001 -- report it, keep comparing
+            rows.append({"bill_number": bill.bill_number, "error": str(exc)})
+            continue
+        if not new:
+            rows.append({"bill_number": bill.bill_number, "error": "no text fetched"})
+            continue
+        rows.append({"bill_number": bill.bill_number, **compare_texts(bill.full_text, new)})
+    return rows
+
+
+def format_compare_rows(rows: list[dict]) -> str:
+    header = f"{'BILL':<14} {'LEN_RATIO':>9} {'DELETED%':>8} {'HEADINGS':>9} {'NUM_LINES':>9}  FLAG"
+    out = [header]
+    for r in rows:
+        if "error" in r:
+            out.append(f"{r['bill_number']:<14} ERROR: {r['error']}")
+            continue
+        ratio = f"{r['length_ratio']:.2f}" if r["length_ratio"] is not None else "n/a"
+        headings = f"{r['old_headings']}->{r['new_headings']}"
+        flag = "FLAG " + ",".join(r["reasons"]) if r["flag"] else ""
+        out.append(
+            f"{r['bill_number']:<14} {ratio:>9} {r['deleted_pct']:>7.0f}% {headings:>9} "
+            f"{r['number_only_lines']:>9}  {flag}"
+        )
+    return "\n".join(out)
 
 
 if __name__ == "__main__":
@@ -531,10 +717,24 @@ if __name__ == "__main__":
         default="legiscan",
         help="Which source system to backfill text for.",
     )
+    parser.add_argument(
+        "--compare",
+        action="store_true",
+        help=(
+            "Re-extract bills that already have text WITHOUT writing it, and print "
+            "old vs new stats per bill with a FLAG column (see compare_texts)."
+        ),
+    )
     args = parser.parse_args()
 
     session = SessionLocal()
     try:
+        if args.compare:
+            rows = compare_bill_texts(session, source=args.source, limit=args.limit)
+            print(format_compare_rows(rows))
+            flagged = sum(1 for r in rows if r.get("flag") or "error" in r)
+            print(f"Compared {len(rows)} bills; {flagged} flagged or failed. Nothing was written.")
+            raise SystemExit(0)
         ok = bad = 0
         if args.source in ("legiscan", "all"):
             a, b = backfill_bill_texts(session, limit=args.limit, refresh=args.refresh)

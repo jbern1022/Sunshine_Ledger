@@ -158,9 +158,12 @@ def restates_bill(statement: str, text: str) -> bool:
     amended, since that is the wording a genuine consequence must not just
     echo back.
 
-    Candidate sentences are prefiltered by shared content words (>= 3)
-    before the O(n*m) `SequenceMatcher` comparison, so this stays fast even
-    on a long (~12,000 char) bill.
+    Candidate sentences are prefiltered before the O(n*m) `SequenceMatcher`
+    comparison, so this stays fast even on a long (~12,000 char) bill:
+    they must share >= 3 content words; their lengths must be close enough
+    that a 0.6 ratio is possible at all (`ratio()` is at most
+    2*min(len)/(len_a+len_b)); and the cheap `quick_ratio()` upper bound
+    must reach 0.6 before the real `ratio()` runs.
     """
     stmt = normalize_ws(statement)
     stmt_words = _content_words(stmt)
@@ -179,8 +182,13 @@ def restates_bill(statement: str, text: str) -> bool:
         # prose easily crosses that threshold (spaces, common letters), which
         # collapses the ratio for exactly the long, near-identical sentences
         # this guard exists to catch.
-        ratio = difflib.SequenceMatcher(None, stmt_lower, sentence.lower(), autojunk=False).ratio()
-        if ratio >= 0.6:
+        len_a, len_b = len(stmt_lower), len(sentence)
+        if 2 * min(len_a, len_b) / (len_a + len_b) < 0.6:
+            continue  # lengths alone rule out a 0.6 ratio
+        matcher = difflib.SequenceMatcher(None, stmt_lower, sentence.lower(), autojunk=False)
+        if matcher.quick_ratio() < 0.6:
+            continue  # upper bound on ratio() -- cheap, and usually decisive
+        if matcher.ratio() >= 0.6:
             return True
     return False
 

@@ -340,3 +340,48 @@ def test_restates_bill_catches_h1171_paraphrase_default_autojunk_would_miss():
         "educational or exhibition purposes."
     )
     assert restates_bill(model_statement, bill_text)
+
+
+def test_restates_bill_skips_ratio_when_lengths_rule_out_a_match(monkeypatch):
+    """ratio() can't exceed 2*min(len)/(len_a+len_b); a sentence far longer
+    than the statement is skipped without the O(n*m) ratio() call, even
+    when it shares plenty of content words."""
+    import difflib
+
+    calls = {"ratio": 0}
+    real_ratio = difflib.SequenceMatcher.ratio
+
+    def counting_ratio(self):
+        calls["ratio"] += 1
+        return real_ratio(self)
+
+    monkeypatch.setattr(difflib.SequenceMatcher, "ratio", counting_ratio)
+    long_sentence = (
+        "Section 1. The agency shall contract with a state university to provide research "
+        "services, together with laboratory space, staffing plans, annual budgets, reporting "
+        "schedules, audit procedures, data-sharing agreements, and publication rules that the "
+        "agency and the university jointly adopt and revise each fiscal year.\n"
+    )
+    assert not restates_bill("The agency may contract with a state university.", long_sentence)
+    assert calls["ratio"] == 0
+
+
+def test_restates_bill_skips_ratio_when_quick_ratio_is_too_low(monkeypatch):
+    """quick_ratio() is a cheap upper bound on ratio(): when it is already
+    below 0.6, ratio() is never computed."""
+    import difflib
+
+    calls = {"ratio": 0}
+    real_ratio = difflib.SequenceMatcher.ratio
+
+    def counting_ratio(self):
+        calls["ratio"] += 1
+        return real_ratio(self)
+
+    monkeypatch.setattr(difflib.SequenceMatcher, "ratio", counting_ratio)
+    bill = "Section 1. Agency university contract research xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.\n"
+    # Same length ballpark and the same content words, but almost no shared
+    # characters beyond them.
+    stmt = "Agency university contract research zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz."
+    assert not restates_bill(stmt, bill)
+    assert calls["ratio"] == 0
