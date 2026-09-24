@@ -11,6 +11,7 @@ Staff-analysis heading strings were sampled from production on 2026-09-23:
 
 from __future__ import annotations
 
+import difflib
 import re
 
 _WS = re.compile(r"\s+")
@@ -21,9 +22,25 @@ _NAV_LINE = re.compile(r"(?m)^\s*JUMP TO SUMMARY ANALYSIS RELEVANT INFORMATION\s
 _BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.(?!\d)", re.IGNORECASE)
 _SECTION_REF = re.compile(r"\b(?:section|sec\.?)\s*(\d+)(?!\.\d)\b", re.IGNORECASE)
 _CONDITIONAL = re.compile(
-    r"\bmay\b(?!\s+\d{1,2}\b)|\b(?:might|could|would|(?:is|are) expected to)\b", re.IGNORECASE
+    # A bare "may not" is how bills state a prohibition ("The agency may not
+    # issue licenses"), not conditional wording about an effect -- it doesn't
+    # count on its own. Plain "may" (not followed by "not"), and the other
+    # conditional cues, still do.
+    r"\bmay\b(?!\s+\d{1,2}\b)(?!\s+not\b)|\b(?:might|could|would|(?:is|are) expected to)\b",
+    re.IGNORECASE,
 )
 _NO_OR_UNKNOWN = re.compile(r"\b(none|no fiscal impact|no impact|indeterminate|insignificant)\b", re.IGNORECASE)
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_CONTENT_WORD = re.compile(r"[A-Za-z']+")
+_STOPWORDS = frozenset({
+    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "is", "are",
+    "was", "were", "be", "been", "being", "by", "with", "as", "at", "that",
+    "this", "these", "those", "it", "its", "shall", "will", "may", "not",
+    "if", "than", "then", "which", "who", "whom", "from", "into", "such",
+    "any", "all", "each", "other", "under", "upon", "about", "through",
+    "must", "can", "have", "has", "had", "but", "also", "when", "while",
+})
 
 # (start, end) pairs, tried in order. Patterns are matched per line.
 _EFFECT_PATTERNS = [
@@ -41,6 +58,7 @@ def normalize_ws(s: str) -> str:
     return _WS.sub(" ", s).strip()
 
 
+_DELETED_BEFORE_PUNCT = re.compile(r" ?\[deleted:[^\]]*\](?=[,.;:)])")
 _DELETED = re.compile(r"\[deleted:[^\]]*\]")
 _ADDED = re.compile(r"\[added:\s*([^\]]*)\]")
 _DELETED_UNTERMINATED = re.compile(r"\s?\[deleted:[^\]]*$")
@@ -53,13 +71,17 @@ def law_as_amended(text: str) -> str:
 
     Drops `[deleted: ...]` spans entirely and unwraps `[added: ...]` spans to
     their contents. Line structure (including "Section N." headings at line
-    start) is preserved; only the double spaces a deletion leaves behind are
-    collapsed.
+    start) is preserved; only the extra whitespace a deletion leaves behind
+    is collapsed -- a run of double spaces, or a single space stranded right
+    before a `, . ; : )` when the deleted marker sat directly against that
+    punctuation. Ordinary spacing elsewhere in the text, not adjacent to a
+    removed marker, is never touched.
 
     A marker cut off by truncation -- an opening `[deleted:` or `[added:`
     with no closing `]` -- never leaks its fragment: an unterminated deleted
     fragment is dropped, an unterminated added fragment is unwrapped.
     """
+    text = _DELETED_BEFORE_PUNCT.sub("", text)
     text = _DELETED.sub("", text)
     text = _ADDED.sub(lambda m: m.group(1), text)
     text = _DELETED_UNTERMINATED.sub("", text)
@@ -117,6 +139,41 @@ def section_for_quote(quote: str, text: str) -> str | None:
 
 def is_conditional(statement: str) -> bool:
     return bool(_CONDITIONAL.search(statement))
+
+
+def _content_words(s: str) -> set[str]:
+    return {
+        w.lower() for w in _CONTENT_WORD.findall(s)
+        if len(w) > 3 and w.lower() not in _STOPWORDS
+    }
+
+
+def restates_bill(statement: str, text: str) -> bool:
+    """True when `statement` is a near-paraphrase of a sentence the bill
+    already contains (often the bill's own wording with "may" inserted),
+    rather than a description of a consequence. Compared against the law as
+    amended, since that is the wording a genuine consequence must not just
+    echo back.
+
+    Candidate sentences are prefiltered by shared content words (>= 3)
+    before the O(n*m) `SequenceMatcher` comparison, so this stays fast even
+    on a long (~12,000 char) bill.
+    """
+    stmt = normalize_ws(statement)
+    stmt_words = _content_words(stmt)
+    if len(stmt_words) < 3:
+        return False
+    stmt_lower = stmt.lower()
+    for sentence in _SENTENCE_SPLIT.split(law_as_amended(text)):
+        sentence = normalize_ws(sentence)
+        if not sentence:
+            continue
+        if len(stmt_words & _content_words(sentence)) < 3:
+            continue
+        ratio = difflib.SequenceMatcher(None, stmt_lower, sentence.lower()).ratio()
+        if ratio >= 0.6:
+            return True
+    return False
 
 
 def states_no_or_unknown_impact(statement: str) -> bool:

@@ -22,6 +22,7 @@ from app.pipeline.bill_layers_text import (
     bill_section_numbers,
     is_conditional,
     law_as_amended,
+    restates_bill,
     section_for_quote,
     section_number,
     states_no_or_unknown_impact,
@@ -34,9 +35,9 @@ from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("bill_says", "bill_text"): "bill_says/bill_text/2",
     ("interpretation", "legislative_staff"): "interpretation/legislative_staff/1",
-    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/2",
-    ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/1",
-    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/2",
+    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/3",
+    ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/2",
+    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/3",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -87,7 +88,7 @@ Write 2 to 5 plain-language statements of what this bill changes in the law. Rul
 
 Respond with JSON only: {{"items": [{{"text": "...", "section_ref": "Section N", "assumptions": ["..."], "affected_groups": ["..."]}}]}}"""
 
-AI_EXPECTED_EFFECT_PROMPT = """You are describing possible direct effects of a bill, for a civic transparency website.
+AI_EXPECTED_EFFECT_PROMPT = """You are describing the likely consequences of a bill for the people, businesses, or institutions it affects, for a civic transparency website.
 
 Bill: {bill_number} — {title}
 
@@ -98,9 +99,9 @@ Bill text:
 
 In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds.
 
-Describe up to 4 direct effects that follow from a specific mechanism in this bill (a requirement, prohibition, funding change, deadline, or penalty it creates or removes). Rules:
+Describe up to 4 consequences that follow from a specific mechanism in this bill (a requirement, prohibition, funding change, deadline, or penalty it creates or removes). A consequence is something that happens to people or institutions BECAUSE of the mechanism -- it is not the mechanism itself. Do not restate what the bill says or requires, and do not just take the bill's own sentence and insert "may" into it. Rules:
 - Each effect MUST cite the bill section that creates the mechanism (e.g. "Section 3").
-- Use conditional wording: "may", "could", or "is expected to". Never state an effect as certain.
+- Use conditional wording: "may", "could", or "is expected to". Never state an effect as certain. A bare "may not" copied from the bill's own prohibition does not count as conditional wording.
 - Do not predict wider economic, social, or behavioral consequences beyond the direct mechanism.
 - For each effect list the assumptions it depends on.
 - List affected groups ONLY if the text names them.
@@ -127,12 +128,13 @@ STAFF_EXPECTED_EFFECT_PROMPT = """Below is the fiscal impact section of a nonpar
 {text}
 \"\"\"
 
-Restate each fiscal finding (tax/fee, private sector, state government, local government) as one plain-language statement. Rules:
+Restate each fiscal finding as one plain-language statement. For each, give the category it belongs to: "tax_fee", "state_government", "local_government", "private_sector", or "other" for anything that does not fit those. Rules:
 - Use conditional wording ("may", "could", "is expected to") for any projected effect.
+- The fiscal text may print a list of options for a category (e.g. "None / Indeterminate / Insignificant"). Report ONLY the option staff actually selected for that category -- never restate the whole list.
 - If staff say "None", "Indeterminate", or "Insignificant", say so literally, e.g. "Staff found the private sector impact indeterminate." Do not guess.
 - List any assumptions staff state. Add nothing that is not in the text above.
 
-Respond with JSON only: {{"items": [{{"text": "...", "assumptions": ["..."]}}]}}"""
+Respond with JSON only: {{"items": [{{"category": "tax_fee", "text": "...", "assumptions": ["..."]}}]}}"""
 
 
 def _parse_items(raw: str) -> list[dict]:
@@ -216,7 +218,19 @@ def build_ai_interpretation(bill_number: str, title: str, full_text: str, client
     raw = _parse_items(client.generate(
         AI_INTERPRETATION_PROMPT.format(bill_number=bill_number, title=title, text=text), json_mode=True
     ))
-    items = [_item(r, assumptions_required=True) for r in raw if str(r.get("text") or "").strip()][:5]
+    sections = bill_section_numbers(law_as_amended(text))
+    items: list[dict] = []
+    for r in raw:
+        if not str(r.get("text") or "").strip():
+            continue
+        item = _item(r, assumptions_required=True)
+        # A section_ref that doesn't resolve to a section this bill actually
+        # has -- unparseable, or a number not present -- is cleared rather
+        # than trusted; the statement itself is kept.
+        if section_number(item["section_ref"]) not in sections:
+            item["section_ref"] = None
+        items.append(item)
+    items = items[:5]
     scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
     if not items:
         note = "No interpretation could be drawn from the bill text"
@@ -236,7 +250,12 @@ def build_ai_expected_effect(bill_number: str, title: str, full_text: str, clien
     dropped: list[dict] = []
     for r in raw:
         item = _item(r, assumptions_required=True)
-        if item["text"] and section_number(item["section_ref"]) in sections and is_conditional(item["text"]):
+        if (
+            item["text"]
+            and section_number(item["section_ref"]) in sections
+            and is_conditional(item["text"])
+            and not restates_bill(item["text"], text)
+        ):
             kept.append(item)
         else:
             dropped.append(r)
@@ -261,6 +280,9 @@ def build_staff_interpretation(effect_section: str | None, staff_label: str, cli
     return LayerResult("supported", staff_label, items)
 
 
+_STAFF_FISCAL_CATEGORIES = {"tax_fee", "state_government", "local_government", "private_sector"}
+
+
 def build_staff_expected_effect(fiscal_section: str | None, staff_label: str, client) -> LayerResult:
     if not fiscal_section:
         return LayerResult("insufficient_evidence", f"{staff_label} has no fiscal impact section", [])
@@ -269,12 +291,23 @@ def build_staff_expected_effect(fiscal_section: str | None, staff_label: str, cl
     ))
     kept: list[dict] = []
     dropped: list[dict] = []
+    seen_categories: set[str] = set()
     for r in raw:
         item = _item(r)
-        if item["text"] and (is_conditional(item["text"]) or states_no_or_unknown_impact(item["text"])):
-            kept.append(item)
-        else:
+        if not (item["text"] and (is_conditional(item["text"]) or states_no_or_unknown_impact(item["text"]))):
             dropped.append(r)
+            continue
+        # When the fiscal analysis template prints every option for a
+        # category ("None / Indeterminate / Insignificant") the model can
+        # restate more than one; keep only the first (the one staff
+        # selected) per category. "other" items are never deduped this way.
+        category = str(r.get("category") or "").strip().lower()
+        if category in _STAFF_FISCAL_CATEGORIES:
+            if category in seen_categories:
+                dropped.append(r)
+                continue
+            seen_categories.add(category)
+        kept.append(item)
     if not kept:
         return LayerResult("insufficient_evidence", f"{staff_label}: no fiscal finding could be restated", [], dropped)
     return LayerResult("supported", staff_label, kept, dropped)

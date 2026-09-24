@@ -5,6 +5,7 @@ from app.pipeline.bill_layers_text import (
     is_conditional,
     law_as_amended,
     normalize_ws,
+    restates_bill,
     section_for_quote,
     section_number,
     states_no_or_unknown_impact,
@@ -227,3 +228,81 @@ def test_law_as_amended_unwraps_unterminated_added_fragment():
 def test_bill_section_rejects_statute_citation_at_line_start():
     text = "Section 316.1895, F.S., requires signage.\nSection 2. Something else.\n"
     assert bill_section_numbers(text) == {"2"}
+
+
+def test_is_conditional_excludes_bare_may_not():
+    assert not is_conditional("The commission may not renew licenses after the deadline.")
+    assert not is_conditional("The agency may not issue, renew, or approve licenses.")
+
+
+def test_is_conditional_still_true_for_plain_may_and_other_cues():
+    assert is_conditional("Employers may need to update payroll.")
+    assert is_conditional("Counties are expected to save money.")
+
+
+def test_is_conditional_true_when_may_not_accompanies_another_conditional_cue():
+    assert is_conditional("Costs may not fall, but administrative burden is expected to rise.")
+
+
+def test_law_as_amended_removes_space_stranded_before_punctuation_by_deletion():
+    assert law_as_amended("the [deleted: agency], as defined by rule") == "the, as defined by rule"
+    assert law_as_amended("Foo [deleted: X]. Bar") == "Foo. Bar"
+    assert law_as_amended("Foo [deleted: X]; bar") == "Foo; bar"
+    assert law_as_amended("Foo [deleted: X]: bar") == "Foo: bar"
+    assert law_as_amended("Foo [deleted: X]) bar") == "Foo) bar"
+
+
+def test_law_as_amended_does_not_touch_ordinary_spacing():
+    text = "Foo , bar ; baz : qux ) end . Section 2. More text here , with commas."
+    assert law_as_amended(text) == text
+
+
+# --- restates_bill -----------------------------------------------------
+
+EE_BILL = (
+    "Section 1. The agency shall contract with a state university to provide research services.\n"
+    "Section 2. The commission may not renew licenses after the deadline.\n"
+    "Section 3. This act shall take effect July 1, 2027.\n"
+)
+
+
+def test_restates_bill_detects_provision_with_may_inserted():
+    # The classic pattern from the quality report: the bill's own sentence,
+    # copied with a "may" swapped in for "shall".
+    assert restates_bill(
+        "The agency may contract with a state university to provide research services.",
+        EE_BILL,
+    )
+
+
+def test_restates_bill_detects_may_not_copied_verbatim():
+    assert restates_bill("The commission may not renew licenses after the deadline.", EE_BILL)
+
+
+def test_restates_bill_false_for_genuine_consequence():
+    assert not restates_bill(
+        "Universities may see increased demand for research staff as a result of the contract requirement.",
+        EE_BILL,
+    )
+
+
+def test_restates_bill_false_for_short_statement_with_few_content_words():
+    assert not restates_bill("Costs may rise.", EE_BILL)
+
+
+def test_restates_bill_is_fast_on_a_long_bill():
+    import time
+
+    long_bill = EE_BILL + (
+        "Section 4. Additional unrelated provisions establish reporting deadlines, "
+        "funding formulas, and administrative procedures for various agencies. " * 150
+    )
+    assert len(long_bill) > 12_000
+    start = time.monotonic()
+    for _ in range(20):
+        restates_bill(
+            "Universities may see increased demand for research staff as a result of the contract requirement.",
+            long_bill,
+        )
+    elapsed = time.monotonic() - start
+    assert elapsed < 2.0
