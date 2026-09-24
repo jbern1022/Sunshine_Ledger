@@ -86,6 +86,63 @@ _FISCAL_PATTERNS = [
 ]
 
 
+# Page furniture the PDF extractors leave in the text, one item per line:
+# House page headers ("hb495-01-c1", "hb565 -02-er", "ENROLLED",
+# "CS/CS/HB 565 2026 Legislature") and "- 3 -" page numbers. They land in
+# the middle of sentences, so a model quoting the sentence (sensibly) leaves
+# them out and the quote no longer matches word for word. Line shapes
+# sampled from production on 2026-09-24.
+_PAGE_FURNITURE_LINE = re.compile(
+    r"^\s*(?:"
+    r"[hs](?:b|jr|cr|m|r)\d+\s?-\d+-[a-z]+\d*"
+    r"|ENROLLED"
+    r"|(?:CS/)*H(?:B|JR|CR|M|R)\s\d+(?:,\s*Engrossed\s\d+)?\s\d{4}(?:\s+Legislature)?"
+    r"|-\s*\d+\s*-"
+    r")\s*$"
+)
+_TRAILING_LINE_NUMBER = re.compile(r"^(.*?)\s*(?<![\d.,$])\b(\d{1,3})\s*$")
+# Jacksonville (Legistar) PDFs number every line at the right margin. A
+# number only counts as a line number inside a run of at least this many
+# lines numbered n, n+1, n+2, ... -- one stray trailing number is text.
+_MIN_LINE_NUMBER_RUN = 3
+
+
+def strip_page_artifacts(text: str) -> str:
+    """`text` without page headers, page numbers, or margin line numbers.
+
+    Only whole lines of known page furniture are removed, and a trailing
+    number is only removed as a line number when it sits in a run of
+    consecutively numbered lines, so ordinary text ending in a number
+    ("... effective July 1, 2027", "subsection (2)") is left alone.
+    """
+    lines = [l for l in text.split("\n") if not _PAGE_FURNITURE_LINE.match(l)]
+    numbers: list[int | None] = []
+    for line in lines:
+        m = _TRAILING_LINE_NUMBER.match(line)
+        numbers.append(int(m.group(2)) if m else None)
+    strip = [False] * len(lines)
+    i = 0
+    while i < len(lines):
+        if numbers[i] is None:
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(lines) and numbers[j + 1] is not None and numbers[j + 1] == numbers[j] + 1:
+            j += 1
+        if j - i + 1 >= _MIN_LINE_NUMBER_RUN:
+            for k in range(i, j + 1):
+                strip[k] = True
+        i = j + 1
+    out = []
+    for line, drop in zip(lines, strip):
+        if drop:
+            line = _TRAILING_LINE_NUMBER.match(line).group(1)
+            if not line.strip():
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def normalize_ws(s: str) -> str:
     return _WS.sub(" ", s).strip()
 
@@ -130,6 +187,10 @@ def _is_substantive_quote(quote: str) -> bool:
     """
     if quote.endswith(":") or quote.endswith(":—"):
         return False
+    # A statute catchline ("119.0712 Executive branch agency-specific
+    # exemptions ... records.—") is a heading, not a provision.
+    if quote.endswith(".—") or quote.endswith(".-"):
+        return False
     if _DEFINITIONS_LEAD_IN.search(quote):
         return False
     if len(quote.split()) < 6:
@@ -137,19 +198,57 @@ def _is_substantive_quote(quote: str) -> bool:
     return True
 
 
+# Curly quotes and dashes the model may swap for their plain forms (or the
+# other way round). Every entry maps one character to one character, so an
+# index into the folded text is an index into the original too.
+_QUOTE_FOLD = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'",
+                             "\u2014": "-", "\u2013": "-"})
+
+
+def _repair_mojibake(s: str) -> str:
+    """Undo UTF-8 read as Windows-1252 ("â€™" for "’"), which the model
+    sometimes emits for curly quotes and dashes."""
+    if "\u00e2\u20ac" not in s and "\u00c3" not in s:
+        return s
+    # Per character: bytes 0x81/0x8d/0x8f/0x90/0x9d have no Windows-1252
+    # character, so those come through as the Latin-1 control character.
+    raw = bytearray()
+    for ch in s:
+        try:
+            raw += ch.encode("cp1252")
+        except UnicodeError:
+            try:
+                raw += ch.encode("latin-1")
+            except UnicodeError:
+                return s  # a real non-Latin character: not mojibake
+    try:
+        return raw.decode("utf-8")
+    except UnicodeError:
+        return s
+
+
 def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[dict]]:
-    """Keep only quotes that appear verbatim (modulo whitespace) in `text`
-    and that carry enough substance to stand as a provision on their own.
+    """Keep only quotes that appear verbatim in `text` and that carry enough
+    substance to stand as a provision on their own.
+
+    "Verbatim" tolerates whitespace, curly-vs-straight quotes and dashes,
+    and mojibake in the model's output -- nothing else. A kept quote is
+    replaced by the text's own characters, so what's published is always
+    exactly what the bill says.
 
     `text` must be exactly what the model was shown (the truncated text), so
     a quote from beyond the truncation point is dropped too.
     """
     haystack = normalize_ws(text)
+    folded = haystack.translate(_QUOTE_FOLD)
     kept: list[dict] = []
     dropped: list[dict] = []
     for c in candidates:
-        quote = normalize_ws(c.get("quote") or "")
-        if quote and quote in haystack and _is_substantive_quote(quote):
+        quote = normalize_ws(_repair_mojibake(c.get("quote") or ""))
+        at = folded.find(quote.translate(_QUOTE_FOLD)) if quote else -1
+        if at >= 0:
+            quote = haystack[at:at + len(quote)]
+        if at >= 0 and _is_substantive_quote(quote):
             kept.append({**c, "quote": quote})
         else:
             dropped.append(c)

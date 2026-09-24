@@ -11,6 +11,7 @@ from app.pipeline.bill_layers_text import (
     restates_bill,
     section_for_quote,
     section_number,
+    strip_page_artifacts,
     verify_quotes,
 )
 
@@ -564,3 +565,90 @@ def test_overstates_modal_splits_after_which_clause():
         "general inventory for other patients if still suitable.",
         text,
     )
+
+
+HOUSE_PAGE_BREAK = (
+    "Section 1. Subsections (46) and (47) of section 393.063,\n"
+    "Florida Statutes, are renumbered as subsections (47) and (48),\n"
+    "hb565 -02-er\n"
+    "ENROLLED\n"
+    "CS/CS/HB 565 2026 Legislature\n"
+    "respectively, and a new subsection (46) is added to that section.\n"
+    "The Legislature finds\n"
+    "hb495-01-c1\n"
+    "that golf courses are agricultural.\n"
+    "CS/HB 91, Engrossed 1 2026 Legislature\n"
+    "Section 2. This act shall take effect July 1, 2026.\n"
+)
+
+LEGISTAR_NUMBERED = (
+    "facility colloquially referred to as Sax Seafood.  7\n"
+    "Section 2.   Oversight Department. The Downtown Investment 8\n"
+    "Authority and the Department of Public Works shall oversee the Project 9\n"
+    "described herein. 10\n"
+    "11\n"
+    "Section 3.  Effective Date . This Ordinance shall become 12\n"
+    "- 2 -\n"
+)
+
+
+def test_strip_page_artifacts_removes_house_page_headers():
+    out = strip_page_artifacts(HOUSE_PAGE_BREAK)
+    assert "hb565" not in out and "hb495" not in out and "ENROLLED" not in out
+    assert "Legislature\n" not in out
+    assert "(48),\nrespectively" in out
+    assert "The Legislature finds\nthat golf" in out
+    assert out.endswith("Section 2. This act shall take effect July 1, 2026.\n")
+
+
+def test_strip_page_artifacts_removes_legistar_line_numbers():
+    out = strip_page_artifacts(LEGISTAR_NUMBERED)
+    assert out == (
+        "facility colloquially referred to as Sax Seafood.\n"
+        "Section 2.   Oversight Department. The Downtown Investment\n"
+        "Authority and the Department of Public Works shall oversee the Project\n"
+        "described herein.\n"
+        "Section 3.  Effective Date . This Ordinance shall become\n"
+    )
+
+
+def test_strip_page_artifacts_keeps_numbers_that_are_text():
+    text = (
+        "The fee is increased to 25\n"
+        "dollars under subsection 2\n"
+        "and the rate is 1.98\n"
+        "Section 4. This act shall take effect July 1, 2027.\n"
+    )
+    assert strip_page_artifacts(text) == text
+
+
+def test_verify_quotes_tolerates_curly_quotes_and_keeps_bill_characters():
+    text = "Section 1. There are hereby appropriated, within the City\u2019s budget, the sums listed below."
+    kept, dropped = verify_quotes(
+        [{"quote": "There are hereby appropriated, within the City's budget, the sums listed below."}], text
+    )
+    assert dropped == []
+    assert kept[0]["quote"] == "There are hereby appropriated, within the City\u2019s budget, the sums listed below."
+
+
+def test_verify_quotes_repairs_mojibake():
+    text = "Section 1. The term \u201cclass A opening protection\u201d means all glazed openings are impact-rated."
+    mangled = "The term \u00e2\u20ac\u0153class A opening protection\u00e2\u20ac\u009d means all glazed openings are impact-rated."
+    kept, _ = verify_quotes([{"quote": mangled}], text)
+    assert kept[0]["quote"] == "The term \u201cclass A opening protection\u201d means all glazed openings are impact-rated."
+
+
+def test_verify_quotes_still_rejects_changed_words():
+    text = "Section 1. The agency may issue licenses to qualified applicants each year."
+    _, dropped = verify_quotes([{"quote": "The agency shall issue licenses to qualified applicants each year."}], text)
+    assert len(dropped) == 1
+
+
+def test_verify_quotes_rejects_statute_catchline():
+    text = ("Section 1. 119.0712 Executive branch agency-specific exemptions from inspection or copying "
+            "of public records.\u2014 (2) The department shall redact e-mail addresses.")
+    _, dropped = verify_quotes(
+        [{"quote": "119.0712 Executive branch agency-specific exemptions from inspection or copying of public records.\u2014"}],
+        text,
+    )
+    assert len(dropped) == 1

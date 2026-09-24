@@ -32,6 +32,7 @@ from app.pipeline.bill_layers_text import (
     restates_bill,
     section_for_quote,
     section_number,
+    strip_page_artifacts,
     verify_quotes,
 )
 from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
@@ -39,11 +40,11 @@ from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 # Bump a value when its prompt or guard changes in a way that should
 # regenerate stored versions. Part of each block's input hash.
 METHOD_VERSIONS: dict[tuple[str, str], str] = {
-    ("bill_says", "bill_text"): "bill_says/bill_text/3",
+    ("bill_says", "bill_text"): "bill_says/bill_text/4",
     ("interpretation", "legislative_staff"): "interpretation/legislative_staff/1",
-    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/5",
+    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
-    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/4",
+    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -185,7 +186,10 @@ def _item(raw: dict, *, quote: str | None = None, assumptions_required: bool = F
 
 
 def _truncate(full_text: str) -> tuple[str, bool]:
-    return full_text[:MAX_BILL_TEXT_CHARS], len(full_text) > MAX_BILL_TEXT_CHARS
+    # Page headers and margin line numbers go first: they split sentences
+    # (so verbatim quotes fail) and waste the model's character budget.
+    text = strip_page_artifacts(full_text)
+    return text[:MAX_BILL_TEXT_CHARS], len(text) > MAX_BILL_TEXT_CHARS
 
 
 def _dedupe_quotes(kept: list[dict]) -> tuple[list[dict], list[dict]]:
