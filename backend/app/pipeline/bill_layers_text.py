@@ -33,6 +33,33 @@ _CONDITIONAL = re.compile(
     re.IGNORECASE,
 )
 _BARE_FINDING_TOKENS = frozenset({"none", "n/a", "na", "indeterminate", "insignificant"})
+# Which option of a fiscal statement's "None / Indeterminate / Insignificant"
+# list a finding reports. A finding that also says "significant" (e.g. "an
+# indeterminate, significant, negative fiscal impact") is a real finding,
+# not a bare option, and matches nothing here.
+_OPTION_KINDS = (
+    ("none", re.compile(r"\bno\s+(?:[\w/-]+\s+){0,3}impact\b|\bnone\b", re.IGNORECASE)),
+    ("indeterminate", re.compile(r"\bindeterminate\b", re.IGNORECASE)),
+    ("insignificant", re.compile(r"\binsignificant\b", re.IGNORECASE)),
+)
+_SIGNIFICANT = re.compile(r"\bsignificant\b", re.IGNORECASE)
+
+# Modal strength: a statement worded as a requirement, and bill wording that
+# does / doesn't impose one.
+# Negated forms ("is not required", "no longer required") state the absence
+# of a requirement and don't count.
+_REQUIREMENT_WORDING = re.compile(
+    r"(?<!\bnot )(?<!\bno longer )\b(?:must|shall|required|requires?|requiring|mandates?|mandatory|obligated)\b",
+    re.IGNORECASE,
+)
+# "may not" is how bills state a prohibition -- binding, not permissive.
+_BILL_MANDATORY = re.compile(r"\b(?:shall|must|required|requires?|requiring|requirements?|may\s+not)\b", re.IGNORECASE)
+# A weaker match than this is as likely to be the wrong sentence as the right
+# one; 3-4 shared words produced false flags on H0091 and H1139 (2026-09-24).
+_MODAL_MIN_OVERLAP = 5
+_CLAUSE_SPLIT = re.compile(r";\s*|,\s*(?:after which|but|while|whereas|unless|except)\b|,?\s+and\s+(?=(?:any|all|each|the|a|an|can|may|must|shall|should|will|is|are|also)\b)", re.IGNORECASE)
+_BILL_PERMISSIVE = re.compile(r"\b(?:should|may(?!\s+not\b))\b", re.IGNORECASE)
+_TOKEN = re.compile(r"[A-Za-z']+|\d+")
 
 _DEFINITIONS_LEAD_IN = re.compile(r"Definitions\.—")
 
@@ -170,6 +197,61 @@ def _content_words(s: str) -> set[str]:
     }
 
 
+def _match_tokens(s: str) -> set[str]:
+    """Content words plus numbers -- "6" vs "13 through 17" is often what
+    tells two similar bill sentences apart."""
+    return {
+        t.lower() for t in _TOKEN.findall(s)
+        if t.isdigit() or (len(t) > 3 and t.lower() not in _STOPWORDS)
+    }
+
+
+def overstates_modal(statement: str, text: str) -> bool:
+    """True when `statement` describes as a requirement something the bill
+    only recommends or permits.
+
+    Each clause of the statement that uses requirement wording ("must",
+    "requires", ...) is matched to the bill sentence sharing the most
+    content words and numbers (at least 5 in common). Only the operative text (from the first
+    "Section N." heading on) is searched: a bill's title summary paraphrases
+    ("requiring a caregiver to ...") and isn't the law. A clause is flagged
+    when that sentence says "should" or "may" without any
+    "shall"/"must"/"required" of its own. Ties are resolved in the
+    statement's favour: if any equally close sentence is mandatory, the
+    clause isn't flagged. Found 2026-09-24: H0763's "Caregivers should
+    provide ... beginning when the child attains 6 years of age, a weekly
+    cash allowance" was restated as "Caregivers must provide a weekly cash
+    allowance to children aged 6 and older".
+    """
+    amended = law_as_amended(text)
+    first_section = _BILL_SECTION.search(amended)
+    if first_section:
+        amended = amended[first_section.start():]
+    sentences = [normalize_ws(x) for x in _SENTENCE_SPLIT.split(amended)]
+    sentences = [x for x in sentences if x]
+    for clause in _CLAUSE_SPLIT.split(normalize_ws(statement)):
+        if _REQUIREMENT_WORDING.search(clause) and _clause_overstates(clause, sentences):
+            return True
+    return False
+
+
+def _clause_overstates(clause: str, sentences: list[str]) -> bool:
+    tokens = _match_tokens(clause)
+    best_score = 0
+    best: list[str] = []
+    for sentence in sentences:
+        score = len(tokens & _match_tokens(sentence))
+        if score > best_score:
+            best_score, best = score, [sentence]
+        elif score == best_score and score:
+            best.append(sentence)
+    if best_score < _MODAL_MIN_OVERLAP:
+        return False
+    if any(_BILL_MANDATORY.search(s) for s in best):
+        return False
+    return any(_BILL_PERMISSIVE.search(s) for s in best)
+
+
 def restates_bill(statement: str, text: str) -> bool:
     """True when `statement` is a near-paraphrase of a sentence the bill
     already contains (often the bill's own wording with "may" inserted),
@@ -233,6 +315,17 @@ def is_substantive_finding(statement: str) -> bool:
     if text.rstrip(".").strip().lower() in _BARE_FINDING_TOKENS:
         return False
     return True
+
+
+def fiscal_option_kind(statement: str) -> str | None:
+    """Which "None / Indeterminate / Insignificant" option a staff finding
+    reports, or None for a real finding that isn't just a category status."""
+    if not statement or _SIGNIFICANT.search(statement):
+        return None
+    for kind, pattern in _OPTION_KINDS:
+        if pattern.search(statement):
+            return kind
+    return None
 
 
 def _between(text: str, patterns: list[tuple[str, str]]) -> str | None:

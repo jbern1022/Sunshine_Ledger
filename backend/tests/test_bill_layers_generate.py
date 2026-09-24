@@ -429,3 +429,66 @@ def test_ai_expected_effect_section_guard_uses_law_as_amended():
     r = build_ai_expected_effect("HB 1", "Pay", text, client)
     assert [i["text"] for i in r.items] == ["The rule may change."]
     assert len(r.dropped) == 1
+
+
+def test_staff_expected_effect_keeps_distinct_findings_in_same_category():
+    # H0565 (2026-09-24): three state-government findings, two of them
+    # significant negative, were cut to one by a keep-one-per-category rule.
+    client = FakeClient({"items": [
+        {"category": "state_government",
+         "text": "Expanding eligibility for the iBudget waiver to include TBRS has no fiscal impact."},
+        {"category": "state_government",
+         "text": "Expanding eligibility for IFS to include people with TBRS has a significant, negative fiscal impact."},
+        {"category": "state_government",
+         "text": "The bill will have a significant, negative fiscal impact on APD to contract with a state university."},
+        {"category": "private_sector",
+         "text": "The bill will have a significant, negative fiscal impact to residential facilities."},
+    ]})
+    r = build_staff_expected_effect("Fiscal section text", "Staff analysis", client)
+    assert len(r.items) == 4
+    assert r.dropped == []
+
+
+def test_staff_expected_effect_keeps_same_option_on_another_subject():
+    client = FakeClient({"items": [
+        {"category": "state_government", "text": "Expanding the iBudget waiver has no fiscal impact."},
+        {"category": "state_government", "text": "The bill has no fiscal impact on the Agency for Health Care Administration."},
+    ]})
+    r = build_staff_expected_effect("Fiscal section text", "Staff analysis", client)
+    assert len(r.items) == 2
+
+
+def test_ai_interpretation_drops_should_restated_as_requirement():
+    text = (
+        "Section 1. Caregivers should provide each child in their care, beginning when the child attains "
+        "6 years of age, a weekly cash allowance to help the child learn to manage money. "
+        "Caregivers licensed by the department must provide a minimum allowance of $20 per week "
+        "to children aged 13 through 17 in their care.\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    client = FakeClient({"items": [
+        {"text": "Caregivers must provide a weekly cash allowance to children aged 6 and older.",
+         "section_ref": "Section 1", "assumptions": [], "affected_groups": []},
+        {"text": "Caregivers must provide at least $20 per week to children aged 13 through 17.",
+         "section_ref": "Section 1", "assumptions": [], "affected_groups": []},
+    ]})
+    r = build_ai_interpretation("HB 763", "Child Welfare", text, client)
+    assert [i["text"] for i in r.items] == [
+        "Caregivers must provide at least $20 per week to children aged 13 through 17."
+    ]
+    assert len(r.dropped) == 1
+
+
+def test_filler_assumptions_are_removed():
+    client = FakeClient({"items": [
+        {"text": "Allows salary payments by direct deposit.", "section_ref": "Section 1",
+         "assumptions": ["The bill will be implemented as written without any modifications or challenges in court.",
+                         "The bill's language is clear and unambiguous.",
+                         "Employees have bank accounts."],
+         "affected_groups": []},
+        {"text": "Sets an effective date of July 1, 2027.", "section_ref": "Section 2",
+         "assumptions": ["None."], "affected_groups": []},
+    ]})
+    r = build_ai_interpretation("HB 1", "Pay", BILL, client)
+    assert r.items[0]["assumptions"] == ["Employees have bank accounts."]
+    assert r.items[1]["assumptions"] == ["None identified"]
