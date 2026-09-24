@@ -244,6 +244,17 @@ def test_is_conditional_true_when_may_not_accompanies_another_conditional_cue():
     assert is_conditional("Costs may not fall, but administrative burden is expected to rise.")
 
 
+def test_is_conditional_treats_may_not_be_have_need_as_forecast():
+    assert is_conditional("The agency may not be able to complete the review on time.")
+    assert is_conditional("The agency may not have enough staff to process applications.")
+    assert is_conditional("The department may not need additional funding.")
+
+
+def test_is_conditional_still_excludes_may_not_prohibition_form():
+    assert not is_conditional("The commission may not issue, renew, or approve licenses.")
+    assert not is_conditional("The association may not adopt rules without notice.")
+
+
 def test_law_as_amended_removes_space_stranded_before_punctuation_by_deletion():
     assert law_as_amended("the [deleted: agency], as defined by rule") == "the, as defined by rule"
     assert law_as_amended("Foo [deleted: X]. Bar") == "Foo. Bar"
@@ -306,3 +317,26 @@ def test_restates_bill_is_fast_on_a_long_bill():
         )
     elapsed = time.monotonic() - start
     assert elapsed < 2.0
+
+
+def test_restates_bill_catches_h1171_paraphrase_default_autojunk_would_miss():
+    # Real pair from the 2026-09-23 quality report. Both sentences are long
+    # (> 200 chars), which is exactly where SequenceMatcher's default
+    # autojunk=True heuristic collapses the ratio on ordinary English prose
+    # and would let this restated provision through.
+    bill_text = (
+        "Section 1. 379.3671 Marine life; endangered and threatened species.\n"
+        "(3) The commission may not issue, renew, or approve an "
+        "education-exhibition special activity license or other authorization "
+        "that would allow a person to collect or transport any endangered or "
+        "threatened marine animal from state waters for purposes prohibited "
+        "in subsection (2).\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    model_statement = (
+        "The Fish and Wildlife Conservation Commission may not issue, renew, "
+        "or approve licenses that would allow the collection or "
+        "transportation of endangered or threatened marine animals for "
+        "educational or exhibition purposes."
+    )
+    assert restates_bill(model_statement, bill_text)

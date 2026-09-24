@@ -244,6 +244,35 @@ def test_ai_expected_effect_keeps_genuine_consequence():
     ]
 
 
+def test_ai_expected_effect_drops_h1171_style_paraphrase_of_a_long_sentence():
+    # Real pair from the 2026-09-23 quality report. Both sentences are
+    # > 200 chars -- exactly where SequenceMatcher's default autojunk
+    # heuristic wrecks the ratio for ordinary English prose and would have
+    # let this restated provision through (see restates_bill regression
+    # test in test_bill_layers_text.py for the ratio numbers).
+    bill_text = (
+        "Section 1. 379.3671 Marine life; endangered and threatened species.\n"
+        "(3) The commission may not issue, renew, or approve an "
+        "education-exhibition special activity license or other authorization "
+        "that would allow a person to collect or transport any endangered or "
+        "threatened marine animal from state waters for purposes prohibited "
+        "in subsection (2).\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    client = FakeClient({"items": [
+        {"text": (
+            "The Fish and Wildlife Conservation Commission may not issue, "
+            "renew, or approve licenses that would allow the collection or "
+            "transportation of endangered or threatened marine animals for "
+            "educational or exhibition purposes."
+        ), "section_ref": "Section 1", "assumptions": []},
+    ]})
+    r = build_ai_expected_effect("HB 1171", "Marine Life", bill_text, client)
+    assert r.evidence_state == "insufficient_evidence"
+    assert r.items == []
+    assert len(r.dropped) == 1
+
+
 def test_ai_interpretation_clears_section_ref_not_present_in_bill():
     client = FakeClient({"items": [
         {"text": "Removes the direct deposit requirement.", "section_ref": "Section 99",
@@ -310,6 +339,21 @@ def test_staff_expected_effect_does_not_dedupe_other_category():
     ]})
     r = build_staff_expected_effect("Fiscal section text", "Staff analysis", client)
     assert len(r.items) == 2
+
+
+def test_staff_expected_effect_does_not_dedupe_missing_empty_or_unknown_category():
+    client = FakeClient({"items": [
+        {"text": "Staff note the department may incur one-time setup costs."},
+        {"category": "", "text": "Staff note the department may incur ongoing costs."},
+        {"category": "unrecognized_bucket", "text": "Staff note counties may see indirect costs."},
+    ]})
+    r = build_staff_expected_effect("Fiscal section text", "Staff analysis", client)
+    assert [i["text"] for i in r.items] == [
+        "Staff note the department may incur one-time setup costs.",
+        "Staff note the department may incur ongoing costs.",
+        "Staff note counties may see indirect costs.",
+    ]
+    assert r.dropped == []
 
 
 def test_ai_expected_effect_section_guard_uses_law_as_amended():

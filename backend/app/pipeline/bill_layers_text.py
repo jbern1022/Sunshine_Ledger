@@ -22,11 +22,14 @@ _NAV_LINE = re.compile(r"(?m)^\s*JUMP TO SUMMARY ANALYSIS RELEVANT INFORMATION\s
 _BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.(?!\d)", re.IGNORECASE)
 _SECTION_REF = re.compile(r"\b(?:section|sec\.?)\s*(\d+)(?!\.\d)\b", re.IGNORECASE)
 _CONDITIONAL = re.compile(
-    # A bare "may not" is how bills state a prohibition ("The agency may not
-    # issue licenses"), not conditional wording about an effect -- it doesn't
-    # count on its own. Plain "may" (not followed by "not"), and the other
-    # conditional cues, still do.
-    r"\bmay\b(?!\s+\d{1,2}\b)(?!\s+not\b)|\b(?:might|could|would|(?:is|are) expected to)\b",
+    # "May not <verb>" is ambiguous: "may not issue licenses" is how bills
+    # state a prohibition (not conditional wording about an effect), but
+    # "may not be able to complete the review on time" is a genuine forecast.
+    # Treat "may not be/have/need (be able to)" as conditional; any other
+    # "may not <verb>" is the prohibition form and doesn't count on its own.
+    # Plain "may" (no "not" at all), and the other conditional cues, still do.
+    r"\bmay\b(?!\s+\d{1,2}\b)(?!\s+not\b(?!\s+(?:be|have|need)\b))"
+    r"|\b(?:might|could|would|(?:is|are) expected to)\b",
     re.IGNORECASE,
 )
 _NO_OR_UNKNOWN = re.compile(r"\b(none|no fiscal impact|no impact|indeterminate|insignificant)\b", re.IGNORECASE)
@@ -170,7 +173,13 @@ def restates_bill(statement: str, text: str) -> bool:
             continue
         if len(stmt_words & _content_words(sentence)) < 3:
             continue
-        ratio = difflib.SequenceMatcher(None, stmt_lower, sentence.lower()).ratio()
+        # autojunk=False: SequenceMatcher's default autojunk heuristic
+        # treats any character making up >1% of a sequence >= 200 chars as
+        # "popular" and excludes it from matching blocks. Ordinary English
+        # prose easily crosses that threshold (spaces, common letters), which
+        # collapses the ratio for exactly the long, near-identical sentences
+        # this guard exists to catch.
+        ratio = difflib.SequenceMatcher(None, stmt_lower, sentence.lower(), autojunk=False).ratio()
         if ratio >= 0.6:
             return True
     return False
