@@ -58,8 +58,12 @@ _BOILERPLATE = re.compile(
     re.IGNORECASE,
 )
 
-# Trailing line number on a content line, e.g. "...effective date. 9"
-_TRAILING_LINE_NUMBER = re.compile(r"\s(\d{1,3})\s*$")
+# Trailing line number on a content line, e.g. "...effective date. 9". The
+# separator is usually whitespace, but pypdf sometimes glues the number
+# straight onto a hyphenated word ("Phelan-32"), so a hyphen counts too --
+# `match.start(1)` (not the whole match) is what gets sliced off below, so
+# the hyphen itself survives.
+_TRAILING_LINE_NUMBER = re.compile(r"[\s-](\d{1,3})\s*$")
 
 # HTML bill text numbers lines at the START instead, e.g.
 # "    2         A resolution designating February 3, 2026..."
@@ -95,9 +99,15 @@ def clean_legislative_text(raw: str) -> str:
             continue
 
         match = _TRAILING_LINE_NUMBER.search(line)
-        if match and int(match.group(1)) == expected + 1:
-            expected = int(match.group(1))
-            line = line[: match.start()]
+        if match:
+            # A missed line (blank, or one that didn't carry its number to
+            # extracted text) can put the sequence briefly behind without
+            # meaning the next number isn't real -- resync as long as it's
+            # a small hop ahead rather than requiring the exact successor.
+            diff = int(match.group(1)) - expected
+            if 1 <= diff <= 3:
+                expected = int(match.group(1))
+                line = line[: match.start(1)].rstrip()
 
         if line.strip():
             cleaned.append(line.strip())
@@ -133,6 +143,34 @@ def clean_html_legislative_text(raw: str) -> str:
     return "\n".join(cleaned)
 
 
+def html_to_marked_text(html: str) -> str:
+    """Turn LegiScan's Senate-style change markup into inline markers.
+
+    Senate HTML marks deletions with `<s class="Remove">` and additions
+    with `<u class="Insert">` (any tag carries the class -- some documents
+    use `<span>` instead). Each such element is replaced with its text
+    wrapped in `[deleted: ...]` / `[added: ...]` *before* the rest of the
+    furniture-stripping runs, so those markers survive line cleaning intact
+    instead of being flattened into indistinguishable plain text.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    def _wrap(css_class: str, kind: str) -> None:
+        for el in soup.find_all(class_=css_class):
+            # Whitespace inside markers is single spaces (some Insert/Remove
+            # spans hold only a run of whitespace -- an added or deleted
+            # space -- which shouldn't produce an empty "[added: ]").
+            text = " ".join(el.get_text().split())
+            el.replace_with(f"[{kind}: {text}]" if text else " ")
+
+    _wrap("Remove", "deleted")
+    _wrap("Insert", "added")
+
+    return clean_html_legislative_text(soup.get_text())
+
+
 def extract_html_text(html_bytes: bytes) -> str:
     """Extract and clean text from an HTML bill document.
 
@@ -141,19 +179,156 @@ def extract_html_text(html_bytes: bytes) -> str:
     unreadable would leave those bills falling back to the short blurb for
     no good reason.
     """
-    from bs4 import BeautifulSoup
-
-    soup = BeautifulSoup(html_bytes.decode("utf-8", errors="replace"), "html.parser")
-    return clean_html_legislative_text(soup.get_text())
+    return html_to_marked_text(html_bytes.decode("utf-8", errors="replace"))
 
 
-def extract_pdf_text(pdf_bytes: bytes) -> str:
-    """Extract and clean text from a bill PDF."""
+# Marker syntax used by both the PDF (mark_words) and HTML (html_to_marked_text)
+# paths, exactly: "[deleted: <text>]" and "[added: <text>]".
+_MARKER_KINDS = ("deleted", "added")
+
+# A word carrying a strike/underline that got wrapped across a PDF's hard
+# line break (a mid-word hyphen at the right margin, most often) comes back
+# from `mark_words` as two separate, adjacent markers of the same kind --
+# one closing at the end of a line, the next opening at the start of the
+# following line. Fold those back into a single marker so a quote or search
+# doesn't see it interrupted by "]\n[added: ".
+_ADJACENT_MARKER = re.compile(r"\[(deleted|added): ([^\]]*)\]\n\[\1: ")
+
+
+def _merge_adjacent_markers(text: str) -> str:
+    def _join(match: re.Match[str]) -> str:
+        kind, prefix = match.group(1), match.group(2).rstrip()
+        # A hyphenated word broken across the line ("Tatton-Brown-" /
+        # "Rahman") continues with no space; anything else gets one.
+        sep = "" if prefix.endswith("-") else " "
+        return f"[{kind}: {prefix}{sep}"
+
+    while True:
+        new_text = _ADJACENT_MARKER.sub(_join, text)
+        if new_text == text:
+            return new_text
+        text = new_text
+
+
+def mark_words(
+    words: list[dict], segments: list[dict], *, margin_x: float = 60.0
+) -> list[str]:
+    """Reassemble pdfplumber words into text lines with change markers.
+
+    A pure function over pdfplumber-style dicts (`words` need `text, x0,
+    x1, top, bottom`; `segments` -- the thin rules a PDF viewer renders as
+    strike-through/underline -- need `x0, x1, top, bottom`) so the layout
+    rules are testable without opening a PDF.
+
+    Words are grouped into lines by `top` (within 2pt), left-margin line
+    numbers are dropped by position rather than pattern-matched after the
+    fact, and each word is classified by whether a segment crosses its
+    vertical middle (struck) or runs along its bottom (underlined/added).
+    Consecutive words of the same kind become one marker.
+    """
+    # Only thin, roughly-horizontal marks count as strike/underline rules --
+    # a tall page-margin rule (drawn as a rect spanning the whole column)
+    # would otherwise need to be excluded by never overlapping any word, but
+    # filtering it out up front is cheaper and more obviously correct.
+    thin_segments = [s for s in segments if abs(s["bottom"] - s["top"]) <= 5]
+
+    def _classify(word: dict) -> str | None:
+        mid = (word["top"] + word["bottom"]) / 2
+        bottom = word["bottom"]
+        added = False
+        for seg in thin_segments:
+            if seg["x1"] <= word["x0"] or seg["x0"] >= word["x1"]:
+                continue  # no horizontal overlap with this word
+            center = (seg["top"] + seg["bottom"]) / 2
+            if abs(center - mid) <= 2.5:
+                return "deleted"
+            if 0 <= center - bottom <= 3:
+                added = True
+        return "added" if added else None
+
+    lines: list[list[dict]] = []
+    for word in sorted(words, key=lambda w: (w["top"], w["x0"])):
+        if lines and abs(word["top"] - lines[-1][0]["top"]) <= 2:
+            lines[-1].append(word)
+        else:
+            lines.append([word])
+
+    result: list[str] = []
+    for line_words in lines:
+        kept = [
+            w
+            for w in line_words
+            if not (w["x0"] < margin_x and w["text"].strip().isdigit())
+        ]
+
+        parts: list[str] = []
+        run_kind: str | None = None
+        run_text: list[str] = []
+
+        def _flush() -> None:
+            if not run_text:
+                return
+            joined = " ".join(run_text)
+            if run_kind:
+                parts.append(f"[{run_kind}: {joined}]")
+            else:
+                parts.append(joined)
+
+        for w in kept:
+            kind = _classify(w)
+            if kind != run_kind:
+                _flush()
+                run_kind, run_text = kind, []
+            run_text.append(w["text"])
+        _flush()
+
+        result.append(" ".join(parts))
+
+    return result
+
+
+def _extract_pdf_text_pypdf(pdf_bytes: bytes) -> str:
+    """Fallback PDF extraction: whole-page text, no change markers.
+
+    Used when pdfplumber can't open or parse a document at all -- rare, but
+    better to fall back to the old (marker-less) behavior than to fail the
+    whole fetch.
+    """
     from pypdf import PdfReader  # imported lazily -- only bill-text runs need it
 
     reader = PdfReader(io.BytesIO(pdf_bytes))
     raw = "\n".join(page.extract_text() or "" for page in reader.pages)
     return clean_legislative_text(raw)
+
+
+def extract_pdf_text(pdf_bytes: bytes) -> str:
+    """Extract and clean text from a bill PDF, with inline change markers.
+
+    House PDFs draw strike-through and underline as thin rules rather than
+    encoding them in the text, so pypdf's plain `extract_text()` flattens a
+    deletion and its replacement together (e.g. "An No agency"). pdfplumber
+    exposes both the words and the rules as positioned objects, which
+    `mark_words` turns back into `[deleted: ...]` / `[added: ...]` markers.
+
+    Falls back to the pypdf path (no markers, but readable) if pdfplumber
+    can't process the document -- one malformed PDF shouldn't take down a
+    backfill.
+    """
+    try:
+        import pdfplumber  # imported lazily -- only bill-text runs need it
+
+        lines: list[str] = []
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                words = page.extract_words()
+                segments = list(page.lines) + list(page.rects)
+                lines.extend(mark_words(words, segments))
+    except Exception:
+        logger.warning("pdfplumber extraction failed -- falling back to pypdf", exc_info=True)
+        return _extract_pdf_text_pypdf(pdf_bytes)
+
+    kept = [line for line in lines if line.strip() and not _BOILERPLATE.match(line)]
+    return _merge_adjacent_markers("\n".join(kept))
 
 
 def fetch_bill_text(client: LegiScanClient, doc_id: int) -> str | None:
