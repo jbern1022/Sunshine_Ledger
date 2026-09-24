@@ -31,7 +31,7 @@ MAX_BILL_TEXT_CHARS = 12_000  # keep prompts cheap; most bill summaries/digests 
 # summaries. It's part of the input hash, so bumping it makes the batch job
 # re-summarize everything on its next run -- which is the intended effect,
 # but it is not free at scale. Don't bump for typo fixes.
-PROMPT_VERSION = "1"
+PROMPT_VERSION = "2"
 
 # Summary fields a cheaper model may write when one is configured.
 # "who_it_affects" is deliberately absent: on a 3B model it fell back to
@@ -94,6 +94,8 @@ Bill text or official summary:
 {bill_text}
 \"\"\"
 
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds; describe the change, not the markers.
+
 Write a 2-4 sentence plain-language summary of what this bill actually does. Rules:
 - Use everyday words, not legal jargon. If you must use a legal term, explain it in the same sentence.
 - Only state what is in the text above. Do not speculate about intent, politics, or effects not stated in the text.
@@ -129,6 +131,8 @@ Bill text or official summary:
 \"\"\"
 {bill_text}
 \"\"\"
+
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds; describe the change, not the markers.
 
 Answer:"""
 
