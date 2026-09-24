@@ -194,7 +194,18 @@ Design: `docs/superpowers/specs/2026-09-23-bill-layers-design.md`.
   stops starting new bills once the wall clock budget is spent, so a large
   backlog can't run into the morning.
 - Preview what would run: `docker exec sunshineledger-backend-1 python -m app.pipeline.bill_layers_batch --dry-run --limit 20`
+- Layers can run a different (larger) model than summaries: set `OLLAMA_LAYERS_MODEL`
+  (defaults to `OLLAMA_MODEL` when unset). Layer calls also use a longer
+  timeout (300s vs. the 120s default) with one retry on a connection error.
 - Quality report (writes nothing): `docker exec sunshineledger-backend-1 python -m app.pipeline.review_bill_layers --sample 20 > layers-review.md`
+- Comparing two models on the exact same bills (`--model` overrides the
+  configured model for the run; `--bills-from` reuses an earlier report's
+  bill list). The first run draws the sample; the second reuses it with no
+  `--sample` of its own, so both runs cover identical bills:
+  ```bash
+  python -m app.pipeline.review_bill_layers --model llama3.1:8b --bills-from <old report> --sample 20 > r8b.md
+  python -m app.pipeline.review_bill_layers --model qwen2.5:14b --bills-from r8b.md > r14b.md
+  ```
 - Don't run a manual backfill while the nightly ingestion is running:
   concurrent writers touching the same bill will fail that bill.
 - Time the first manual `--limit 25` backfill and use it to size `--limit`

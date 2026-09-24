@@ -3,7 +3,9 @@ from app.pipeline.bill_layers_text import (
     extract_effect_section,
     extract_fiscal_section,
     is_conditional,
+    law_as_amended,
     normalize_ws,
+    restates_bill,
     section_for_quote,
     section_number,
     states_no_or_unknown_impact,
@@ -192,3 +194,194 @@ def test_extract_house_fiscal_falls_back_to_summary_box():
 def test_extract_returns_none_when_absent():
     assert extract_effect_section("Unrelated document text.") is None
     assert extract_fiscal_section("Unrelated document text.") is None
+
+
+def test_law_as_amended_removes_deletion_and_collapses_space():
+    assert law_as_amended("An [deleted: No] agency") == "An agency"
+
+
+def test_law_as_amended_unwraps_addition():
+    text = (
+        "McDermid syndrome, [deleted: or] Prader-Willi syndrome, "
+        "[added: or Tatton-Brown-Rahman syndrome;] that manifests"
+    )
+    assert law_as_amended(text) == (
+        "McDermid syndrome, Prader-Willi syndrome, or Tatton-Brown-Rahman syndrome; that manifests"
+    )
+
+
+def test_law_as_amended_keeps_line_structure():
+    text = "Section 1. Foo [deleted: bar] baz.\nSection 2. Qux.\n"
+    assert law_as_amended(text) == "Section 1. Foo baz.\nSection 2. Qux.\n"
+
+
+def test_law_as_amended_drops_unterminated_deleted_fragment():
+    text = "Words before [deleted: cut off with no closing bracket"
+    assert law_as_amended(text) == "Words before"
+
+
+def test_law_as_amended_unwraps_unterminated_added_fragment():
+    text = "Words before [added: cut off with no closing"
+    assert law_as_amended(text) == "Words before cut off with no closing"
+
+
+def test_bill_section_rejects_statute_citation_at_line_start():
+    text = "Section 316.1895, F.S., requires signage.\nSection 2. Something else.\n"
+    assert bill_section_numbers(text) == {"2"}
+
+
+def test_is_conditional_excludes_bare_may_not():
+    assert not is_conditional("The commission may not renew licenses after the deadline.")
+    assert not is_conditional("The agency may not issue, renew, or approve licenses.")
+
+
+def test_is_conditional_still_true_for_plain_may_and_other_cues():
+    assert is_conditional("Employers may need to update payroll.")
+    assert is_conditional("Counties are expected to save money.")
+
+
+def test_is_conditional_true_when_may_not_accompanies_another_conditional_cue():
+    assert is_conditional("Costs may not fall, but administrative burden is expected to rise.")
+
+
+def test_is_conditional_treats_may_not_be_have_need_as_forecast():
+    assert is_conditional("The agency may not be able to complete the review on time.")
+    assert is_conditional("The agency may not have enough staff to process applications.")
+    assert is_conditional("The department may not need additional funding.")
+
+
+def test_is_conditional_still_excludes_may_not_prohibition_form():
+    assert not is_conditional("The commission may not issue, renew, or approve licenses.")
+    assert not is_conditional("The association may not adopt rules without notice.")
+
+
+def test_law_as_amended_removes_space_stranded_before_punctuation_by_deletion():
+    assert law_as_amended("the [deleted: agency], as defined by rule") == "the, as defined by rule"
+    assert law_as_amended("Foo [deleted: X]. Bar") == "Foo. Bar"
+    assert law_as_amended("Foo [deleted: X]; bar") == "Foo; bar"
+    assert law_as_amended("Foo [deleted: X]: bar") == "Foo: bar"
+    assert law_as_amended("Foo [deleted: X]) bar") == "Foo) bar"
+
+
+def test_law_as_amended_does_not_touch_ordinary_spacing():
+    text = "Foo , bar ; baz : qux ) end . Section 2. More text here , with commas."
+    assert law_as_amended(text) == text
+
+
+# --- restates_bill -----------------------------------------------------
+
+EE_BILL = (
+    "Section 1. The agency shall contract with a state university to provide research services.\n"
+    "Section 2. The commission may not renew licenses after the deadline.\n"
+    "Section 3. This act shall take effect July 1, 2027.\n"
+)
+
+
+def test_restates_bill_detects_provision_with_may_inserted():
+    # The classic pattern from the quality report: the bill's own sentence,
+    # copied with a "may" swapped in for "shall".
+    assert restates_bill(
+        "The agency may contract with a state university to provide research services.",
+        EE_BILL,
+    )
+
+
+def test_restates_bill_detects_may_not_copied_verbatim():
+    assert restates_bill("The commission may not renew licenses after the deadline.", EE_BILL)
+
+
+def test_restates_bill_false_for_genuine_consequence():
+    assert not restates_bill(
+        "Universities may see increased demand for research staff as a result of the contract requirement.",
+        EE_BILL,
+    )
+
+
+def test_restates_bill_false_for_short_statement_with_few_content_words():
+    assert not restates_bill("Costs may rise.", EE_BILL)
+
+
+def test_restates_bill_is_fast_on_a_long_bill():
+    import time
+
+    long_bill = EE_BILL + (
+        "Section 4. Additional unrelated provisions establish reporting deadlines, "
+        "funding formulas, and administrative procedures for various agencies. " * 150
+    )
+    assert len(long_bill) > 12_000
+    start = time.monotonic()
+    for _ in range(20):
+        restates_bill(
+            "Universities may see increased demand for research staff as a result of the contract requirement.",
+            long_bill,
+        )
+    elapsed = time.monotonic() - start
+    assert elapsed < 2.0
+
+
+def test_restates_bill_catches_h1171_paraphrase_default_autojunk_would_miss():
+    # Real pair from the 2026-09-23 quality report. Both sentences are long
+    # (> 200 chars), which is exactly where SequenceMatcher's default
+    # autojunk=True heuristic collapses the ratio on ordinary English prose
+    # and would let this restated provision through.
+    bill_text = (
+        "Section 1. 379.3671 Marine life; endangered and threatened species.\n"
+        "(3) The commission may not issue, renew, or approve an "
+        "education-exhibition special activity license or other authorization "
+        "that would allow a person to collect or transport any endangered or "
+        "threatened marine animal from state waters for purposes prohibited "
+        "in subsection (2).\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    model_statement = (
+        "The Fish and Wildlife Conservation Commission may not issue, renew, "
+        "or approve licenses that would allow the collection or "
+        "transportation of endangered or threatened marine animals for "
+        "educational or exhibition purposes."
+    )
+    assert restates_bill(model_statement, bill_text)
+
+
+def test_restates_bill_skips_ratio_when_lengths_rule_out_a_match(monkeypatch):
+    """ratio() can't exceed 2*min(len)/(len_a+len_b); a sentence far longer
+    than the statement is skipped without the O(n*m) ratio() call, even
+    when it shares plenty of content words."""
+    import difflib
+
+    calls = {"ratio": 0}
+    real_ratio = difflib.SequenceMatcher.ratio
+
+    def counting_ratio(self):
+        calls["ratio"] += 1
+        return real_ratio(self)
+
+    monkeypatch.setattr(difflib.SequenceMatcher, "ratio", counting_ratio)
+    long_sentence = (
+        "Section 1. The agency shall contract with a state university to provide research "
+        "services, together with laboratory space, staffing plans, annual budgets, reporting "
+        "schedules, audit procedures, data-sharing agreements, and publication rules that the "
+        "agency and the university jointly adopt and revise each fiscal year.\n"
+    )
+    assert not restates_bill("The agency may contract with a state university.", long_sentence)
+    assert calls["ratio"] == 0
+
+
+def test_restates_bill_skips_ratio_when_quick_ratio_is_too_low(monkeypatch):
+    """quick_ratio() is a cheap upper bound on ratio(): when it is already
+    below 0.6, ratio() is never computed."""
+    import difflib
+
+    calls = {"ratio": 0}
+    real_ratio = difflib.SequenceMatcher.ratio
+
+    def counting_ratio(self):
+        calls["ratio"] += 1
+        return real_ratio(self)
+
+    monkeypatch.setattr(difflib.SequenceMatcher, "ratio", counting_ratio)
+    bill = "Section 1. Agency university contract research xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.\n"
+    # Same length ballpark and the same content words, but almost no shared
+    # characters beyond them.
+    stmt = "Agency university contract research zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz."
+    assert not restates_bill(stmt, bill)
+    assert calls["ratio"] == 0

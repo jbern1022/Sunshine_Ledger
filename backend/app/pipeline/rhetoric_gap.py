@@ -48,6 +48,8 @@ Full bill text:
 {full_text}
 \"\"\"
 
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds.
+
 Your default assumption should be that there is NO meaningful gap. Bill titles are inherently short and often use a branded or appealing name (e.g. "Protecting Florida Families Act") -- that alone is completely normal and not deceptive. Only flag a gap when the full text does something MATERIALLY narrower, broader, or different from what the title/description would lead a reader to expect -- for example: the title implies broad protection but the text carves out major exemptions; the title names one purpose but the text's substantive effect is mostly something else; the description omits a significant, unrelated provision buried in the text.
 
 Do NOT flag: ordinary terseness, a branded/catchy name with no substantive mismatch, technical legal phrasing, or the text simply having more detail than the short description (that is expected, not a gap).

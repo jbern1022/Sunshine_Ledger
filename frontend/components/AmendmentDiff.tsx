@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { diffWordsWithSpace } from "diff";
+import { lawAsAmended } from "@/lib/changeMarkers";
 
 /** Word-level diff between the bill's stored full text and one amendment's
  *  document text -- added text highlighted, removed text struck through.
@@ -19,7 +20,10 @@ import { diffWordsWithSpace } from "diff";
  */
 export default function AmendmentDiff({ baseText, amendedText }: { baseText: string; amendedText: string }) {
   const [expanded, setExpanded] = useState(false);
-  const parts = expanded ? diffWordsWithSpace(baseText, amendedText) : [];
+  // Both texts can carry the bill's own inline `[deleted: …]`/`[added: …]`
+  // markers. Diff the law as each version would read it, so the markers'
+  // brackets and struck wording don't show up as spurious changes.
+  const parts = expanded ? diffWordsWithSpace(lawAsAmended(baseText), lawAsAmended(amendedText)) : [];
 
   return (
     <div className="mt-1">

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 
 import httpx
 from sqlalchemy import select
@@ -31,7 +32,7 @@ MAX_BILL_TEXT_CHARS = 12_000  # keep prompts cheap; most bill summaries/digests 
 # summaries. It's part of the input hash, so bumping it makes the batch job
 # re-summarize everything on its next run -- which is the intended effect,
 # but it is not free at scale. Don't bump for typo fixes.
-PROMPT_VERSION = "1"
+PROMPT_VERSION = "2"
 
 # Summary fields a cheaper model may write when one is configured.
 # "who_it_affects" is deliberately absent: on a 3B model it fell back to
@@ -94,6 +95,8 @@ Bill text or official summary:
 {bill_text}
 \"\"\"
 
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds; describe the change, not the markers.
+
 Write a 2-4 sentence plain-language summary of what this bill actually does. Rules:
 - Use everyday words, not legal jargon. If you must use a legal term, explain it in the same sentence.
 - Only state what is in the text above. Do not speculate about intent, politics, or effects not stated in the text.
@@ -130,6 +133,8 @@ Bill text or official summary:
 {bill_text}
 \"\"\"
 
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds; describe the change, not the markers.
+
 Answer:"""
 
 
@@ -137,11 +142,22 @@ class OllamaError(RuntimeError):
     pass
 
 
+# Connection-level failures worth one retry: Ollama restarting (refused),
+# or dropping the connection mid-response. Deliberately excludes every
+# httpx.TimeoutException subclass.
+_RETRYABLE_ERRORS = (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ReadError)
+RETRY_DELAY_SECONDS = 5.0
+# Module-level so tests can patch it out instead of really sleeping.
+_sleep = time.sleep
+
+
 class OllamaClient:
-    def __init__(self, host: str | None = None, model: str | None = None) -> None:
+    def __init__(
+        self, host: str | None = None, model: str | None = None, *, timeout: float = 120.0
+    ) -> None:
         self.host = (host or settings.ollama_host).rstrip("/")
         self.model = model or settings.ollama_model
-        self._client = httpx.Client(timeout=120.0)
+        self._client = httpx.Client(timeout=timeout)
 
     def generate(self, prompt: str, *, json_mode: bool = False) -> str:
         # json_mode asks Ollama to constrain output to valid JSON (its
@@ -150,7 +166,17 @@ class OllamaClient:
         body = {"model": self.model, "prompt": prompt, "stream": False}
         if json_mode:
             body["format"] = "json"
-        resp = self._client.post(f"{self.host}/api/generate", json=body)
+        # Retry once, after a short pause, on a connection-level failure
+        # (refused, dropped, reset) -- the 2026-09-23 quality report hit
+        # three of these when Ollama restarted mid-run. Not retried:
+        # timeouts (a request that timed out would most likely time out
+        # again, doubling the wait for nothing) and HTTP error statuses
+        # (raise_for_status below), since a 404/500 just repeats.
+        try:
+            resp = self._client.post(f"{self.host}/api/generate", json=body)
+        except _RETRYABLE_ERRORS:
+            _sleep(RETRY_DELAY_SECONDS)
+            resp = self._client.post(f"{self.host}/api/generate", json=body)
         resp.raise_for_status()
         data = resp.json()
         if "response" not in data:

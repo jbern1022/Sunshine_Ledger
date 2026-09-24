@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getBill } from "@/lib/server-api";
 import TagBadges from "@/components/TagBadges";
 import AmendmentDiff from "@/components/AmendmentDiff";
+import MarkedText from "@/components/MarkedText";
 import BillLayers from "@/components/BillLayers";
 import { hasAnyLayer } from "@/lib/layers";
 
@@ -262,7 +263,7 @@ export default async function BillPage({ params }: Props) {
               Full bill text
             </summary>
             <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">
-              {bill.full_text}
+              <MarkedText text={bill.full_text} />
             </p>
           </details>
         </section>

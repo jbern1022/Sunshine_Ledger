@@ -11,16 +11,39 @@ Staff-analysis heading strings were sampled from production on 2026-09-23:
 
 from __future__ import annotations
 
+import difflib
 import re
 
 _WS = re.compile(r"\s+")
 _NAV_LINE = re.compile(r"(?m)^\s*JUMP TO SUMMARY ANALYSIS RELEVANT INFORMATION\s*$\n?")
-_BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.", re.IGNORECASE)
+# `(?!\d)` keeps a statute citation like "Section 316.1895, F.S." from being
+# read as a heading for section 316 -- a real heading's "Section N." is never
+# followed immediately by another digit.
+_BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.(?!\d)", re.IGNORECASE)
 _SECTION_REF = re.compile(r"\b(?:section|sec\.?)\s*(\d+)(?!\.\d)\b", re.IGNORECASE)
 _CONDITIONAL = re.compile(
-    r"\bmay\b(?!\s+\d{1,2}\b)|\b(?:might|could|would|(?:is|are) expected to)\b", re.IGNORECASE
+    # "May not <verb>" is ambiguous: "may not issue licenses" is how bills
+    # state a prohibition (not conditional wording about an effect), but
+    # "may not be able to complete the review on time" is a genuine forecast.
+    # Treat "may not be/have/need (be able to)" as conditional; any other
+    # "may not <verb>" is the prohibition form and doesn't count on its own.
+    # Plain "may" (no "not" at all), and the other conditional cues, still do.
+    r"\bmay\b(?!\s+\d{1,2}\b)(?!\s+not\b(?!\s+(?:be|have|need)\b))"
+    r"|\b(?:might|could|would|(?:is|are) expected to)\b",
+    re.IGNORECASE,
 )
 _NO_OR_UNKNOWN = re.compile(r"\b(none|no fiscal impact|no impact|indeterminate|insignificant)\b", re.IGNORECASE)
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_CONTENT_WORD = re.compile(r"[A-Za-z']+")
+_STOPWORDS = frozenset({
+    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "is", "are",
+    "was", "were", "be", "been", "being", "by", "with", "as", "at", "that",
+    "this", "these", "those", "it", "its", "shall", "will", "may", "not",
+    "if", "than", "then", "which", "who", "whom", "from", "into", "such",
+    "any", "all", "each", "other", "under", "upon", "about", "through",
+    "must", "can", "have", "has", "had", "but", "also", "when", "while",
+})
 
 # (start, end) pairs, tried in order. Patterns are matched per line.
 _EFFECT_PATTERNS = [
@@ -36,6 +59,37 @@ _FISCAL_PATTERNS = [
 
 def normalize_ws(s: str) -> str:
     return _WS.sub(" ", s).strip()
+
+
+_DELETED_BEFORE_PUNCT = re.compile(r" ?\[deleted:[^\]]*\](?=[,.;:)])")
+_DELETED = re.compile(r"\[deleted:[^\]]*\]")
+_ADDED = re.compile(r"\[added:\s*([^\]]*)\]")
+_DELETED_UNTERMINATED = re.compile(r"\s?\[deleted:[^\]]*$")
+_ADDED_UNTERMINATED = re.compile(r"\[added:\s*([^\]]*)$")
+_DOUBLE_SPACE = re.compile(r"[ \t]{2,}")
+
+
+def law_as_amended(text: str) -> str:
+    """The text of the law as it will read once this bill takes effect.
+
+    Drops `[deleted: ...]` spans entirely and unwraps `[added: ...]` spans to
+    their contents. Line structure (including "Section N." headings at line
+    start) is preserved; only the extra whitespace a deletion leaves behind
+    is collapsed -- a run of double spaces, or a single space stranded right
+    before a `, . ; : )` when the deleted marker sat directly against that
+    punctuation. Ordinary spacing elsewhere in the text, not adjacent to a
+    removed marker, is never touched.
+
+    A marker cut off by truncation -- an opening `[deleted:` or `[added:`
+    with no closing `]` -- never leaks its fragment: an unterminated deleted
+    fragment is dropped, an unterminated added fragment is unwrapped.
+    """
+    text = _DELETED_BEFORE_PUNCT.sub("", text)
+    text = _DELETED.sub("", text)
+    text = _ADDED.sub(lambda m: m.group(1), text)
+    text = _DELETED_UNTERMINATED.sub("", text)
+    text = _ADDED_UNTERMINATED.sub(lambda m: m.group(1), text)
+    return _DOUBLE_SPACE.sub(" ", text)
 
 
 def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[dict]]:
@@ -88,6 +142,55 @@ def section_for_quote(quote: str, text: str) -> str | None:
 
 def is_conditional(statement: str) -> bool:
     return bool(_CONDITIONAL.search(statement))
+
+
+def _content_words(s: str) -> set[str]:
+    return {
+        w.lower() for w in _CONTENT_WORD.findall(s)
+        if len(w) > 3 and w.lower() not in _STOPWORDS
+    }
+
+
+def restates_bill(statement: str, text: str) -> bool:
+    """True when `statement` is a near-paraphrase of a sentence the bill
+    already contains (often the bill's own wording with "may" inserted),
+    rather than a description of a consequence. Compared against the law as
+    amended, since that is the wording a genuine consequence must not just
+    echo back.
+
+    Candidate sentences are prefiltered before the O(n*m) `SequenceMatcher`
+    comparison, so this stays fast even on a long (~12,000 char) bill:
+    they must share >= 3 content words; their lengths must be close enough
+    that a 0.6 ratio is possible at all (`ratio()` is at most
+    2*min(len)/(len_a+len_b)); and the cheap `quick_ratio()` upper bound
+    must reach 0.6 before the real `ratio()` runs.
+    """
+    stmt = normalize_ws(statement)
+    stmt_words = _content_words(stmt)
+    if len(stmt_words) < 3:
+        return False
+    stmt_lower = stmt.lower()
+    for sentence in _SENTENCE_SPLIT.split(law_as_amended(text)):
+        sentence = normalize_ws(sentence)
+        if not sentence:
+            continue
+        if len(stmt_words & _content_words(sentence)) < 3:
+            continue
+        # autojunk=False: SequenceMatcher's default autojunk heuristic
+        # treats any character making up >1% of a sequence >= 200 chars as
+        # "popular" and excludes it from matching blocks. Ordinary English
+        # prose easily crosses that threshold (spaces, common letters), which
+        # collapses the ratio for exactly the long, near-identical sentences
+        # this guard exists to catch.
+        len_a, len_b = len(stmt_lower), len(sentence)
+        if 2 * min(len_a, len_b) / (len_a + len_b) < 0.6:
+            continue  # lengths alone rule out a 0.6 ratio
+        matcher = difflib.SequenceMatcher(None, stmt_lower, sentence.lower(), autojunk=False)
+        if matcher.quick_ratio() < 0.6:
+            continue  # upper bound on ratio() -- cheap, and usually decisive
+        if matcher.ratio() >= 0.6:
+            return True
+    return False
 
 
 def states_no_or_unknown_impact(statement: str) -> bool:
