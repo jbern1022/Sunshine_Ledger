@@ -43,6 +43,36 @@ def _is_retryable(exc: Exception) -> bool:
     return False
 
 
+def _redact_query_string(exc: Exception) -> Exception:
+    """If `exc` is an httpx.HTTPStatusError, replace its message in place
+    with one whose request URL has no query string, then return the same
+    (mutated) exception object.
+
+    httpx.HTTPStatusError's message embeds the full request URL, including
+    query params -- for a client like LegiScan's or the Census API's that
+    authenticate via `?key=...`, that puts the key in whatever eventually
+    renders `str(exc)`. Redacting once here, at the point the exception is
+    first seen, makes every caller safe by construction: with_retry's own
+    retry-warning line, a caller's `except Exception as exc: logger.warning(
+    ..., exc)`, and an uncaught exception's traceback (which also renders
+    via `str(exc)`) all inherit the fix without having to know about it.
+
+    Only `.args` (and so `str(exc)`) changes -- `.request` / `.response`
+    (and so `.response.status_code`) are left alone, so a caller that does
+    `except httpx.HTTPStatusError:` or reads `exc.response.status_code`
+    keeps working exactly as before.
+
+    The other exceptions with_retry treats as retryable -- TimeoutException,
+    ConnectError, RemoteProtocolError -- carry a plain message with no URL
+    in it (confirmed against the installed httpx version), so they pass
+    through unchanged.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        redacted_url = exc.request.url.copy_with(query=b"")
+        exc.args = (f"{exc.response.status_code} {exc.response.reason_phrase} for url '{redacted_url}'",)
+    return exc
+
+
 def with_retry(fn: Callable[[], T], *, description: str, delays: tuple[float, ...] = RETRY_DELAYS_SECONDS) -> T:
     """Call `fn()`, retrying on transient network/5xx failures.
 
@@ -63,6 +93,7 @@ def with_retry(fn: Callable[[], T], *, description: str, delays: tuple[float, ..
         try:
             return fn()
         except Exception as exc:  # noqa: BLE001 -- re-raised below if not retryable/exhausted
+            exc = _redact_query_string(exc)
             if not _is_retryable(exc) or attempt == attempts:
                 raise
             delay = delays[attempt - 1]

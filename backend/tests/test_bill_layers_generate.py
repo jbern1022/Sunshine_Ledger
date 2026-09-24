@@ -153,7 +153,43 @@ def test_staff_expected_effect_keeps_literal_none_and_conditional():
     assert [i["text"] for i in r.items] == [
         "Staff found the private sector impact indeterminate.",
         "The department may incur costs to update systems.",
+        "The department will save $2 million.",
     ]
+
+
+def test_staff_expected_effect_keeps_real_finding_without_conditional_wording():
+    # H0565-style finding: a plain, unconditional statement of a real fiscal
+    # impact attributed to staff -- not a prediction, so it doesn't need
+    # "may"/"could" wording to count.
+    client = FakeClient({"items": [
+        {"category": "private_sector", "text": (
+            "The bill will have a significant, negative fiscal impact to "
+            "residential facilities and adult day training programs who "
+            "must conduct level 2 background screenings on all employees."
+        )},
+        {"category": "private_sector", "text": "Staff found no private sector impact."},
+    ]})
+    r = build_staff_expected_effect("Fiscal section text", "Staff analysis, Rules Committee, 2026-03-01", client)
+    assert [i["text"] for i in r.items] == [
+        "The bill will have a significant, negative fiscal impact to "
+        "residential facilities and adult day training programs who "
+        "must conduct level 2 background screenings on all employees.",
+    ]
+    assert len(r.dropped) == 1  # second item deduped by category, not dropped for wording
+
+
+def test_staff_expected_effect_drops_bare_none():
+    # H0763-style output: three items that read only "None" with no category
+    # to dedupe on.
+    client = FakeClient({"items": [
+        {"text": "None"},
+        {"text": "None"},
+        {"text": "None"},
+    ]})
+    r = build_staff_expected_effect("Fiscal section text", "Staff analysis, Rules Committee, 2026-03-01", client)
+    assert r.evidence_state == "insufficient_evidence"
+    assert r.items == []
+    assert len(r.dropped) == 3
 
 
 def test_staff_expected_effect_without_fiscal_section_is_insufficient():
@@ -200,8 +236,31 @@ def test_bill_says_drops_quote_with_deleted_words():
     assert len(r.dropped) == 1
 
 
+def test_bill_says_drops_definitions_lead_in_quote():
+    # H0565-style quote: a section heading with a colon lead-in and no
+    # substance of its own.
+    bill = (
+        "Section 1. 393.063 Definitions.—For the purposes of this chapter, the term:\n"
+        "(1) \"Agency\" means the Agency for Persons with Disabilities.\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    client = FakeClient({"items": [
+        {"section_ref": "Section 1",
+         "quote": "393.063 Definitions.—For the purposes of this chapter, the term:"},
+        {"section_ref": "Section 2", "quote": "This act shall take effect July 1, 2027."},
+    ]})
+    r = build_bill_says("H0565", "APD", bill, client)
+    assert [i["quote"] for i in r.items] == ["This act shall take effect July 1, 2027."]
+    assert len(r.dropped) == 1
+
+
 def test_bill_says_prompt_describes_law_as_amended():
     assert "law as it will read" in BILL_SAYS_PROMPT
+
+
+def test_ai_interpretation_prompt_keeps_modal_strength():
+    assert "shall" in AI_INTERPRETATION_PROMPT and "must" in AI_INTERPRETATION_PROMPT
+    assert "never describe a \"should\" or \"may\" provision as a requirement" in AI_INTERPRETATION_PROMPT
 
 
 def test_interpretation_and_expected_effect_prompts_explain_markers():

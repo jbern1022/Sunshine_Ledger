@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
 from app.db import SessionLocal
+from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Source, StaffAnalysis
 from app.pipeline import bill_layers as gen
 from app.pipeline.bill_layers_store import current_layer, layer_input_hash, store_layer_version
@@ -188,6 +189,7 @@ def exit_code(*, written: int, failed: int) -> int:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None, help="Max bills with work to process this run.")
     parser.add_argument("--max-minutes", type=float, default=180, help="Wall clock budget in minutes; no new bill starts once elapsed.")

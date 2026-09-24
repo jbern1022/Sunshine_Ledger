@@ -26,6 +26,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.db import SessionLocal
+from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Source
 from app.pipeline.rhetoric_gap import CLAIM_TYPE, rhetoric_gap_and_store
 
@@ -112,6 +113,7 @@ def run_rhetoric_gap_batch(limit: int | None = None) -> tuple[int, int, int]:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()

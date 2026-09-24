@@ -32,6 +32,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.logging_setup import quiet_http_logging
 from app.models import Entity, Event
 from app.pipeline.bill_text import extract_html_text, extract_pdf_text
 from app.pipeline.legiscan import LegiScanClient
@@ -174,6 +175,7 @@ if __name__ == "__main__":
     from app.db import SessionLocal
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--refresh", action="store_true", help="Re-fetch amendments that already have text.")
