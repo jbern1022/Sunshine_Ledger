@@ -43,5 +43,17 @@ Add-Content -Path $Log -Value "=== ollama-serve.ps1 starting $(Get-Date -Format 
 # PowerShell 5.1, redirected native stderr arrives as error records, and with
 # ErrorActionPreference=Stop the first one would kill this wrapper; Continue
 # lets every line through to the log.
+#
+# The log is written through a stream opened with FileShare.ReadWrite and
+# flushed per line. Add-Content in a long-running pipeline holds the file
+# with no read sharing for as long as Ollama runs, which silently blinded the
+# watchdog's CPU-fallback check (found 2026-09-24).
 $ErrorActionPreference = "Continue"
-& $Ollama serve 2>&1 | ForEach-Object { "$_" } | Add-Content -Path $Log
+$stream = [System.IO.File]::Open($Log, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::ReadWrite)
+$writer = New-Object System.IO.StreamWriter($stream)
+$writer.AutoFlush = $true
+try {
+    & $Ollama serve 2>&1 | ForEach-Object { $writer.WriteLine("$_") }
+} finally {
+    $writer.Dispose()
+}
