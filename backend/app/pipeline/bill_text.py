@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity
 from app.pipeline.legiscan import LegiScanClient
+from app.pipeline.text_cleanup import strip_page_artifacts
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,7 @@ def extract_html_text(html_bytes: bytes) -> str:
     unreadable would leave those bills falling back to the short blurb for
     no good reason.
     """
-    return html_to_marked_text(html_bytes.decode("utf-8", errors="replace"))
+    return strip_page_artifacts(html_to_marked_text(html_bytes.decode("utf-8", errors="replace")))
 
 
 # Two markers of the same kind separated only by whitespace -- or by
@@ -368,7 +369,12 @@ def _extract_pdf_text_pypdf(pdf_bytes: bytes) -> str:
 
     reader = PdfReader(io.BytesIO(pdf_bytes))
     raw = "\n".join(page.extract_text() or "" for page in reader.pages)
-    return clean_legislative_text(raw)
+    # strip_page_artifacts runs first, on the raw text, where every line
+    # still carries its number: it recognises whole runs even when a page
+    # restarts its numbering at 1 (Jacksonville ordinances), which
+    # clean_legislative_text's forward-only window can't follow. It also
+    # removes page headers _BOILERPLATE doesn't know.
+    return clean_legislative_text(strip_page_artifacts(raw))
 
 
 def extract_pdf_text(pdf_bytes: bytes) -> str:
@@ -403,7 +409,10 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         return _extract_pdf_text_pypdf(pdf_bytes)
 
     kept = [line for line in lines if line.strip() and not _BOILERPLATE.match(line)]
-    return _merge_adjacent_markers("\n".join(kept))
+    # Strip page headers before merging markers, so an [added: ...] block
+    # split by a page break ("...coordination.]\nhb565 -02-er\n[added: c. ...")
+    # is folded back into one.
+    return _merge_adjacent_markers(strip_page_artifacts("\n".join(kept)))
 
 
 def fetch_bill_text(client: LegiScanClient, doc_id: int) -> str | None:
@@ -603,6 +612,36 @@ COMPARE_MAX_LENGTH_CHANGE = 0.15
 COMPARE_MAX_DELETED_PCT = 60.0
 
 
+def clean_stored_text(text: str) -> str:
+    """The cleanup new extractions get, applied to already-stored text:
+    page headers and margin line numbers out, then any change markers the
+    removed lines had split apart merged back together."""
+    return _merge_adjacent_markers(strip_page_artifacts(text))
+
+
+def clean_stored_texts(db: Session, *, apply: bool, limit: int | None = None) -> dict:
+    """Run clean_stored_text over every stored bill text, without re-fetching.
+
+    Dry run unless `apply`. Changed text changes each bill's summary and
+    layer input hashes, so the nightly batch regenerates them on its own.
+    """
+    stmt = select(Bill).where(Bill.full_text.isnot(None)).order_by(Bill.bill_number)
+    if limit:
+        stmt = stmt.limit(limit)
+    stats = {"checked": 0, "changed": 0, "chars_removed": 0}
+    for bill in db.execute(stmt).scalars():
+        stats["checked"] += 1
+        cleaned = clean_stored_text(bill.full_text)
+        if cleaned != bill.full_text:
+            stats["changed"] += 1
+            stats["chars_removed"] += len(bill.full_text) - len(cleaned)
+            if apply:
+                bill.full_text = cleaned
+    if apply:
+        db.commit()
+    return stats
+
+
 def compare_texts(old: str, new: str) -> dict:
     """Compare a bill's stored text with a fresh re-extraction.
 
@@ -727,10 +766,25 @@ if __name__ == "__main__":
             "old vs new stats per bill with a FLAG column (see compare_texts)."
         ),
     )
+    parser.add_argument(
+        "--clean-stored",
+        action="store_true",
+        help=(
+            "Strip page headers and margin line numbers from already-stored text "
+            "(no re-fetch). Dry run unless --apply."
+        ),
+    )
+    parser.add_argument("--apply", action="store_true", help="With --clean-stored: write the cleaned text.")
     args = parser.parse_args()
 
     session = SessionLocal()
     try:
+        if args.clean_stored:
+            stats = clean_stored_texts(session, apply=args.apply, limit=args.limit)
+            verb = "Cleaned" if args.apply else "Would clean"
+            print(f"{verb} {stats['changed']} of {stats['checked']} bills "
+                  f"({stats['chars_removed']:,} characters removed).")
+            raise SystemExit(0)
         if args.compare:
             rows = compare_bill_texts(session, source=args.source, limit=args.limit)
             print(format_compare_rows(rows))
