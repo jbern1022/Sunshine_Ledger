@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import update
 
 from app.db import SessionLocal
+from app.logging_setup import quiet_http_logging
 from app.models import Flag
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ def purge_reporter_emails(db, *, now: datetime | None = None, dry_run: bool = Fa
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Count what would be purged; change nothing.")
     args = parser.parse_args()

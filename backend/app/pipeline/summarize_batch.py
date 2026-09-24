@@ -33,6 +33,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.db import SessionLocal
+from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Source
 from app.pipeline.summarize import summarize_and_store, summary_input_hash
 
@@ -222,6 +223,7 @@ def summarize_unclaimed_bills(limit: int | None = None, *, force: bool = False) 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument(

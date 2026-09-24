@@ -22,6 +22,7 @@ from shapely.geometry import MultiPolygon, Polygon, shape as shapely_shape
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app.logging_setup import quiet_http_logging
 from app.models import SpatialContext
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,7 @@ if __name__ == "__main__":
     from app.db import SessionLocal
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description="Load reference boundary geometry.")
     parser.add_argument(
         "--districts",

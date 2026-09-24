@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.logging_setup import quiet_http_logging
 from app.models import DemographicOverlay
 from app.pipeline._retry import with_retry
 
@@ -320,6 +321,7 @@ if __name__ == "__main__":
     from app.db import SessionLocal
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     session = SessionLocal()
     try:
         totals = load_all_overlays(session)

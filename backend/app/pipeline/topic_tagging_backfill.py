@@ -29,6 +29,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.db import SessionLocal
+from app.logging_setup import quiet_http_logging
 from app.models import Entity
 from app.models.tag import BillTag
 from app.pipeline.topic_tagging_ollama import tag_local_bill
@@ -108,6 +109,7 @@ def backfill_local_bill_tags(limit: int | None = None) -> tuple[int, int]:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--limit",

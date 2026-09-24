@@ -43,6 +43,21 @@ def _is_retryable(exc: Exception) -> bool:
     return False
 
 
+def _safe_exc_str(exc: Exception) -> str:
+    """str(exc), but with any request URL's query string stripped.
+
+    httpx.HTTPStatusError's message embeds the full request URL, including
+    query params -- for a client like LegiScan's that authenticates via
+    `?key=...`, logging that string verbatim would put the API key in the
+    log. Every other retryable exception here (timeouts, connect errors) is
+    a plain message with no URL in it.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        url = exc.request.url.copy_with(query=b"")
+        return f"{exc.response.status_code} {exc.response.reason_phrase} for url '{url}'"
+    return str(exc)
+
+
 def with_retry(fn: Callable[[], T], *, description: str, delays: tuple[float, ...] = RETRY_DELAYS_SECONDS) -> T:
     """Call `fn()`, retrying on transient network/5xx failures.
 
@@ -71,7 +86,7 @@ def with_retry(fn: Callable[[], T], *, description: str, delays: tuple[float, ..
                 description,
                 attempt,
                 attempts,
-                exc,
+                _safe_exc_str(exc),
                 delay,
             )
             last_exc = exc
