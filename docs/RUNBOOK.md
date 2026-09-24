@@ -302,6 +302,28 @@ host**, only the resolved container env vars are sent over the Docker API.
   Ollama itself is down. Real fix: DHCP-reserve the wired MAC, or just
   disable Wi-Fi on a machine that's always plugged in anyway (see Todoist
   ticket).
+- **Ollama must run as a scheduled task, not from the tray app.** On
+  2026-09-23 the nightly summaries failed because the Powerstation had
+  rebooted and nobody signed in. The tray app only starts Ollama at sign-in,
+  and when it did start it often came up **CPU-only**: its GPU discovery ran
+  before the NVIDIA driver was ready. On CPU the default context is 4096
+  tokens, which silently truncates bill prompts. Separately, the tray app's
+  own Settings → Context length overrides the `OLLAMA_CONTEXT_LENGTH`
+  environment variable (it was set to 128k, too big for the 12 GB card).
+  Fix: `scripts/powerstation/`. In an admin PowerShell on the Powerstation,
+  run `powershell -ExecutionPolicy Bypass -File .\install-ollama-tasks.ps1`
+  from that folder. It sets machine env `OLLAMA_HOST=0.0.0.0:11434` and
+  `OLLAMA_CONTEXT_LENGTH=8192`, and registers two tasks. "Ollama Server"
+  starts at boot after a 2-minute delay, whether or not anyone signs in.
+  "Ollama Watchdog" runs every 5 minutes and restarts the server if the API
+  is down or it fell back to CPU (a GPU retry is attempted at most once per
+  30 minutes). It also moves the tray app's Startup shortcut aside.
+  Logs: `%LOCALAPPDATA%\Ollama\serve-task.log` and `watchdog.log`. Undo with
+  `uninstall-ollama-tasks.ps1`. Quick GPU check from the Mac:
+  `ssh powerstation "powershell -NoProfile -Command \"Select-String -Path $env:LOCALAPPDATA\Ollama\serve-task.log -Pattern 'inference compute' | Select-Object -Last 1\""`
+  must name the RTX 5070, not `library=cpu`. A missed night doesn't need
+  a manual rerun: summarization only processes bills without current
+  summaries, so the next nightly run catches up.
 - **Miami's iQM2 attachments are not bill text, and some contain personal
   data.** iQM2 legislation pages link documents via
   `FileOpen.aspx?Type=N&ID=NNNNN`. At least one of those is a scan of
