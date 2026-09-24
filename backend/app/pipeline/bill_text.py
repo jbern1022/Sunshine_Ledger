@@ -222,9 +222,13 @@ def mark_words(
 
     Words are grouped into lines by `top` (within 2pt), left-margin line
     numbers are dropped by position rather than pattern-matched after the
-    fact, and each word is classified by whether a segment crosses its
-    vertical middle (struck) or runs along its bottom (underlined/added).
-    Consecutive words of the same kind become one marker.
+    fact, and each word is classified by whether segments crossing its
+    vertical middle (struck) or running along its bottom (underlined/
+    added) cover at least half of its width -- summed across however many
+    segments touch it, so a rule that merely grazes a word's edge (e.g. a
+    neighbor's underline overrunning by a point or two) doesn't pull an
+    unrelated word into the marker. Consecutive words of the same kind
+    become one marker.
     """
     # Only thin, roughly-horizontal marks count as strike/underline rules --
     # a tall page-margin rule (drawn as a rect spanning the whole column)
@@ -233,18 +237,26 @@ def mark_words(
     thin_segments = [s for s in segments if abs(s["bottom"] - s["top"]) <= 5]
 
     def _classify(word: dict) -> str | None:
+        width = word["x1"] - word["x0"]
+        if width <= 0:
+            return None
         mid = (word["top"] + word["bottom"]) / 2
         bottom = word["bottom"]
-        added = False
+        deleted_coverage = added_coverage = 0.0
         for seg in thin_segments:
-            if seg["x1"] <= word["x0"] or seg["x0"] >= word["x1"]:
+            overlap = min(seg["x1"], word["x1"]) - max(seg["x0"], word["x0"])
+            if overlap <= 0:
                 continue  # no horizontal overlap with this word
             center = (seg["top"] + seg["bottom"]) / 2
             if abs(center - mid) <= 2.5:
-                return "deleted"
-            if 0 <= center - bottom <= 3:
-                added = True
-        return "added" if added else None
+                deleted_coverage += overlap
+            elif 0 <= center - bottom <= 3:
+                added_coverage += overlap
+        if deleted_coverage / width >= 0.5:
+            return "deleted"
+        if added_coverage / width >= 0.5:
+            return "added"
+        return None
 
     lines: list[list[dict]] = []
     for word in sorted(words, key=lambda w: (w["top"], w["x0"])):

@@ -11,12 +11,13 @@ task report for detail.
 
 PDF fixture: `h0565_enrolled.pdf` (Florida CS/CS/HB 565, enrolled). Known
 from the spike: "managers and supervisors" is struck and "all employees" is
-underlined in one sentence; "Tatton-Brown-Rahman syndrome" is underlined
-(added) elsewhere, together with the "or" immediately before it -- the
-underline segment also grazes ~11% of the preceding "syndrome," at the
-word's trailing edge, which the any-overlap rule (as specified) sweeps into
-the same marker. The old pypdf path corrupted this same text to "Phelan-32
-McDermid" by gluing the margin line number onto a hyphenated word.
+underlined in one sentence; the "or" immediately before the new syndrome
+name is struck, and "or Tatton-Brown-Rahman syndrome;" is underlined
+(added) right after it. A rule under the preceding word ("syndrome,")
+grazes only ~11% of its width -- below the >=50% coverage threshold a word
+needs to count as marked -- so that word stays plain. The old pypdf path
+corrupted this same text to "Phelan-32 McDermid" by gluing the margin line
+number onto a hyphenated word.
 """
 
 from __future__ import annotations
@@ -71,9 +72,10 @@ def test_pdf_fixture_marks_struck_and_underlined_text():
 
     assert "[deleted: managers and supervisors]" in text
     assert "[added: all employees]" in text
-    # The added run includes the "or" that immediately precedes the new
-    # definition name -- see the module docstring above.
-    assert re.search(r"\[added: [^\]]*Tatton-Brown-Rahman syndrome", text)
+    # The "or" right before the new syndrome name is struck, and the new
+    # name (with its own "or") is added immediately after -- see the
+    # module docstring above.
+    assert "[deleted: or] Prader-Willi syndrome, [added: or Tatton-Brown-Rahman syndrome;]" in text
 
     assert "Phelan-32" not in text
     assert "CODING" not in text
@@ -113,6 +115,20 @@ def test_mark_words_run_merging():
     ]
     segments = [_seg(10, 90, 111, 111.5)]  # underline under "all employees" only
     assert mark_words(words, segments) == ["[added: all employees] of"]
+
+
+def test_mark_words_ignores_a_segment_that_only_grazes_a_word():
+    """A rule meant for one word can overrun into a neighbor's edge by a
+    point or two (rendering, not intent). Coverage below 50% of the word's
+    width must not mark it."""
+    words = [
+        _word("kept", 10, 30, 100),  # width 20
+        _word("marked", 35, 75, 100),  # width 40
+    ]
+    # Underline segment covers all of "marked" (35-75) plus 2pt into
+    # "kept" (28-30) -- 2/20 = 10% of "kept"'s width, well under 50%.
+    segments = [_seg(28, 75, 111, 111.5)]
+    assert mark_words(words, segments) == ["kept [added: marked]"]
 
 
 def test_mark_words_drops_left_margin_line_numbers():
