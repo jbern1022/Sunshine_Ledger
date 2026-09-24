@@ -15,7 +15,10 @@ import re
 
 _WS = re.compile(r"\s+")
 _NAV_LINE = re.compile(r"(?m)^\s*JUMP TO SUMMARY ANALYSIS RELEVANT INFORMATION\s*$\n?")
-_BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.", re.IGNORECASE)
+# `(?!\d)` keeps a statute citation like "Section 316.1895, F.S." from being
+# read as a heading for section 316 -- a real heading's "Section N." is never
+# followed immediately by another digit.
+_BILL_SECTION = re.compile(r"(?m)^\s*Section\s+(\d+)\.(?!\d)", re.IGNORECASE)
 _SECTION_REF = re.compile(r"\b(?:section|sec\.?)\s*(\d+)(?!\.\d)\b", re.IGNORECASE)
 _CONDITIONAL = re.compile(
     r"\bmay\b(?!\s+\d{1,2}\b)|\b(?:might|could|would|(?:is|are) expected to)\b", re.IGNORECASE
@@ -36,6 +39,32 @@ _FISCAL_PATTERNS = [
 
 def normalize_ws(s: str) -> str:
     return _WS.sub(" ", s).strip()
+
+
+_DELETED = re.compile(r"\[deleted:[^\]]*\]")
+_ADDED = re.compile(r"\[added:\s*([^\]]*)\]")
+_DELETED_UNTERMINATED = re.compile(r"\s?\[deleted:[^\]]*$")
+_ADDED_UNTERMINATED = re.compile(r"\[added:\s*([^\]]*)$")
+_DOUBLE_SPACE = re.compile(r"[ \t]{2,}")
+
+
+def law_as_amended(text: str) -> str:
+    """The text of the law as it will read once this bill takes effect.
+
+    Drops `[deleted: ...]` spans entirely and unwraps `[added: ...]` spans to
+    their contents. Line structure (including "Section N." headings at line
+    start) is preserved; only the double spaces a deletion leaves behind are
+    collapsed.
+
+    A marker cut off by truncation -- an opening `[deleted:` or `[added:`
+    with no closing `]` -- never leaks its fragment: an unterminated deleted
+    fragment is dropped, an unterminated added fragment is unwrapped.
+    """
+    text = _DELETED.sub("", text)
+    text = _ADDED.sub(lambda m: m.group(1), text)
+    text = _DELETED_UNTERMINATED.sub("", text)
+    text = _ADDED_UNTERMINATED.sub(lambda m: m.group(1), text)
+    return _DOUBLE_SPACE.sub(" ", text)
 
 
 def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[dict]]:

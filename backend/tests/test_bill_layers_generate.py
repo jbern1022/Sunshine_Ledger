@@ -3,6 +3,9 @@ import json
 import pytest
 
 from app.pipeline.bill_layers import (
+    AI_EXPECTED_EFFECT_PROMPT,
+    AI_INTERPRETATION_PROMPT,
+    BILL_SAYS_PROMPT,
     LayerGenerationError,
     build_ai_expected_effect,
     build_ai_interpretation,
@@ -13,6 +16,11 @@ from app.pipeline.bill_layers import (
 
 BILL = """Section 1. Subsection (2) of section 110.113, Florida Statutes, is amended to read:
 (2) Salary payments may be made by direct deposit.
+Section 2. This act shall take effect July 1, 2027.
+"""
+
+BILL_MARKED = """Section 1. Subsection (2) of section 110.113, Florida Statutes, is amended to read:
+(2) Salary payments [deleted: may not] [added: may] be made by direct deposit.
 Section 2. This act shall take effect July 1, 2027.
 """
 
@@ -151,3 +159,62 @@ def test_staff_expected_effect_without_fiscal_section_is_insufficient():
 def test_unparseable_model_output_raises():
     with pytest.raises(LayerGenerationError):
         build_ai_interpretation("HB 1", "Pay", BILL, FakeClient("not json"))
+
+
+def test_bill_says_drops_duplicate_quotes():
+    client = FakeClient({"items": [
+        {"section_ref": "Section 2", "quote": "This act shall take effect July 1, 2027."},
+        {"section_ref": "Section 2", "quote": "This act shall take effect   July 1, 2027."},
+    ]})
+    r = build_bill_says("HB 1", "Pay", BILL, client)
+    assert [i["quote"] for i in r.items] == ["This act shall take effect July 1, 2027."]
+    assert len(r.dropped) == 1
+
+
+def test_bill_says_verifies_against_law_as_amended_view():
+    client = FakeClient({"items": [
+        {"section_ref": "Section 1", "quote": "(2) Salary payments may be made by direct deposit."},
+    ]})
+    r = build_bill_says("HB 1", "Pay", BILL_MARKED, client)
+    assert r.evidence_state == "supported"
+    assert r.items[0]["quote"] == "(2) Salary payments may be made by direct deposit."
+    assert r.items[0]["section_ref"] == "Section 1"
+    # The model was shown the amended view, not the raw markers.
+    assert "[deleted:" not in client.prompts[0]
+    assert "[added:" not in client.prompts[0]
+
+
+def test_bill_says_drops_quote_with_deleted_words():
+    client = FakeClient({"items": [
+        {"section_ref": "Section 1", "quote": "(2) Salary payments may not be made by direct deposit."},
+    ]})
+    r = build_bill_says("HB 1", "Pay", BILL_MARKED, client)
+    assert r.evidence_state == "insufficient_evidence"
+    assert r.items == []
+    assert len(r.dropped) == 1
+
+
+def test_bill_says_prompt_describes_law_as_amended():
+    assert "law as it will read" in BILL_SAYS_PROMPT
+
+
+def test_interpretation_and_expected_effect_prompts_explain_markers():
+    marker_sentence = "In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds."
+    assert marker_sentence in AI_INTERPRETATION_PROMPT
+    assert marker_sentence in AI_EXPECTED_EFFECT_PROMPT
+
+
+def test_ai_expected_effect_section_guard_uses_law_as_amended():
+    # "Section 316.1895, F.S." must not be read as a heading for section 316
+    # under the amended view either.
+    text = (
+        "Section 316.1895, F.S., requires signage.\n"
+        "Section 1. [deleted: Old] [added: New] rule applies.\n"
+    )
+    client = FakeClient({"items": [
+        {"text": "Drivers may see new signage.", "section_ref": "Section 316", "assumptions": []},
+        {"text": "The rule may change.", "section_ref": "Section 1", "assumptions": []},
+    ]})
+    r = build_ai_expected_effect("HB 1", "Pay", text, client)
+    assert [i["text"] for i in r.items] == ["The rule may change."]
+    assert len(r.dropped) == 1

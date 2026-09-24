@@ -33,7 +33,7 @@ def test_first_store_creates_version_1_with_sources(db_session, bill_factory):
     entity = bill_factory()
     row = _store(db_session, entity, "h1")
     assert row.version == 1 and row.superseded_at is None
-    assert row.method_version == "interpretation/sunshine_ledger_ai/1"
+    assert row.method_version == "interpretation/sunshine_ledger_ai/2"
     assert len(row.source_links) == 1
 
 

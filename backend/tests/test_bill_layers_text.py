@@ -3,6 +3,7 @@ from app.pipeline.bill_layers_text import (
     extract_effect_section,
     extract_fiscal_section,
     is_conditional,
+    law_as_amended,
     normalize_ws,
     section_for_quote,
     section_number,
@@ -192,3 +193,37 @@ def test_extract_house_fiscal_falls_back_to_summary_box():
 def test_extract_returns_none_when_absent():
     assert extract_effect_section("Unrelated document text.") is None
     assert extract_fiscal_section("Unrelated document text.") is None
+
+
+def test_law_as_amended_removes_deletion_and_collapses_space():
+    assert law_as_amended("An [deleted: No] agency") == "An agency"
+
+
+def test_law_as_amended_unwraps_addition():
+    text = (
+        "McDermid syndrome, [deleted: or] Prader-Willi syndrome, "
+        "[added: or Tatton-Brown-Rahman syndrome;] that manifests"
+    )
+    assert law_as_amended(text) == (
+        "McDermid syndrome, Prader-Willi syndrome, or Tatton-Brown-Rahman syndrome; that manifests"
+    )
+
+
+def test_law_as_amended_keeps_line_structure():
+    text = "Section 1. Foo [deleted: bar] baz.\nSection 2. Qux.\n"
+    assert law_as_amended(text) == "Section 1. Foo baz.\nSection 2. Qux.\n"
+
+
+def test_law_as_amended_drops_unterminated_deleted_fragment():
+    text = "Words before [deleted: cut off with no closing bracket"
+    assert law_as_amended(text) == "Words before"
+
+
+def test_law_as_amended_unwraps_unterminated_added_fragment():
+    text = "Words before [added: cut off with no closing"
+    assert law_as_amended(text) == "Words before cut off with no closing"
+
+
+def test_bill_section_rejects_statute_citation_at_line_start():
+    text = "Section 316.1895, F.S., requires signage.\nSection 2. Something else.\n"
+    assert bill_section_numbers(text) == {"2"}

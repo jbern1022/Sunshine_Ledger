@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from app.pipeline.bill_layers_text import (
     bill_section_numbers,
     is_conditional,
+    law_as_amended,
     section_for_quote,
     section_number,
     states_no_or_unknown_impact,
@@ -31,11 +32,11 @@ from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 # Bump a value when its prompt or guard changes in a way that should
 # regenerate stored versions. Part of each block's input hash.
 METHOD_VERSIONS: dict[tuple[str, str], str] = {
-    ("bill_says", "bill_text"): "bill_says/bill_text/1",
+    ("bill_says", "bill_text"): "bill_says/bill_text/2",
     ("interpretation", "legislative_staff"): "interpretation/legislative_staff/1",
-    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/1",
+    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/2",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/1",
-    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/1",
+    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/2",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -57,7 +58,7 @@ BILL_SAYS_PROMPT = """You are selecting the most important provisions of a bill,
 
 Bill: {bill_number} — {title}
 
-Bill text:
+The text below is the law as it will read once this bill takes effect (struck language already removed, inserted language already merged in):
 \"\"\"
 {text}
 \"\"\"
@@ -74,6 +75,8 @@ Bill text:
 \"\"\"
 {text}
 \"\"\"
+
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds.
 
 Write 2 to 5 plain-language statements of what this bill changes in the law. Rules:
 - Each statement must be tied to the bill section it comes from (e.g. "Section 3").
@@ -92,6 +95,8 @@ Bill text:
 \"\"\"
 {text}
 \"\"\"
+
+In the text, [deleted: …] marks wording the bill removes and [added: …] marks wording it adds.
 
 Describe up to 4 direct effects that follow from a specific mechanism in this bill (a requirement, prohibition, funding change, deadline, or penalty it creates or removes). Rules:
 - Each effect MUST cite the bill section that creates the mechanism (e.g. "Section 3").
@@ -165,12 +170,30 @@ def _truncate(full_text: str) -> tuple[str, bool]:
     return full_text[:MAX_BILL_TEXT_CHARS], len(full_text) > MAX_BILL_TEXT_CHARS
 
 
+def _dedupe_quotes(kept: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Drop later items whose (already-normalized) quote text repeats an earlier one."""
+    seen: set[str] = set()
+    unique: list[dict] = []
+    dupes: list[dict] = []
+    for item in kept:
+        quote = item["quote"]
+        if quote in seen:
+            dupes.append(item)
+        else:
+            seen.add(quote)
+            unique.append(item)
+    return unique, dupes
+
+
 def build_bill_says(bill_number: str, title: str, full_text: str, client) -> LayerResult:
     text, truncated = _truncate(full_text)
+    amended = law_as_amended(text)
     raw = _parse_items(client.generate(
-        BILL_SAYS_PROMPT.format(bill_number=bill_number, title=title, text=text), json_mode=True
+        BILL_SAYS_PROMPT.format(bill_number=bill_number, title=title, text=amended), json_mode=True
     ))
-    kept, dropped = verify_quotes(raw, text)
+    kept, verify_dropped = verify_quotes(raw, amended)
+    kept, dupe_dropped = _dedupe_quotes(kept)
+    dropped = verify_dropped + dupe_dropped
     if not kept:
         note = "Quotes could not be verified against the bill text"
         if truncated:
@@ -181,9 +204,9 @@ def build_bill_says(bill_number: str, title: str, full_text: str, client) -> Lay
         # _item() would use the model's own "text" field if it supplied one
         # instead of the quote; force it back to the verified quote. The
         # model's section_ref is unverified too, so derive it from where the
-        # (now-verified) quote actually sits in the text.
+        # (now-verified) quote actually sits in the amended text.
         i["text"] = i["quote"]
-        i["section_ref"] = section_for_quote(i["quote"], text)
+        i["section_ref"] = section_for_quote(i["quote"], amended)
     scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
     return LayerResult("supported", scope, items, dropped)
 
@@ -208,7 +231,7 @@ def build_ai_expected_effect(bill_number: str, title: str, full_text: str, clien
     raw = _parse_items(client.generate(
         AI_EXPECTED_EFFECT_PROMPT.format(bill_number=bill_number, title=title, text=text), json_mode=True
     ))
-    sections = bill_section_numbers(text)
+    sections = bill_section_numbers(law_as_amended(text))
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:
