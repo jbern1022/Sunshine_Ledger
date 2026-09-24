@@ -2,10 +2,12 @@ from app.pipeline.bill_layers_text import (
     bill_section_numbers,
     extract_effect_section,
     extract_fiscal_section,
+    fiscal_option_kind,
     is_conditional,
     is_substantive_finding,
     law_as_amended,
     normalize_ws,
+    overstates_modal,
     restates_bill,
     section_for_quote,
     section_number,
@@ -433,3 +435,103 @@ def test_restates_bill_skips_ratio_when_quick_ratio_is_too_low(monkeypatch):
     stmt = "Agency university contract research zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz."
     assert not restates_bill(stmt, bill)
     assert calls["ratio"] == 0
+
+
+H0763_ALLOWANCE = (
+    "A bill to be entitled An act relating to child welfare; requiring a caregiver to provide a weekly "
+    "cash allowance to each child in his or her care beginning when the child attains a certain age.\n"
+    "Section 3. Section 409.1451, Florida Statutes, is amended to read:\n"
+    "(a) The Legislature finds that an allowance teaches a child the value and use of money. "
+    "Caregivers should provide each child in their care, beginning when the child attains 6 years "
+    "of age, a weekly cash allowance to help the child learn to manage money. "
+    "(b) Caregivers licensed by the department must provide a minimum allowance of $20 per week "
+    "from the caregivers' existing board rate to children aged 13 through 17 in their care. "
+    "A new medical report may be required only when there is a change in the dosage.\n"
+)
+
+
+def test_overstates_modal_flags_should_restated_as_must():
+    assert overstates_modal(
+        "Caregivers must provide a weekly cash allowance to children aged 6 and older.", H0763_ALLOWANCE
+    )
+
+
+def test_overstates_modal_accepts_requirement_the_bill_imposes():
+    assert not overstates_modal(
+        "Caregivers must provide at least $20 per week to children aged 13 through 17.", H0763_ALLOWANCE
+    )
+
+
+def test_overstates_modal_accepts_non_requirement_wording():
+    assert not overstates_modal(
+        "Caregivers are encouraged to give children 6 and older a weekly cash allowance.", H0763_ALLOWANCE
+    )
+
+
+def test_overstates_modal_treats_may_be_required_as_mandatory_wording():
+    assert not overstates_modal(
+        "Requires a new medical report only when there is a change in the dosage.", H0763_ALLOWANCE
+    )
+
+
+def test_overstates_modal_ignores_weak_matches():
+    assert not overstates_modal("Requires the agency to publish annual reports.", H0763_ALLOWANCE)
+    # Four words in common with the "should" sentence is not enough to
+    # say which sentence the statement came from.
+    assert not overstates_modal("Caregivers must provide each child money.", H0763_ALLOWANCE)
+
+
+def test_fiscal_option_kind():
+    assert fiscal_option_kind("Staff found no fiscal impact on local governments.") == "none"
+    assert fiscal_option_kind("Staff found the tax/fee impact none.") == "none"
+    assert fiscal_option_kind("Staff found no private sector impact.") == "none"
+    assert fiscal_option_kind("Staff found the private sector impact indeterminate.") == "indeterminate"
+    assert fiscal_option_kind("The impact on state revenues is insignificant.") == "insignificant"
+    assert fiscal_option_kind(
+        "Expanding eligibility for IFS has an indeterminate, significant, negative fiscal impact."
+    ) is None
+    assert fiscal_option_kind("The department may incur costs to update systems.") is None
+
+
+def test_overstates_modal_checks_each_clause_separately():
+    text = (
+        "Section 1. The physical placement of a speed detection system may be outside the boundaries "
+        "of the school zone but within the roadway maintained as a school zone. Any notice of violation "
+        "issued using a speed detection system must be based solely on a violation occurring within "
+        "the boundaries of the school zone.\n"
+    )
+    assert not overstates_modal(
+        "The physical placement of speed detection systems can be outside the boundaries of the school "
+        "zone, and any violation notices must be based on violations occurring within the school zone boundaries.",
+        text,
+    )
+    assert overstates_modal(
+        "The physical placement of speed detection systems must be outside the boundaries of the school zone.",
+        text,
+    )
+
+
+def test_overstates_modal_treats_may_not_as_a_prohibition():
+    text = (
+        "Section 1. An interlocal agreement entered into before October 1, 2024, may not extend "
+        "beyond October 1, 2031.\n"
+    )
+    assert not overstates_modal(
+        "Prohibits interlocal agreements entered into before October 1, 2024 from extending beyond "
+        "October 1, 2031, and requires such agreements to end by that date.",
+        text,
+    )
+
+
+def test_overstates_modal_splits_clauses_before_a_modal():
+    text = (
+        "Section 1. A candidate may not have changed his or her name during the 365-day period. "
+        "The candidacy may be challenged by a qualified candidate or a political party with "
+        "qualified candidates in the same race by filing an action in the circuit court.\n"
+    )
+    assert not overstates_modal(
+        "Not changing one's name during the 365-day period is mandatory and can be challenged by a "
+        "qualified candidate or a political party with qualified candidates in the same race by filing "
+        "an action in the circuit court.",
+        text,
+    )

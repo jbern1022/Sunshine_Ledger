@@ -7,6 +7,8 @@ prompt alone:
 - Bill Says quotes must appear word for word in the text shown to the model.
 - Sunshine Ledger expected effects must cite a bill section that exists and
   use conditional wording.
+- Sunshine Ledger interpretations must not turn a "should"/"may" provision
+  into a requirement.
 - Staff expected effects must be a real finding -- not a bare "None" /
   "Indeterminate" / "N/A" token left over from a fiscal statement's
   category list.
@@ -17,13 +19,16 @@ Design: docs/superpowers/specs/2026-09-23-bill-layers-design.md
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from app.pipeline.bill_layers_text import (
     bill_section_numbers,
+    fiscal_option_kind,
     is_conditional,
     is_substantive_finding,
     law_as_amended,
+    overstates_modal,
     restates_bill,
     section_for_quote,
     section_number,
@@ -36,9 +41,9 @@ from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("bill_says", "bill_text"): "bill_says/bill_text/3",
     ("interpretation", "legislative_staff"): "interpretation/legislative_staff/1",
-    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/4",
-    ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/3",
-    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/3",
+    ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/5",
+    ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
+    ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/4",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -156,8 +161,17 @@ def _str_list(value) -> list[str]:
     return [str(v).strip() for v in value if str(v).strip()]
 
 
+# Assumptions that hold for every bill and so say nothing about this one, and
+# the model's own ways of saying it has none.
+_FILLER_ASSUMPTION = re.compile(
+    r"implemented as written|without any modifications or challenges|language is clear and unambiguous"
+    r"|^(?:none|n/a|none identified)\.?$",
+    re.IGNORECASE,
+)
+
+
 def _item(raw: dict, *, quote: str | None = None, assumptions_required: bool = False) -> dict:
-    assumptions = _str_list(raw.get("assumptions"))
+    assumptions = [a for a in _str_list(raw.get("assumptions")) if not _FILLER_ASSUMPTION.search(a)]
     if assumptions_required and not assumptions:
         assumptions = ["None identified"]
     ref = raw.get("section_ref")
@@ -222,10 +236,17 @@ def build_ai_interpretation(bill_number: str, title: str, full_text: str, client
     ))
     sections = bill_section_numbers(law_as_amended(text))
     items: list[dict] = []
+    dropped: list[dict] = []
     for r in raw:
         if not str(r.get("text") or "").strip():
             continue
         item = _item(r, assumptions_required=True)
+        # The prompt asks the model to keep "should"/"may" non-binding, but
+        # that's enforced here too: a statement turning a recommendation into
+        # a requirement is dropped rather than published.
+        if overstates_modal(item["text"], text):
+            dropped.append(r)
+            continue
         # A section_ref that doesn't resolve to a section this bill actually
         # has -- unparseable, or a number not present -- is cleared rather
         # than trusted; the statement itself is kept.
@@ -239,7 +260,7 @@ def build_ai_interpretation(bill_number: str, title: str, full_text: str, client
         if truncated:
             note += " in the first part of a long bill"
         return LayerResult("insufficient_evidence", note, [], raw)
-    return LayerResult("supported", scope, items)
+    return LayerResult("supported", scope, items, dropped)
 
 
 def build_ai_expected_effect(bill_number: str, title: str, full_text: str, client) -> LayerResult:
@@ -283,6 +304,7 @@ def build_staff_interpretation(effect_section: str | None, staff_label: str, cli
 
 
 _STAFF_FISCAL_CATEGORIES = {"tax_fee", "state_government", "local_government", "private_sector"}
+_REAL_FINDING = "finding"
 
 
 def build_staff_expected_effect(fiscal_section: str | None, staff_label: str, client) -> LayerResult:
@@ -293,7 +315,7 @@ def build_staff_expected_effect(fiscal_section: str | None, staff_label: str, cl
     ))
     kept: list[dict] = []
     dropped: list[dict] = []
-    seen_categories: set[str] = set()
+    category_state: dict[str, str] = {}
     for r in raw:
         item = _item(r)
         if not is_substantive_finding(item["text"]):
@@ -301,14 +323,22 @@ def build_staff_expected_effect(fiscal_section: str | None, staff_label: str, cl
             continue
         # When the fiscal analysis template prints every option for a
         # category ("None / Indeterminate / Insignificant") the model can
-        # restate more than one; keep only the first (the one staff
-        # selected) per category. "other" items are never deduped this way.
+        # restate more than one. Real findings are always kept -- H0565 lost
+        # two significant negative state findings to a keep-one-per-category
+        # rule (2026-09-24). A bare option finding is dropped only when it
+        # contradicts what the category already reports: a different option,
+        # or a real finding ("no impact" after "a significant, negative
+        # impact"). Further findings of the same option on another subject
+        # are kept. "other" items are never deduped this way.
         category = str(r.get("category") or "").strip().lower()
         if category in _STAFF_FISCAL_CATEGORIES:
-            if category in seen_categories:
+            kind = fiscal_option_kind(item["text"]) or _REAL_FINDING
+            first = category_state.setdefault(category, kind)
+            if kind != _REAL_FINDING and kind != first:
                 dropped.append(r)
                 continue
-            seen_categories.add(category)
+            if kind == _REAL_FINDING:
+                category_state[category] = _REAL_FINDING
         kept.append(item)
     if not kept:
         return LayerResult("insufficient_evidence", f"{staff_label}: no fiscal finding could be restated", [], dropped)
