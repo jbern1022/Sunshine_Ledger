@@ -124,6 +124,22 @@ def test_verify_quotes_drops_definitions_lead_in_and_short_fragments():
     assert len(dropped) == 2
 
 
+def test_verify_quotes_drops_definitions_lead_in_even_without_trailing_colon():
+    # A Definitions.— lead-in never states a provision on its own, even if
+    # the model happens to quote it without the trailing colon.
+    text = (
+        "Section 1. 393.063 Definitions.—For the purposes of this chapter, "
+        "the term means something specific.\n"
+        "Section 2. This act shall take effect July 1, 2027.\n"
+    )
+    kept, dropped = verify_quotes(
+        [{"section_ref": "Section 1",
+          "quote": "393.063 Definitions.—For the purposes of this chapter, the term"}],
+        text,
+    )
+    assert kept == [] and len(dropped) == 1
+
+
 def test_bill_section_numbers():
     assert bill_section_numbers(BILL) == {"1", "2"}
 

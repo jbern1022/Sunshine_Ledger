@@ -5,7 +5,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from app.pipeline._retry import RETRY_DELAYS_SECONDS, _safe_exc_str, with_retry
+from app.pipeline._retry import RETRY_DELAYS_SECONDS, _redact_query_string, with_retry
 
 
 def _status_error(code: int, url: str = "https://example.test") -> httpx.HTTPStatusError:
@@ -103,18 +103,27 @@ def test_does_not_retry_on_4xx(mock_sleep):
     mock_sleep.assert_not_called()
 
 
-def test_safe_exc_str_strips_query_string_from_http_status_error():
-    # A LegiScan-style URL carries its API key as a query param
-    # (?key=...&op=...). The retry log line must never include it.
+def test_redact_query_string_strips_it_from_http_status_error_message():
+    # A LegiScan/Census-style URL carries its API key as a query param
+    # (?key=...&op=...). str(exc) must never include it.
     exc = _status_error(503, "https://api.legiscan.com/?key=SECRETKEY&op=getMasterList")
-    rendered = _safe_exc_str(exc)
+    redacted = _redact_query_string(exc)
+    assert redacted is exc  # mutated in place, not replaced
+    rendered = str(redacted)
     assert "SECRETKEY" not in rendered
     assert "key=" not in rendered
     assert "503" in rendered
+    # .request / .response (and so .response.status_code) are untouched --
+    # callers that inspect the status code or catch HTTPStatusError by type
+    # keep working.
+    assert redacted.response.status_code == 503
+    assert isinstance(redacted, httpx.HTTPStatusError)
 
 
-def test_safe_exc_str_leaves_plain_exceptions_alone():
-    assert _safe_exc_str(httpx.TimeoutException("timed out")) == "timed out"
+def test_redact_query_string_leaves_plain_exceptions_alone():
+    exc = httpx.TimeoutException("timed out")
+    assert _redact_query_string(exc) is exc
+    assert str(exc) == "timed out"
 
 
 @patch("time.sleep")
@@ -131,6 +140,35 @@ def test_retry_log_line_never_includes_query_string_key(mock_sleep, caplog):
         with_retry(fn, description="LegiScan op=getMasterList")
 
     assert "SECRETKEY" not in caplog.text
+
+
+@patch("time.sleep")
+def test_propagated_exception_on_non_retryable_4xx_is_redacted(mock_sleep):
+    # Immediate-raise path (not retryable): the exception the caller
+    # actually catches -- not just with_retry's own log line -- must be
+    # redacted, since callers like staff_analysis.py log str(exc) directly.
+    def fn():
+        raise _status_error(404, "https://api.legiscan.com/?key=SECRETKEY&op=getBill")
+
+    with pytest.raises(httpx.HTTPStatusError) as excinfo:
+        with_retry(fn, description="test")
+
+    assert "SECRETKEY" not in str(excinfo.value)
+    assert excinfo.value.response.status_code == 404
+
+
+@patch("time.sleep")
+def test_propagated_exception_after_exhausted_retries_is_redacted(mock_sleep):
+    # Exhausted-retries path (retryable 5xx that never recovers): same
+    # requirement on the exception that finally escapes with_retry.
+    def fn():
+        raise _status_error(503, "https://api.legiscan.com/?key=SECRETKEY&op=getMasterList")
+
+    with pytest.raises(httpx.HTTPStatusError) as excinfo:
+        with_retry(fn, description="test")
+
+    assert "SECRETKEY" not in str(excinfo.value)
+    assert excinfo.value.response.status_code == 503
 
 
 @patch("time.sleep")

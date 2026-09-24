@@ -95,14 +95,15 @@ def law_as_amended(text: str) -> str:
 
 
 def _is_substantive_quote(quote: str) -> bool:
-    """False for a quote that carries no substance on its own: a bare
-    section/definitions lead-in ("393.063 Definitions.—For the purposes of
-    this chapter, the term:") or anything else that trails off with a colon,
-    or a fragment too short to stand as a provision by itself.
+    """False for a quote that carries no substance on its own: anything
+    that trails off with a colon, a "393.063 Definitions.—" lead-in (even
+    without a trailing colon -- it only ever introduces a list of defined
+    terms, never states one on its own), or a fragment too short to stand
+    as a provision by itself.
     """
     if quote.endswith(":") or quote.endswith(":—"):
         return False
-    if _DEFINITIONS_LEAD_IN.search(quote) and quote.rstrip().endswith(":"):
+    if _DEFINITIONS_LEAD_IN.search(quote):
         return False
     if len(quote.split()) < 6:
         return False
