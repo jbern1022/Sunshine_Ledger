@@ -32,7 +32,7 @@ def test_legistar_pypdf_cleanup_handles_page_number_restart():
     )
 
 
-def test_clean_stored_text_merges_added_block_split_by_page_header():
+def test_clean_stored_text_drops_page_header_between_added_blocks():
     stored = (
         "Section 3. [added: (1)(a) The agency shall contract with a state university. "
         "b. Attributes and behaviors that define high-quality support coordination.]\n"
@@ -44,8 +44,8 @@ def test_clean_stored_text_merges_added_block_split_by_page_header():
     )
     assert clean_stored_text(stored) == (
         "Section 3. [added: (1)(a) The agency shall contract with a state university. "
-        "b. Attributes and behaviors that define high-quality support coordination. "
-        "c. Best practices and areas for improvement.]\n"
+        "b. Attributes and behaviors that define high-quality support coordination.]\n"
+        "[added: c. Best practices and areas for improvement.]\n"
         "Section 4. This act shall take effect July 1, 2026."
     )
 

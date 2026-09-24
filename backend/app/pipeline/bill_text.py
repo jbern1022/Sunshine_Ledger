@@ -218,8 +218,20 @@ def extract_html_text(html_bytes: bytes) -> str:
 #
 # Exception: a marker that *opens* with a "Section N." heading keeps its own
 # line, so law_as_amended still finds that heading at a line start.
+# A line that opens a list item: "(1)", "(a)", "(2)(b)", "2.", "b. ". A lone
+# lowercase letter must be followed by a space and not a digit, so a
+# statute citation that wraps to the start of a line ("s. 393.063") isn't
+# taken for one.
+_LIST_ITEM_START = r"(?:\(\w{1,4}\)|\d{1,3}\.(?!\d)|[a-z]\.\s(?!\d))"
+
+# A block opening a list item on a new line is also kept separate, so a long
+# inserted list ("(1) ... (a) ... (b) ...") keeps one item per line instead
+# of folding into one. The check sits in the pattern (a lookahead), not in
+# the replacement, so the item's own continuation lines still merge into it.
 _ADJACENT_MARKER = re.compile(
-    r"\[(deleted|added): ([^\]]*)\]([ \t]*\n?[ \t]*)\[\1: (?!Section\s+\d+\.(?!\d))"
+    r"\[(deleted|added): ([^\]]*)\]"
+    r"([ \t]*(?:\n[ \t]*(?!\[(?:deleted|added): " + _LIST_ITEM_START + r"))?)"
+    r"\[\1: (?!Section\s+\d+\.(?!\d))"
 )
 
 
