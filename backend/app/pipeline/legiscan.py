@@ -184,6 +184,19 @@ def _build_people_by_id(client: LegiScanClient, state: str, *, sessions: int = 2
     return people
 
 
+def introduced_date(detail: dict) -> date | None:
+    """When a bill was filed. getBill has no `introduced` field for FL bills
+    (all 1,897 stored bills had no introduced date as of 2026-09-25), so fall
+    back to the earliest entry in its action history, which is "Filed" for
+    98% of them.
+    """
+    explicit = _parse_date(detail.get("introduced"))
+    if explicit:
+        return explicit
+    dates = [d for d in (_parse_date(h.get("date")) for h in detail.get("history") or []) if d]
+    return min(dates) if dates else None
+
+
 ACTION_CHAMBERS = {"H": "House", "S": "Senate"}
 
 
@@ -484,7 +497,7 @@ def ingest_state_bills(
         if not fallback or fallback.isdigit():
             fallback = "Unknown"
         bill.status = normalize_status(STATUS_MAP.get(status_code, fallback))
-        bill.introduced_date = _parse_date(detail.get("introduced"))
+        bill.introduced_date = introduced_date(detail)
         bill.last_action_date = _parse_date(detail.get("status_date") or row.get("last_action_date"))
         bill.last_action = detail.get("last_action") or row.get("last_action")
         bill.full_text_url = detail.get("state_link") or row.get("url")
@@ -675,6 +688,8 @@ def sync_state_bill_history(
 
         sync_bill_amendments(db, bill_entity=entity, amendments=detail.get("amendments") or [])
         sync_bill_actions(db, bill_entity=entity, history=detail.get("history") or [])
+        if entity.bill is not None and entity.bill.introduced_date is None:
+            entity.bill.introduced_date = introduced_date(detail)
         votes = detail.get("votes") or []
         if votes:
             roll_calls_fetched += _sync_bill_votes(
