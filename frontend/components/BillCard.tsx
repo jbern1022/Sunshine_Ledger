@@ -92,6 +92,14 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 <span>{bill.chamber}</span>
               </>
             )}
+            {/* Special-session bills reuse regular-session numbers (the 2026
+                budget is H5001 in both), so name the session on the card. */}
+            {bill.session.includes("Special Session") && (
+              <>
+                <span>·</span>
+                <span>{bill.session}</span>
+              </>
+            )}
           </div>
           {/* Render the bill number verbatim. This used to strip a
               " (DEMO)" suffix, which meant seeded sample bills displayed
