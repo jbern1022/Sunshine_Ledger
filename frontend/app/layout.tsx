@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
             <Link href="/" className="flex items-center gap-2">
               <span className="text-xl font-bold text-ledger-900">Sunshine Ledger</span>
-              <span className="rounded bg-sunshine-100 px-2 py-0.5 text-xs font-medium text-sunshine-600">
+              <span className="rounded bg-sunshine-100 px-2 py-0.5 text-xs font-medium text-sunshine-700">
                 FLORIDA · MVP
               </span>
             </Link>
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-5xl px-4 py-8 text-xs text-slate-400">
+        <footer className="mx-auto max-w-5xl px-4 py-8 text-xs text-slate-500">
           Bernal Labs · Sunshine Ledger MVP. Bill data from LegiScan (Florida), Legistar (Jacksonville), and
           Granicus iQM2 (Miami). Every claim links to a source. Informational only, not legal advice.{" "}
           <Link href="/methodology" className="underline hover:text-slate-600">How this works</Link> &middot; <a href="/feed.xml" className="underline hover:text-slate-600">RSS</a> &middot; <Link href="/privacy" className="underline hover:text-slate-600">Privacy &amp; Terms</Link> &middot; <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-600">Security</a>

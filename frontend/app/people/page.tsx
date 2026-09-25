@@ -76,14 +76,14 @@ export default function PeoplePage() {
       />
 
       {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
-      {!error && loading && <p className="mt-4 text-sm text-slate-400">Loading…</p>}
+      {!error && loading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}
       {!error && !loading && people.length === 0 && (
-        <p className="mt-4 text-sm text-slate-400">No sponsors match that search.</p>
+        <p className="mt-4 text-sm text-slate-500">No sponsors match that search.</p>
       )}
 
       {!error && !loading && people.length > 0 && (
         <>
-          <p className="mt-4 text-xs text-slate-400">
+          <p className="mt-4 text-xs text-slate-500">
             {total} sponsor{total === 1 ? "" : "s"}
             {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
           </p>
@@ -93,11 +93,11 @@ export default function PeoplePage() {
                 <div>
                   <Link
                     href={`/people/${p.entity_id}`}
-                    className="text-sm font-medium text-sunshine-600 underline"
+                    className="text-sm font-medium text-sunshine-700 underline"
                   >
                     {p.name}
                   </Link>
-                  <span className="ml-2 text-xs text-slate-400">
+                  <span className="ml-2 text-xs text-slate-500">
                     {[p.role, p.district, p.party].filter(Boolean).join(" · ")}
                   </span>
                 </div>
@@ -117,7 +117,7 @@ export default function PeoplePage() {
               >
                 ← Previous
               </button>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 Page {currentPage} of {totalPages}
               </span>
               <button

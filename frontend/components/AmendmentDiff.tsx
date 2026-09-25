@@ -30,13 +30,13 @@ export default function AmendmentDiff({ baseText, amendedText }: { baseText: str
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="text-xs font-medium text-sunshine-600 underline hover:text-sunshine-500"
+        className="text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
       >
         {expanded ? "Hide changes" : "View changes"}
       </button>
       {expanded && (
         <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3">
-          <p className="mb-2 text-[11px] text-slate-400">
+          <p className="mb-2 text-[11px] text-slate-500">
             Diffed against the bill&apos;s current stored text, not necessarily the version
             immediately before this amendment — see caveat in source. Added text is highlighted,
             removed text is struck through.
