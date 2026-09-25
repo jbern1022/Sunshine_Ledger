@@ -171,7 +171,8 @@ bill it fetches fresh detail for (`sync_votes=True` by default — pass
 `sync_votes=False` to skip it). Bills already ingested before this feature
 existed won't be revisited by that (their `change_hash` already matches, so
 `ingest_state_bills` skips the `getBill` call entirely). The same applies to
-amendment timeline entries. Backfill both explicitly with
+amendment timeline entries and the action history (filed, referred, passed,
+signed). Backfill all three explicitly with
 `sync_state_bill_history`:
 
 ```bash

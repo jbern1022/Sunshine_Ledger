@@ -6,7 +6,7 @@ getBill shape matches HB 1389 as fetched live on 2026-09-25 (3 amendments,
 from sqlalchemy import select
 
 from app.models import Entity, Event
-from app.pipeline.legiscan import sync_state_bill_history
+from app.pipeline.legiscan import sync_bill_actions, sync_state_bill_history
 
 
 class FakeLegiScanClient:
@@ -30,7 +30,18 @@ class FakeLegiScanClient:
         return [{"people_id": 1, "name": "Mike Redondo", "district": "HD-118", "role": "Rep", "party": "R"}]
 
 
+HISTORY = [
+    {"date": "2026-01-09", "action": "Filed", "chamber": "H", "chamber_id": 27, "importance": 1},
+    {"date": "2026-01-13", "action": "1st Reading (Original Filed Version)", "chamber": "H",
+     "chamber_id": 27, "importance": 0},
+    {"date": "2026-01-15", "action": "Referred to Housing, Agriculture & Tourism Subcommittee",
+     "chamber": "H", "chamber_id": 27, "importance": 1},
+    {"date": "2026-06-26", "action": "Approved by Governor", "chamber": "", "chamber_id": 0,
+     "importance": 1},
+]
+
 HB1389 = {
+    "history": HISTORY,
     "amendments": [
         {"amendment_id": 208403, "adopted": 0, "chamber": "H", "date": "2026-02-10",
          "title": "House Committee Amendment #208403", "description": ""},
@@ -82,6 +93,7 @@ def test_stores_amendments_and_votes_from_one_getbill_call(db_session):
         False, False, True,
     ]
     assert len(events(db_session, bill, "vote")) == 2
+    assert len(events(db_session, bill, "action")) == 4
     assert bill.external_ids["legiscan_history_hash"] == "abc"
 
 
@@ -119,3 +131,68 @@ def test_limit_caps_the_bills_fetched(db_session):
 
     assert processed == 1
     assert len(client.get_bill_calls) == 1
+
+
+def test_sync_bill_actions_maps_chambers_and_keeps_order(db_session):
+    bill = make_state_bill(db_session, "2044116")
+
+    assert sync_bill_actions(db_session, bill_entity=bill, history=HISTORY) == 4
+
+    actions = sorted(events(db_session, bill, "action"), key=lambda e: e.attributes["seq"])
+    assert [a.title for a in actions] == [
+        "Filed",
+        "1st Reading (Original Filed Version)",
+        "Referred to Housing, Agriculture & Tourism Subcommittee",
+        "Approved by Governor",
+    ]
+    assert [a.attributes["chamber"] for a in actions] == ["House", "House", "House", None]
+    assert [a.attributes["importance"] for a in actions] == [True, False, True, True]
+
+
+def test_sync_bill_actions_is_idempotent_and_appends_new_entries(db_session):
+    bill = make_state_bill(db_session, "2044116")
+    sync_bill_actions(db_session, bill_entity=bill, history=HISTORY[:2])
+
+    assert sync_bill_actions(db_session, bill_entity=bill, history=HISTORY[:2]) == 0
+    assert sync_bill_actions(db_session, bill_entity=bill, history=HISTORY) == 2
+    assert len(events(db_session, bill, "action")) == 4
+
+
+def test_sync_bill_actions_keeps_a_genuinely_repeated_action(db_session):
+    bill = make_state_bill(db_session, "2044116")
+    referral = {"date": "2026-01-15", "action": "Referred to Rules", "chamber": "S", "importance": 1}
+
+    assert sync_bill_actions(db_session, bill_entity=bill, history=[referral, referral]) == 2
+    assert sync_bill_actions(db_session, bill_entity=bill, history=[referral, referral]) == 0
+
+
+def test_sync_bill_actions_skips_entries_without_date_or_text(db_session):
+    bill = make_state_bill(db_session, "2044116")
+    history = [{"date": "", "action": "Filed"}, {"date": "2026-01-09", "action": "  "}]
+
+    assert sync_bill_actions(db_session, bill_entity=bill, history=history) == 0
+
+
+def test_nightly_ingest_stores_history_and_marks_the_bill_synced(monkeypatch, db_session):
+    import app.pipeline.legiscan as legiscan_module
+
+    class IngestClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_master_list(self, state):
+            return [{"bill_id": 2044116, "number": "HB 1389", "change_hash": "eea7", "status": "4"}]
+
+        def get_bill(self, bill_id):
+            return {"bill_id": bill_id, "bill_number": "H1389", "title": "Affordable Housing", "status": 4,
+                    "session": {"session_name": "2026 Regular Session"}, "sponsors": [], "votes": [],
+                    "history": HISTORY, "amendments": HB1389["amendments"]}
+
+    monkeypatch.setattr(legiscan_module, "LegiScanClient", IngestClient)
+
+    legiscan_module.ingest_state_bills(db_session, state="FL")
+
+    bill = db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalar_one()
+    assert len(events(db_session, bill, "action")) == 4
+    assert len(events(db_session, bill, "AMENDED")) == 3
+    assert bill.external_ids["legiscan_history_hash"] == "eea7"
