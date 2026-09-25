@@ -155,3 +155,19 @@ def test_classify_prompt_names_the_kind_of_legislation():
                                       kind=STATE_KIND) == ["housing"]
     assert "a piece of Florida state legislation" in Recording.prompt
     assert "local government" not in Recording.prompt
+
+
+def test_governance_is_dropped_when_a_specific_topic_was_chosen():
+    class Answer:
+        def generate(self, prompt):
+            return '["governance", "housing"]'
+
+    assert classify_local_bill_topics("Affordable Housing", "", client=Answer()) == ["housing"]
+
+
+def test_governance_alone_is_kept():
+    class Answer:
+        def generate(self, prompt):
+            return '["governance"]'
+
+    assert classify_local_bill_topics("Council Rules", "", client=Answer()) == ["governance"]

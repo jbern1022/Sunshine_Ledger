@@ -106,6 +106,14 @@ def classify_local_bill_topics(
         else:
             logger.warning("Ollama returned an unrecognized tag slug %r for bill %r; dropping it", item, title)
 
+    # The prompt says to pick "governance" only when nothing more specific
+    # applies, but llama3.1:8b adds it alongside a specific topic most of
+    # the time (465 of 651 local bills, 13 of 21 sampled state bills on
+    # 2026-09-25), which puts a meaningless Governance badge on most bills.
+    # Enforce the rule here.
+    if len(slugs) > 1 and "governance" in slugs:
+        slugs.remove("governance")
+
     return slugs or list(GOVERNANCE_FALLBACK)
 
 
