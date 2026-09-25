@@ -122,6 +122,16 @@ describe("BillCard", () => {
     expect(screen.queryByRole("link", { name: /housing|taxes/i })).not.toBeInTheDocument();
   });
 
+  it("names a special session, whose bill numbers repeat regular-session ones", () => {
+    render(<BillCard bill={{ ...baseBill, session: "2026 Fifth Special Session" }} />);
+    expect(screen.getByText("2026 Fifth Special Session")).toBeInTheDocument();
+  });
+
+  it("does not label regular-session bills with their session", () => {
+    render(<BillCard bill={baseBill} />);
+    expect(screen.queryByText("2026 Regular Session")).not.toBeInTheDocument();
+  });
+
   it("shows an error state if flag submission fails", async () => {
     vi.mocked(api.submitFlag).mockRejectedValueOnce(new Error("network error"));
     const user = userEvent.setup();
