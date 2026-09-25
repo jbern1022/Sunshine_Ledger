@@ -32,6 +32,57 @@ def test_legistar_pypdf_cleanup_handles_page_number_restart():
     )
 
 
+# Raw pypdf text of Ordinance 2026-619 (lines 0-27): "Introduced" split in
+# two, whitespace-only lines between numbered lines, and numbers glued to
+# the text ("AN16", "-212", "DATE.18").
+LEGISTAR_GLUED_NUMBERS = (
+    "Int\n"
+    "roduced by the Land Use and Zoning Committee: 1 \n"
+    "2\n"
+    " \n"
+    "3\n"
+    " \n"
+    "ORDINANCE 2026-619 4 \n"
+    "BAKER, FROM COMMERCIAL COMMUNITY/GENERAL-1 (CCG-5 \n"
+    "ISTRICT TO  COMMERCIAL COMMUNITY/GENERAL -26 \n"
+    "(CCG-2) DISTRICT, AS DEFINED AND CLASSIFIED UNDER7 \n"
+    "THE ZONING CODE, PURSUANT TO APPLICATION NUMBER8\n"
+    " \n"
+    "GRANTED HEREIN SHALL NOT BE CONSTRUED AS AN9 \n"
+    "EXEMPTION FROM ANY OTHER APPLICABLE LAW S;10\n"
+    " \n"
+    "PROVIDING AN EFFECTIVE DATE.11 \n"
+    "12\n"
+    " \n"
+    "WHEREAS, the Planning and Development Department has considered 13 \n"
+    "the 2045 Comprehensive Plan 14\n"
+)
+
+
+def test_legistar_pypdf_cleanup_handles_blank_lines_and_glued_numbers():
+    out = clean_legislative_text(strip_page_artifacts(LEGISTAR_GLUED_NUMBERS))
+    assert out == (
+        "Introduced by the Land Use and Zoning Committee:\n"
+        "ORDINANCE 2026-619\n"
+        "BAKER, FROM COMMERCIAL COMMUNITY/GENERAL-1 (CCG-\n"
+        "ISTRICT TO  COMMERCIAL COMMUNITY/GENERAL -2\n"
+        "(CCG-2) DISTRICT, AS DEFINED AND CLASSIFIED UNDER\n"
+        "THE ZONING CODE, PURSUANT TO APPLICATION NUMBER\n"
+        "GRANTED HEREIN SHALL NOT BE CONSTRUED AS AN\n"
+        "EXEMPTION FROM ANY OTHER APPLICABLE LAW S;\n"
+        "PROVIDING AN EFFECTIVE DATE.\n"
+        "WHEREAS, the Planning and Development Department has considered\n"
+        "the 2045 Comprehensive Plan"
+    )
+
+
+def test_glued_number_only_counts_inside_a_run():
+    # Text that merely ends in digits, outside any numbered run, stays.
+    text = "Section 5. The fee shall be $25\nunder Schedule A-4\nand ORDINANCE12"
+    assert strip_page_artifacts(text) == text
+    assert strip_page_artifacts("Int\nerest accrues") == "Int\nerest accrues"
+
+
 def test_clean_stored_text_drops_page_header_between_added_blocks():
     stored = (
         "Section 3. [added: (1)(a) The agency shall contract with a state university. "

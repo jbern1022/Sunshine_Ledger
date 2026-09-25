@@ -28,6 +28,25 @@ _TRAILING_LINE_NUMBER = re.compile(r"^(.*?)\s*(?<![\d.,$])\b(\d{1,3})\s*$")
 # number only counts as a line number inside a run of at least this many
 # lines numbered n, n+1, n+2, ... -- one stray trailing number is text.
 _MIN_LINE_NUMBER_RUN = 3
+# pypdf splits the first word of Jacksonville ordinances across two lines
+# ("In" / "troduced by Council Member ...").
+_SPLIT_INTRODUCED = re.compile(r"^(In?t?r?)\n(n?t?r?oduced)\b", re.MULTILINE)
+
+
+def _line_number_at_end(line: str, expected: int) -> int | None:
+    """Length of margin line number `expected` at the end of `line`, or None.
+
+    Within a run the number also counts when pypdf glued it to the text
+    ("EFFECTIVE DATE.18", or "GENERAL -212" for line 12): mid-run, text
+    ending in exactly the next line number is a negligible coincidence.
+    """
+    m = _TRAILING_LINE_NUMBER.match(line)
+    if m and int(m.group(2)) == expected:
+        return len(line) - len(m.group(1))
+    stripped = line.rstrip()
+    if stripped.endswith(str(expected)):
+        return len(line) - len(stripped) + len(str(expected))
+    return None
 
 
 def strip_page_artifacts(text: str) -> str:
@@ -37,29 +56,43 @@ def strip_page_artifacts(text: str) -> str:
     number is only removed as a line number when it sits in a run of
     consecutively numbered lines, so ordinary text ending in a number
     ("... effective July 1, 2027", "subsection (2)") is left alone.
+    Whitespace-only lines, which pypdf puts between Jacksonville's
+    numbered lines, don't break a run.
     """
+    text = _SPLIT_INTRODUCED.sub(
+        lambda m: "Introduced" if m.group(1) + m.group(2) == "Introduced" else m.group(0), text
+    )
     lines = [l for l in text.split("\n") if not _PAGE_FURNITURE_LINE.match(l)]
-    numbers: list[int | None] = []
-    for line in lines:
-        m = _TRAILING_LINE_NUMBER.match(line)
-        numbers.append(int(m.group(2)) if m else None)
-    strip = [False] * len(lines)
+    cut = [0] * len(lines)  # characters to drop from the end of each line
     i = 0
     while i < len(lines):
-        if numbers[i] is None:
+        m = _TRAILING_LINE_NUMBER.match(lines[i])
+        if not m:
             i += 1
             continue
-        j = i
-        while j + 1 < len(lines) and numbers[j + 1] is not None and numbers[j + 1] == numbers[j] + 1:
+        run = [(i, len(lines[i]) - len(m.group(1)))]
+        n = int(m.group(2))
+        j = i + 1
+        while j < len(lines):
+            if not lines[j].strip():
+                j += 1
+                continue
+            length = _line_number_at_end(lines[j], n + 1)
+            if length is None:
+                break
+            run.append((j, length))
+            n += 1
             j += 1
-        if j - i + 1 >= _MIN_LINE_NUMBER_RUN:
-            for k in range(i, j + 1):
-                strip[k] = True
-        i = j + 1
+        if len(run) >= _MIN_LINE_NUMBER_RUN:
+            for k, length in run:
+                cut[k] = length
+            i = run[-1][0] + 1
+        else:
+            i += 1
     out = []
-    for line, drop in zip(lines, strip):
-        if drop:
-            line = _TRAILING_LINE_NUMBER.match(line).group(1)
+    for line, length in zip(lines, cut):
+        if length:
+            line = line[: len(line) - length].rstrip()
             if not line.strip():
                 continue
         out.append(line)
