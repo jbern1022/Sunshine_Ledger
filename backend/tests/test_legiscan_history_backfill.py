@@ -196,3 +196,36 @@ def test_nightly_ingest_stores_history_and_marks_the_bill_synced(monkeypatch, db
     assert len(events(db_session, bill, "action")) == 4
     assert len(events(db_session, bill, "AMENDED")) == 3
     assert bill.external_ids["legiscan_history_hash"] == "eea7"
+
+
+def test_backfill_stores_new_staff_analyses_from_the_same_getbill(monkeypatch, db_session):
+    import base64
+
+    import app.pipeline.staff_analysis as staff_module
+    from app.models import StaffAnalysis
+
+    monkeypatch.setattr(staff_module, "extract_analysis_pdf_text", lambda raw: "Analysis text")
+    bill = make_state_bill(db_session, "2044116")
+    db_session.add(StaffAnalysis(entity_id=bill.id, legiscan_supplement_id=500, source_url="https://x", text="old"))
+    db_session.flush()
+    supplements = [
+        {"supplement_id": 500, "title": "Analysis", "description": "Housing Subcommittee"},  # stored already
+        {"supplement_id": 501, "title": "Analysis", "description": "Commerce Committee", "date": "2026-02-24",
+         "state_link": "https://flsenate.gov/a.pdf"},
+        {"supplement_id": 502, "title": "Vote Record", "description": "not an analysis"},
+    ]
+    client = FakeLegiScanClient({2044116: {**HB1389, "supplements": supplements}})
+    fetched_docs = []
+    client.get_supplement = lambda sid: fetched_docs.append(sid) or {
+        "mime": "application/pdf", "doc": base64.b64encode(b"%PDF").decode()
+    }
+
+    sync_state_bill_history(db_session, state="FL", client=client)
+
+    assert fetched_docs == [501]
+    stored = db_session.execute(
+        select(StaffAnalysis).where(StaffAnalysis.legiscan_supplement_id == 501)
+    ).scalar_one()
+    assert stored.committee == "Commerce Committee"
+    assert stored.text == "Analysis text"
+    assert len(events(db_session, bill, "AMENDED")) == 3  # committed before the analysis step

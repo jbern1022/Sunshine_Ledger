@@ -616,8 +616,9 @@ def sync_state_bill_history(
     something folded into the nightly job).
 
     Costs one getBill call per bill (its response carries the amendments,
-    history and votes arrays) plus one getRollCall call per roll call
-    not already recorded. Each bill is marked with the change_hash it was
+    history, votes and supplements arrays) plus one getRollCall call per
+    roll call and one getSupplement call per staff analysis not already
+    stored. Each bill is marked with the change_hash it was
     synced at (`legiscan_history_hash`), so an interrupted or repeated run
     skips bills already done instead of paying for them again. Pass `limit`
     to test on a small batch first: at ~1,900 bills this is a meaningful
@@ -625,7 +626,10 @@ def sync_state_bill_history(
 
     Returns (bills_processed, roll_calls_fetched).
     """
-    from app.pipeline.amendments import sync_bill_amendments  # circular import, see ingest_state_bills
+    # Imported here: both modules import this one (see ingest_state_bills).
+    from app.models import StaffAnalysis
+    from app.pipeline.amendments import sync_bill_amendments
+    from app.pipeline.staff_analysis import store_new_staff_analyses
 
     state = state or settings.legiscan_state
     client = client or LegiScanClient()
@@ -643,8 +647,11 @@ def sync_state_bill_history(
         bill_entities = bill_entities[:limit]
     people_by_id = _build_people_by_id(client, state) if fetch_individual and bill_entities else {}
 
+    known_analysis_ids = {row[0] for row in db.execute(select(StaffAnalysis.legiscan_supplement_id))}
+
     bills_processed = 0
     roll_calls_fetched = 0
+    analyses_fetched = 0
 
     for entity in bill_entities:
         legiscan_bill_id = int(entity.external_ids["legiscan_id"])
@@ -669,11 +676,17 @@ def sync_state_bill_history(
             "legiscan_history_hash": entity.external_ids.get("legiscan_change_hash"),
         }
         db.commit()
+        # After the commit: this helper commits or rolls back on its own.
+        analyses_fetched += store_new_staff_analyses(
+            db, client, entity=entity, supplements=detail.get("supplements") or [],
+            known_ids=known_analysis_ids,
+        )[0]
 
     logger.info(
-        "Bill history backfill: checked %d bills, fetched %d new roll calls (state=%s)",
+        "Bill history backfill: checked %d bills, fetched %d new roll calls and %d new staff analyses (state=%s)",
         bills_processed,
         roll_calls_fetched,
+        analyses_fetched,
         state,
     )
     return bills_processed, roll_calls_fetched
