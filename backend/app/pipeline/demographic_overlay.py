@@ -40,8 +40,10 @@ logger = logging.getLogger(__name__)
 ACS_BASE_URL = "https://api.census.gov/data/{year}/acs/acs5"
 BLS_SERIES_URL = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
 
-# Most recent 5-year ACS vintage available at write time (2026-09-15).
-ACS_YEAR = "2022"
+# Most recent 5-year ACS vintage (2020-2024 estimates; checked 2026-09-25,
+# when 2025 was not yet published). The Census Bureau releases the next one
+# each December: bump this, then rerun `python -m app.pipeline.demographic_overlay`.
+ACS_YEAR = "2024"
 
 FL_STATE_FIPS = "12"
 

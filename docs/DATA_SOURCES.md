@@ -104,9 +104,12 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
 - **Module:** `backend/app/pipeline/demographic_overlay.py`.
 - **Cadence:** a batch loader (`python -m app.pipeline.demographic_overlay`)
   meant to run after each annual ACS release; BLS updates monthly.
-- **Coverage (2026-09-25):** BLS county unemployment loaded for Duval
-  (5.0%, July 2026) and Miami-Dade (2.7%, August 2026). **ACS is not
-  loaded:** it needs `CENSUS_API_KEY`, which isn't set in production.
+- **Coverage (2026-09-25):** ACS 2024 5-year estimates for Housing and
+  Infrastructure/Transportation in all 160 state legislative districts and
+  in Duval and Miami-Dade counties; BLS county unemployment for Duval
+  (5.0%, July 2026) and Miami-Dade (2.7%, August 2026). `CENSUS_API_KEY`
+  is in the production env. Bump `ACS_YEAR` each December when the next
+  5-year release comes out.
 - **Terms:** public domain. Census requires the notice "This product uses
   the Census Bureau Data API but is not endorsed or certified by the
   Census Bureau."
