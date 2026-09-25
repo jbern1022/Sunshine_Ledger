@@ -180,7 +180,13 @@ signed). Backfill all three explicitly with
 # before running the full corpus.
 docker compose exec backend python -m app.pipeline.legiscan --sync-history --limit 20
 
-# Full corpus (~1,900 bills): one getBill call per bill plus one getRollCall
+# Preferred: read bills and roll calls from the session's LegiScan dataset
+# zip -- 2 API calls for the whole session instead of one per bill (see
+# backend/app/pipeline/legiscan_dataset.py). Only staff-analysis documents
+# and bills outside that session still hit the API.
+docker compose exec backend python -m app.pipeline.legiscan --sync-history --from-dataset "2026 Regular Session"
+
+# Without a dataset (~1,900 bills): one getBill call per bill plus one getRollCall
 # call per not-yet-recorded roll call. Each bill is marked with the
 # change_hash it was synced at, so a partial or repeated run skips bills
 # already done. LegiScan's free tier is 30,000 queries/month until

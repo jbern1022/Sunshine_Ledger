@@ -715,12 +715,32 @@ if __name__ == "__main__":
         help="Backfill amendments and roll-call votes for already-ingested bills (costs API quota).",
     )
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--from-dataset",
+        metavar="SESSION_NAME",
+        help=(
+            'With --sync-history: read bills and roll calls from that session\'s LegiScan '
+            'dataset (e.g. "2026 Regular Session"; 2 API calls) instead of one call per bill.'
+        ),
+    )
     args = parser.parse_args()
     if not args.sync_history:
         parser.error("nothing to do: pass --sync-history")
     session = SessionLocal()
     try:
-        bills, roll_calls = sync_state_bill_history(session, limit=args.limit)
-        print(f"Done: {bills} bills checked, {roll_calls} new roll calls fetched.")
+        client = None
+        if args.from_dataset:
+            from app.pipeline.legiscan_dataset import DatasetClient, fetch_session_dataset
+
+            api = LegiScanClient()
+            client = DatasetClient(
+                fetch_session_dataset(api, settings.legiscan_state, args.from_dataset), fallback=api
+            )
+            print(f"Dataset: {len(client.bills)} bills, {len(client.roll_calls)} roll calls, "
+                  f"{len(client.people)} legislators.")
+        bills, roll_calls = sync_state_bill_history(session, limit=args.limit, client=client)
+        print(f"Done: {bills} bills checked, {roll_calls} new roll calls stored.")
+        if client is not None:
+            print(f"API calls beyond the dataset download: {client.fallback_calls}.")
     finally:
         session.close()
