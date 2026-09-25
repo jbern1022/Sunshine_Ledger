@@ -406,7 +406,13 @@ def _get_or_create_bill_entity(db: Session, *, legiscan_bill_id: int) -> Entity 
 
 
 def ingest_state_bills(
-    db: Session, *, state: str | None = None, limit: int | None = None, sync_votes: bool = True
+    db: Session,
+    *,
+    state: str | None = None,
+    limit: int | None = None,
+    sync_votes: bool = True,
+    client: LegiScanClient | None = None,
+    master_list: list[dict] | None = None,
 ) -> list[Entity]:
     """Pull the master bill list for `state` and upsert each bill + sponsors + source.
 
@@ -418,12 +424,17 @@ def ingest_state_bills(
     changed bills); see sync_state_bill_history for backfilling the rest of an
     already-ingested corpus.
 
+    `client` and `master_list` let a caller substitute another source for
+    the API's current-session master list -- ingest_session_dataset feeds
+    a whole session from its LegiScan dataset this way.
+
     Returns the list of bill Entities written (new or refreshed).
     """
     state = state or settings.legiscan_state
-    client = LegiScanClient()
+    client = client or LegiScanClient()
 
-    master_list = client.get_master_list(state)
+    if master_list is None:
+        master_list = client.get_master_list(state)
     if limit:
         master_list = master_list[:limit]
 
@@ -583,6 +594,35 @@ def ingest_state_bills(
         len(written),
         state,
         roll_calls_fetched,
+    )
+    return written
+
+
+def ingest_session_dataset(db: Session, *, session_name: str, state: str | None = None) -> list[Entity]:
+    """Ingest every bill of one past session from its LegiScan dataset.
+
+    Nightly ingestion only sees the current session's master list, so
+    sessions it never covered (e.g. the 2026 special sessions) come in this
+    way: 2 API calls for the dataset, then the same ingest_state_bills path
+    as nightly bills (sponsors, tags, amendments, history, roll calls with
+    individual votes), all answered from the dataset. Bill text is separate:
+    run bill_text afterwards (2 calls per new bill).
+    """
+    from app.pipeline.legiscan_dataset import DatasetClient, fetch_session_dataset
+
+    state = state or settings.legiscan_state
+    api = LegiScanClient()
+    client = DatasetClient(fetch_session_dataset(api, state, session_name), fallback=api)
+    master_list = [
+        {"bill_id": bill_id, "change_hash": bill.get("change_hash"), "number": bill.get("bill_number"),
+         "title": bill.get("title"), "url": bill.get("state_link") or bill.get("url") or "",
+         "status": bill.get("status")}
+        for bill_id, bill in sorted(client.bills.items())
+    ]
+    written = ingest_state_bills(db, state=state, client=client, master_list=master_list)
+    logger.info(
+        "%s: %d bills in dataset, %d written, %d API calls beyond the dataset",
+        session_name, len(master_list), len(written), client.fallback_calls,
     )
     return written
 
@@ -753,9 +793,26 @@ if __name__ == "__main__":
             'dataset (e.g. "2026 Regular Session"; 2 API calls) instead of one call per bill.'
         ),
     )
+    parser.add_argument(
+        "--ingest-dataset",
+        metavar="SESSION_NAME",
+        action="append",
+        help='Ingest every bill of a past session from its LegiScan dataset (repeatable), '
+             'e.g. "2026 Fourth Special Session". 2 API calls per session.',
+    )
     args = parser.parse_args()
+    if args.ingest_dataset:
+        session = SessionLocal()
+        try:
+            for name in args.ingest_dataset:
+                written = ingest_session_dataset(session, session_name=name)
+                print(f"{name}: {len(written)} bills written.")
+        finally:
+            session.close()
+            print(api_usage_summary())
+        raise SystemExit(0)
     if not args.sync_history:
-        parser.error("nothing to do: pass --sync-history")
+        parser.error("nothing to do: pass --sync-history or --ingest-dataset")
     session = SessionLocal()
     try:
         client = None

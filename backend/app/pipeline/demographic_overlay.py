@@ -24,6 +24,7 @@ treat "no row found" as "no overlay for this badge," not an error.
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 import httpx
 from sqlalchemy import select
@@ -299,7 +300,7 @@ def load_bls_county_unemployment(db: Session, *, year: str, client: BLSClient | 
     return count
 
 
-def load_all_overlays(db: Session, *, bls_year: str = "2024") -> dict[str, int]:
+def load_all_overlays(db: Session, *, bls_year: str | None = None) -> dict[str, int]:
     """Batch entry point: populate every overlay this module knows how to
     build. Safe to re-run -- _store_overlay upserts by the unique key."""
     results = {
@@ -311,7 +312,10 @@ def load_all_overlays(db: Session, *, bls_year: str = "2024") -> dict[str, int]:
         "acs_county_infrastructure_transportation": load_acs_county_overlays(
             db, badge_slug="infrastructure_transportation"
         ),
-        "bls_county_labor_employment": load_bls_county_unemployment(db, year=bls_year),
+        # Latest month available: the current year's series, or last year's
+        # early in January before the first release.
+        "bls_county_labor_employment": load_bls_county_unemployment(db, year=bls_year or str(date.today().year))
+        or load_bls_county_unemployment(db, year=str(date.today().year - 1)),
     }
     logger.info("Demographic overlay batch load complete: %s", results)
     return results

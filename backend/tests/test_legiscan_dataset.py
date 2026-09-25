@@ -97,3 +97,31 @@ def test_bill_missing_from_the_dataset_falls_back_to_the_api(db_session):
 
     assert api.calls == [("getBill", 999)]
     assert client.fallback_calls == 1
+
+
+def test_ingest_session_dataset_creates_bills_with_everything_from_the_zip(monkeypatch, db_session):
+    import app.pipeline.legiscan as legiscan_module
+    import app.pipeline.legiscan_dataset as dataset_module
+    from app.models import Bill
+
+    special = {**BILL, "bill_id": 2100001, "bill_number": "H0001B", "title": "Property Tax Relief",
+               "status": 4, "session": {"session_id": 2259, "session_name": "2026 Fourth Special Session"},
+               "sponsors": [{"people_id": 1622, "name": "Mike Redondo", "sponsor_type_id": 1}]}
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("FL/2026-2026_4th_Special_Session/bill/H0001B.json", json.dumps({"bill": special}))
+        z.writestr("FL/2026-2026_4th_Special_Session/vote/1700001.json", json.dumps({"roll_call": ROLL_CALL}))
+        z.writestr("FL/2026-2026_4th_Special_Session/people/Mike_Redondo.json", json.dumps({"person": PERSON}))
+    api = RecordingApi()
+    monkeypatch.setattr(legiscan_module, "LegiScanClient", lambda *a, **k: api)
+    monkeypatch.setattr(dataset_module, "fetch_session_dataset", lambda client, state, name: buf.getvalue())
+
+    written = legiscan_module.ingest_session_dataset(db_session, session_name="2026 Fourth Special Session", state="FL")
+
+    assert len(written) == 1
+    bill = db_session.execute(select(Bill).where(Bill.bill_number == "H0001B")).scalar_one()
+    assert bill.session == "2026 Fourth Special Session"
+    assert bill.introduced_date is not None
+    types = sorted(e.event_type for e in db_session.execute(select(Event).where(Event.entity_id == bill.entity_id)).scalars())
+    assert types == ["AMENDED", "action", "vote"]
+    assert api.calls == []  # everything came from the dataset
