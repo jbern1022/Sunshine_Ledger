@@ -169,6 +169,65 @@ def _build_people_by_id(client: LegiScanClient, state: str, *, sessions: int = 2
     return people
 
 
+ACTION_CHAMBERS = {"H": "House", "S": "Senate"}
+
+
+def sync_bill_actions(db: Session, *, bill_entity: Entity, history: list[dict]) -> int:
+    """Store LegiScan's action history (getBill `history`) as `action` Events.
+
+    The raw material for a "how it became law" timeline: filed, referred,
+    reported by committee, passed, signed, chaptered. Shape verified
+    2026-09-25 against HB 1389 (55 entries): {date, action, chamber ("H",
+    "S", or "" for governor/chapter steps), chamber_id, importance (0/1)}.
+
+    Append-only and idempotent. An entry is identified by (date, chamber,
+    action) plus how many times that same triple occurred before it, so a
+    bill that is really referred to the same committee twice keeps both,
+    and re-running against an unchanged history writes nothing. `seq`
+    keeps LegiScan's order among same-day entries.
+
+    Returns the number of new events written.
+    """
+    seen: dict[tuple, int] = {}
+    for e in db.execute(
+        select(Event).where(Event.entity_id == bill_entity.id, Event.event_type == "action")
+    ).scalars():
+        key = (e.event_date.isoformat(), e.attributes.get("chamber"), e.title)
+        seen[key] = seen.get(key, 0) + 1
+
+    written = 0
+    occurrences: dict[tuple, int] = {}
+    for seq, entry in enumerate(history):
+        action_date = _parse_date(entry.get("date"))
+        action = (entry.get("action") or "").strip()
+        if action_date is None or not action:
+            continue
+        chamber = ACTION_CHAMBERS.get(entry.get("chamber") or "")
+        title = action[:500]
+        key = (action_date.isoformat(), chamber, title)
+        occurrences[key] = occurrences.get(key, 0) + 1
+        if occurrences[key] <= seen.get(key, 0):
+            continue
+        db.add(
+            Event(
+                entity_id=bill_entity.id,
+                event_type="action",
+                event_date=action_date,
+                title=title,
+                attributes={
+                    "chamber": chamber,
+                    "importance": bool(entry.get("importance")),
+                    "seq": seq,
+                },
+            )
+        )
+        written += 1
+
+    if written:
+        db.flush()
+    return written
+
+
 def _sync_bill_votes(
     db: Session,
     *,
@@ -376,6 +435,10 @@ def ingest_state_bills(
             "legiscan_id": str(legiscan_bill_id),
             "legiscan_change_hash": row_change_hash,
         }
+        if sync_votes:
+            # This pass syncs amendments, history and votes from `detail`,
+            # so sync_state_bill_history has nothing left to fetch for it.
+            entity.external_ids = {**entity.external_ids, "legiscan_history_hash": row_change_hash}
         db.flush()
 
         source = Source(
@@ -426,6 +489,7 @@ def ingest_state_bills(
         from app.pipeline.amendments import sync_bill_amendments
 
         sync_bill_amendments(db, bill_entity=entity, amendments=detail.get("amendments", []))
+        sync_bill_actions(db, bill_entity=entity, history=detail.get("history") or [])
 
         for sponsor in detail.get("sponsors", []):
             person = _get_or_create_person(
@@ -545,14 +609,14 @@ def sync_state_bill_history(
     fetch_individual: bool = True,
     client: LegiScanClient | None = None,
 ) -> tuple[int, int]:
-    """Backfill amendments and roll-call votes for bills already in the DB
-    that `ingest_state_bills` will never revisit, because their change_hash
+    """Backfill amendments, action history and roll-call votes for bills
+    already in the DB that `ingest_state_bills` will never revisit, because their change_hash
     already matches (that skip exists specifically to protect the API quota,
     so this is a deliberate, explicit, one-time-per-bill re-fetch rather than
     something folded into the nightly job).
 
-    Costs one getBill call per bill (its response carries both the
-    amendments and the votes arrays) plus one getRollCall call per roll call
+    Costs one getBill call per bill (its response carries the amendments,
+    history and votes arrays) plus one getRollCall call per roll call
     not already recorded. Each bill is marked with the change_hash it was
     synced at (`legiscan_history_hash`), so an interrupted or repeated run
     skips bills already done instead of paying for them again. Pass `limit`
@@ -588,6 +652,7 @@ def sync_state_bill_history(
         bills_processed += 1
 
         sync_bill_amendments(db, bill_entity=entity, amendments=detail.get("amendments") or [])
+        sync_bill_actions(db, bill_entity=entity, history=detail.get("history") or [])
         votes = detail.get("votes") or []
         if votes:
             roll_calls_fetched += _sync_bill_votes(
