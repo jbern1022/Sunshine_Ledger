@@ -63,23 +63,7 @@ COMPOSE=(docker --context "$DOCKER_CONTEXT" compose -p "$PROJECT_NAME" -f "$COMP
 echo "==> Building backend + frontend..."
 "${COMPOSE[@]}" build backend frontend
 
-# Migration check: the database must already be at the revision the new code
-# expects. Revisions come from the image just built, so a migration added in
-# this push is seen. To ship one: let this fail, then run
-#   docker compose ... run --rm backend alembic upgrade head
-# (RUNBOOK "Manual commands"), which uses that same freshly built image, and
-# deploy again.
-revisions() { { grep -oE '^[0-9a-f]{12}' || true; } | sort | tr '\n' ' '; }
-code_heads="$("${COMPOSE[@]}" run --rm --no-deps -T backend alembic heads 2>/dev/null | revisions)"
-db_current="$("${COMPOSE[@]}" run --rm -T backend alembic current 2>/dev/null | revisions)"
-if [[ -z "$code_heads" || "$code_heads" != "$db_current" ]]; then
-  echo "ERROR: database is at [${db_current:-unknown}] but the new code expects [${code_heads:-unknown}]." >&2
-  echo "       Apply the migration by hand (docs/RUNBOOK.md \"Manual commands\"), then deploy again." >&2
-  exit 1
-fi
-echo "==> Database at expected revision: $code_heads"
-
-# Don't restart the backend under a running pipeline job (the nightly
+# Don't restart anything under a running pipeline job (the nightly
 # ingestion runs its steps with `docker exec ... python -m app.pipeline.X`;
 # recreating the container kills that step mid-run). The bracket in the
 # pattern keeps grep from matching the shell running it.
@@ -96,6 +80,25 @@ if [[ -n "$backend_id" ]]; then
     sleep 60
   done
 fi
+
+# Migration check, after the wait above: the database must already be at the
+# revision the new code expects. Revisions come from the image just built, so
+# a migration added in this push is seen. To ship one: let this fail, then run
+#   docker compose ... run --rm backend alembic upgrade head
+# (RUNBOOK "Manual commands"), which uses that same freshly built image, and
+# deploy again. Both runs use --no-deps: without it `compose run` starts the
+# backend's dependencies, recreating the db container whenever its config
+# changed -- on 2026-09-25 that restarted the database under a running
+# bill-text refresh, before the wait was ever reached.
+revisions() { { grep -oE '^[0-9a-f]{12}' || true; } | sort | tr '\n' ' '; }
+code_heads="$("${COMPOSE[@]}" run --rm --no-deps -T backend alembic heads 2>/dev/null | revisions)"
+db_current="$("${COMPOSE[@]}" run --rm --no-deps -T backend alembic current 2>/dev/null | revisions)"
+if [[ -z "$code_heads" || "$code_heads" != "$db_current" ]]; then
+  echo "ERROR: database is at [${db_current:-unknown}] but the new code expects [${code_heads:-unknown}]." >&2
+  echo "       Apply the migration by hand (docs/RUNBOOK.md \"Manual commands\"), then deploy again." >&2
+  exit 1
+fi
+echo "==> Database at expected revision: $code_heads"
 
 echo "==> Applying..."
 "${COMPOSE[@]}" up -d
