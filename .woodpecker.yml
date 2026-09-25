@@ -1,14 +1,19 @@
-# Woodpecker CI pipeline: auto-build/test on push.
+# Woodpecker CI pipeline: test every push and pull request; deploy main.
 #
-# This repo isn't registered with the Woodpecker server yet -- that's a
-# one-time step in the Woodpecker web UI (Settings -> Add Repository),
-# which needs an authenticated click through the GitHub/Gitea OAuth flow
-# and isn't something that can be done headlessly. Once enabled, this file
-# runs automatically; nothing else needs to change.
+# Registered at https://woodpecker.josephbernal.com (repo joe/Sunshine_Ledger).
 #
-# Scope: build/test verification only, no auto-deploy. Deploys to the
-# live app still go through the manual process in docs/RUNBOOK.md --
-# auto-deploy is a separate decision for later, not bundled in here.
+# Deploy: on a push to main, once backend-tests and frontend-build pass,
+# the deploy step runs scripts/deploy.sh on docker-host itself, against the
+# local Docker socket. The production .env lives on the host at
+# /home/joe/sunshine-ledger/deploy.env (chmod 600) -- not in the repo and not
+# in Woodpecker's secret store -- and is mounted read-only. deploy.sh keeps
+# its guards: public https API URL, database at the revision the code
+# expects (migrations stay manual), no restart under a running pipeline job,
+# post-deploy smoke test. Host mounts need the repo marked Trusted
+# (volumes) in the Woodpecker repo settings.
+#
+# Manual deploys still work the same way: ./scripts/deploy.sh from a Mac
+# checkout (see docs/RUNBOOK.md).
 
 steps:
   - name: backend-tests
@@ -40,6 +45,22 @@ steps:
     when:
       - event: push
       - event: pull_request
+
+  - name: deploy
+    image: docker:27-cli
+    depends_on: [backend-tests, frontend-build]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/joe/sunshine-ledger/deploy.env:/run/secrets/deploy.env:ro
+    environment:
+      DEPLOY_DOCKER_CONTEXT: default
+      DEPLOY_ENV_FILE: /run/secrets/deploy.env
+    commands:
+      - apk add --no-cache bash curl
+      - ./scripts/deploy.sh
+    when:
+      - event: push
+        branch: main
 
 services:
   - name: postgres
