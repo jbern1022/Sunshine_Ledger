@@ -55,10 +55,11 @@ echo "[$(date)] Starting scheduled ingestion run."
 
 step "LegiScan state bills" py "
 from app.db import SessionLocal
-from app.pipeline.legiscan import ingest_state_bills
+from app.pipeline.legiscan import api_usage_summary, ingest_state_bills
 db = SessionLocal()
 written = ingest_state_bills(db)
 print(f'LegiScan: {len(written)} bills changed/new')
+print(api_usage_summary())
 "
 
 step "Legistar (jaxcityc)" py "

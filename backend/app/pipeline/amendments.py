@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.logging_setup import quiet_http_logging
 from app.models import Entity, Event
 from app.pipeline.bill_text import extract_html_text, extract_pdf_text
-from app.pipeline.legiscan import LegiScanClient
+from app.pipeline.legiscan import LegiScanClient, api_usage_summary
 
 logger = logging.getLogger(__name__)
 
@@ -187,3 +187,4 @@ if __name__ == "__main__":
         print(f"Done: {ok} fetched, {bad} skipped/failed.")
     finally:
         session.close()
+        print(api_usage_summary())
