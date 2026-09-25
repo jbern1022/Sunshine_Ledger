@@ -31,7 +31,8 @@ from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
 from app.models import Entity
-from app.models.tag import BillTag
+from app.models.tag import BillTag, Tag
+from app.pipeline.topic_tagging import set_bill_tag_active
 from app.pipeline.topic_tagging_ollama import LOCAL_KIND, STATE_KIND, tag_local_bill
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,33 @@ def select_local_bills_needing_tags(
     return list(db.execute(stmt).scalars().all())
 
 
+def hide_redundant_governance(db, *, apply: bool = False) -> int:
+    """Hide the model-assigned Governance badge on bills that also have a
+    more specific model-assigned badge (the rule the classifier now
+    enforces for new tags). Hidden, not deleted: each change logs a
+    tag_hidden event and can be reversed. Dry run unless `apply`.
+    Returns the number of badges hidden (or that would be)."""
+    rows = db.execute(
+        select(BillTag.bill_entity_id, BillTag.id, Tag.slug)
+        .join(Tag, Tag.id == BillTag.tag_id)
+        .where(BillTag.tag_source == "ollama", BillTag.active.is_(True))
+    ).all()
+    by_bill: dict = {}
+    for bill_id, bill_tag_id, slug in rows:
+        by_bill.setdefault(bill_id, []).append((bill_tag_id, slug))
+    redundant = [
+        bill_tag_id
+        for tags in by_bill.values()
+        if len(tags) > 1
+        for bill_tag_id, slug in tags
+        if slug == "governance"
+    ]
+    if apply:
+        for bill_tag_id in redundant:
+            set_bill_tag_active(db, bill_tag_id, active=False)
+    return len(redundant)
+
+
 def backfill_local_bill_tags(limit: int | None = None, *, include_state: bool = False) -> tuple[int, int]:
     """Returns (succeeded, failed) counts."""
     _check_ollama_reachable()
@@ -132,7 +160,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Also classify state (LegiScan) bills, whose LegiScan subjects are empty.",
     )
+    parser.add_argument(
+        "--hide-redundant-governance",
+        action="store_true",
+        help="Hide model-assigned Governance badges on bills that have a more specific one. Dry run unless --apply.",
+    )
+    parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
+
+    if args.hide_redundant_governance:
+        session = SessionLocal()
+        try:
+            n = hide_redundant_governance(session, apply=args.apply)
+            print(f"{'Hid' if args.apply else 'Would hide'} {n} redundant Governance badges.")
+        finally:
+            session.close()
+        raise SystemExit(0)
 
     ok, bad = backfill_local_bill_tags(limit=args.limit, include_state=args.include_state)
     print(f"\nDone: {ok} tagged, {bad} failed.")

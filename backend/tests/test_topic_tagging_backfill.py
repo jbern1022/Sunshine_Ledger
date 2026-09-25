@@ -75,3 +75,28 @@ def test_state_bills_are_selected_only_with_include_state(db_session, bill_facto
 
     assert select_local_bills_needing_tags(db_session) == []
     assert [e.id for e in select_local_bills_needing_tags(db_session, include_state=True)] == [state_bill.id]
+
+
+def test_hide_redundant_governance_hides_only_alongside_a_specific_badge(db_session, bill_factory, housing_tag):
+    from sqlalchemy import select
+
+    from app.models import Event
+    from app.pipeline.topic_tagging_backfill import hide_redundant_governance
+
+    governance = Tag(slug="governance", label="Governance", active=True)
+    db_session.add(governance)
+    db_session.flush()
+    both = _make_local_bill(db_session, bill_factory, source_key="legistar_matter_id", source_value="1")
+    only_gov = _make_local_bill(db_session, bill_factory, source_key="legistar_matter_id", source_value="2")
+    for bill, tag in [(both, governance), (both, housing_tag), (only_gov, governance)]:
+        db_session.add(BillTag(bill_entity_id=bill.id, tag_id=tag.id, tag_source="ollama", active=True))
+    db_session.commit()
+
+    assert hide_redundant_governance(db_session) == 1  # dry run
+    assert all(t.active for t in db_session.execute(select(BillTag)).scalars())
+
+    assert hide_redundant_governance(db_session, apply=True) == 1
+    active = {(t.bill_entity_id, t.tag.slug) for t in db_session.execute(select(BillTag)).scalars() if t.active}
+    assert active == {(both.id, "housing"), (only_gov.id, "governance")}
+    hidden = db_session.execute(select(Event).where(Event.event_type == "tag_hidden")).scalar_one()
+    assert hidden.entity_id == both.id
