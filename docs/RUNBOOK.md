@@ -23,8 +23,28 @@ says `joe@docker-host` before running any host command in this runbook.
 
 ## Deploy / redeploy
 
-**Standard path: `scripts/deploy.sh`.** Run it from anywhere, on the local
-Mac, with a clean repo checkout:
+**Automatic: every push to `main`.** Woodpecker
+(https://woodpecker.josephbernal.com, repo `joe/Sunshine_Ledger`) runs the
+backend and frontend tests on every push; on a push to `main` that passes
+both, its `deploy` step runs `scripts/deploy.sh` on docker-host against the
+local Docker socket. So: merge to `main`, push to gitea, and the deploy
+happens -- don't also run `deploy.sh` by hand. Requirements, all one-time:
+
+- The production `.env` copy at `/home/joe/sunshine-ledger/deploy.env` on
+  docker-host (chmod 600). **Keep it in sync with the Mac's `.env`** when
+  either changes: `scp .env docker:sunshine-ledger/deploy.env`.
+- The repo marked **Trusted → volumes** in Woodpecker's repo settings
+  (the step mounts the Docker socket and that file).
+
+`deploy.sh` stops the deploy, before touching the running containers, if the
+database isn't at the revision the new code expects (apply the migration by
+hand -- see "Manual commands" -- then re-run the pipeline or `deploy.sh`), and
+waits up to 30 minutes for a running `app.pipeline` job (e.g. the nightly
+ingestion) rather than restarting the backend under it.
+
+**Manual path: `scripts/deploy.sh`.** Same script, run from anywhere on the
+local Mac with a clean repo checkout -- for a redeploy without a push, or
+when Woodpecker is down:
 
 ```bash
 scripts/deploy.sh
