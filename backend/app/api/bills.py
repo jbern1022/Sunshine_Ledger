@@ -111,19 +111,40 @@ def _active_tags_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[uuid.
     return result
 
 
+def _pick_primary_sponsor(sponsors: list[Entity]) -> Entity | None:
+    """The bill's primary sponsor among its `sponsor` relationships.
+
+    Florida committee substitutes list the committees that produced them as
+    sponsors too (HB 1389: Commerce Committee, the Housing subcommittee,
+    then Rep. Mike Redondo) -- 1,065 state bills as of 2026-09-25. A
+    committee has no district, so prefer the first sponsor that has one
+    (a legislator), and fall back to the first sponsor for bills whose only
+    sponsors are committees, or local bills, whose sponsors carry no
+    district at all.
+    """
+    for sponsor in sponsors:
+        if (sponsor.attributes or {}).get("district"):
+            return sponsor
+    return sponsors[0] if sponsors else None
+
+
+def _sponsors_in_order(stmt):
+    return stmt.order_by(Relationship.created_at, Relationship.id)
+
+
 def _primary_sponsors_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
     """One batched query for a whole page of bills, rather than one query per bill."""
     if not entity_ids:
         return {}
-    stmt = (
-        select(Relationship.to_entity_id, Entity.name)
+    stmt = _sponsors_in_order(
+        select(Relationship.to_entity_id, Entity)
         .join(Entity, Entity.id == Relationship.from_entity_id)
         .where(Relationship.to_entity_id.in_(entity_ids), Relationship.relationship_type == "sponsor")
     )
-    result: dict[uuid.UUID, str] = {}
-    for bill_entity_id, sponsor_name in db.execute(stmt).all():
-        result.setdefault(bill_entity_id, sponsor_name)  # first sponsor found per bill
-    return result
+    sponsors: dict[uuid.UUID, list[Entity]] = {}
+    for bill_entity_id, sponsor in db.execute(stmt).all():
+        sponsors.setdefault(bill_entity_id, []).append(sponsor)
+    return {bill_id: _pick_primary_sponsor(entities).name for bill_id, entities in sponsors.items()}
 
 
 @router.get("", response_model=BillListResponse)
@@ -268,11 +289,15 @@ def _bill_geography(db: Session, entity: Entity, bill: Bill) -> tuple[str, str] 
             return "county", bill.geo_scope_names[0]
         return None
 
-    sponsor = db.execute(
-        select(Entity)
-        .join(Relationship, Relationship.from_entity_id == Entity.id)
-        .where(Relationship.to_entity_id == entity.id, Relationship.relationship_type == "sponsor")
-    ).scalars().first()
+    sponsor = _pick_primary_sponsor(
+        db.execute(
+            _sponsors_in_order(
+                select(Entity)
+                .join(Relationship, Relationship.from_entity_id == Entity.id)
+                .where(Relationship.to_entity_id == entity.id, Relationship.relationship_type == "sponsor")
+            )
+        ).scalars().all()
+    )
     district = (sponsor.attributes or {}).get("district") if sponsor else None
     if not district:
         return None
@@ -384,16 +409,17 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         for c in entity.claims
     ]
 
-    sponsor_stmt = (
+    sponsor_stmt = _sponsors_in_order(
         select(Relationship, Entity)
         .join(Entity, Entity.id == Relationship.from_entity_id)
         .where(Relationship.to_entity_id == entity_id, Relationship.relationship_type.in_(["sponsor", "co_sponsor"]))
     )
+    sponsor_rows = db.execute(sponsor_stmt).all()
     sponsors_out = [
-        SponsorOut(entity_id=e.id, name=e.name, relationship_type=r.relationship_type)
-        for r, e in db.execute(sponsor_stmt).all()
+        SponsorOut(entity_id=e.id, name=e.name, relationship_type=r.relationship_type) for r, e in sponsor_rows
     ]
-    primary_sponsor = next((s.name for s in sponsors_out if s.relationship_type == "sponsor"), None)
+    primary = _pick_primary_sponsor([e for r, e in sponsor_rows if r.relationship_type == "sponsor"])
+    primary_sponsor = primary.name if primary else None
     tags_out = _active_tags_by_bill(db, [entity_id]).get(entity_id, [])
     list_item = _to_list_item(entity, primary_sponsor=primary_sponsor, tags=tags_out)
 

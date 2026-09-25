@@ -585,3 +585,43 @@ def test_bill_detail_overlay_renders_multiple_badges_without_breaking(client, db
 
     body = client.get(f"/bills/{entity.id}").json()
     assert {o["badge_slug"] for o in body["demographic_overlays"]} == {"housing", "infrastructure_transportation"}
+
+
+def test_committee_sponsors_listed_first_do_not_become_the_primary_sponsor(client, db_session, bill_factory):
+    """HB 1389's shape: a committee substitute lists its committees as
+    sponsors ahead of the legislator. The legislator is the primary sponsor
+    (cards, detail) and their district drives the overlay."""
+    entity = bill_factory()
+    committee = Entity(entity_type="person", name="Commerce Committee", jurisdiction_level="state",
+                       jurisdiction_name="FL", external_ids={}, attributes={})
+    rep = Entity(entity_type="person", name="Mike Redondo", jurisdiction_level="state", jurisdiction_name="FL",
+                 external_ids={}, attributes={"district": "HD-118"})
+    db_session.add_all([committee, rep])
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=committee.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=rep.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    db_session.add(Tag(slug="housing", label="Housing", active=True))
+    db_session.commit()
+    assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
+    db_session.add(DemographicOverlay(geography_type="district", geography_id="HD-118", badge_slug="housing",
+                                      source="acs", metrics=[], as_of="2024"))
+    db_session.commit()
+
+    detail = client.get(f"/bills/{entity.id}").json()
+    assert detail["primary_sponsor"] == "Mike Redondo"
+    assert [o["geography_id"] for o in detail["demographic_overlays"]] == ["HD-118"]
+    listed = next(b for b in client.get("/bills").json()["items"] if b["entity_id"] == str(entity.id))
+    assert listed["primary_sponsor"] == "Mike Redondo"
+
+
+def test_committee_only_sponsor_is_still_shown(client, db_session, bill_factory):
+    entity = bill_factory()
+    committee = Entity(entity_type="person", name="Rules Committee", jurisdiction_level="state",
+                       jurisdiction_name="FL", external_ids={}, attributes={})
+    db_session.add(committee)
+    db_session.flush()
+    db_session.add(Relationship(from_entity_id=committee.id, to_entity_id=entity.id, relationship_type="sponsor"))
+    db_session.commit()
+
+    assert client.get(f"/bills/{entity.id}").json()["primary_sponsor"] == "Rules Committee"
