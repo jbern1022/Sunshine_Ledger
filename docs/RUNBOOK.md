@@ -272,6 +272,19 @@ docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.miam
 # skipped. Costs LegiScan quota (10,000/month from 2026-10-01); see README's
 # "Roll-call votes" section before running without --limit.
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.legiscan --sync-history --limit 20
+# Whole session from LegiScan's dataset zip: 2 API calls instead of ~6,000.
+# Used on 2026-09-25 for the 2026 Regular Session (79 s).
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.legiscan --sync-history --from-dataset "2026 Regular Session"
+
+# Amendment document text for the diff view: one getAmendment call per
+# amendment without text. --clean-stored [--apply] strips form furniture
+# from stored text with no API calls.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.amendments --limit 20
+
+# LegiScan quota: 10,000 calls/month from 2026-10-01. Every LegiScan CLI
+# (and the nightly LegiScan step) ends by printing "LegiScan API calls this
+# run: N (op counts)" -- HTTP logging is off, so that line is the only
+# record. See docs/DATA_SOURCES.md.
 
 # Summarize bills whose summaries are missing or stale. Safe and cheap to
 # re-run: each claim stores a hash of what generated it (source text +
