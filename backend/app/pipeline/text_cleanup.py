@@ -97,3 +97,27 @@ def strip_page_artifacts(text: str) -> str:
                 continue
         out.append(line)
     return "\n".join(out)
+
+
+# Form furniture on Florida amendment documents (sampled from the 1,185
+# stored amendments on 2026-09-25): the Senate's barcode line
+# ("Ì877368ZÎ877368"), its LEGISLATIVE ACTION box (a "Senate . House"
+# header, lone dots, em-dash rules) and the House committee form's Y/N
+# checkboxes. The floor-action codes and timestamps inside the Senate box
+# ("Floor: 1/AD/RM") are kept: they record what happened to the amendment.
+_AMENDMENT_FURNITURE_LINE = re.compile(
+    r"^\s*(?:\[added:\s*)?(?:"
+    r"Ì\w+Î\w+"
+    r"|LEGISLATIVE ACTION"
+    r"|(?:Senate|House)?\s*\.\s*(?:Senate|House)?"
+    r"|—{5,}"
+    r"|(?:ADOPTED|ADOPTED AS AMENDED|ADOPTED W/O OBJECTION|FAILED TO ADOPT|WITHDRAWN) \(Y/N\)"
+    r"|OTHER"
+    r"|COMMITTEE/SUBCOMMITTEE ACTION"
+    r")\]?\s*$"
+)
+
+
+def strip_amendment_furniture(text: str) -> str:
+    """`text` without the form furniture of a Florida amendment document."""
+    return "\n".join(l for l in text.split("\n") if not _AMENDMENT_FURNITURE_LINE.match(l))

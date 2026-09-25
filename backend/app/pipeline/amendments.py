@@ -35,6 +35,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.logging_setup import quiet_http_logging
 from app.models import Entity, Event
 from app.pipeline.bill_text import extract_html_text, extract_pdf_text
+from app.pipeline.text_cleanup import strip_amendment_furniture
 from app.pipeline.legiscan import LegiScanClient, api_usage_summary
 
 logger = logging.getLogger(__name__)
@@ -113,9 +114,9 @@ def fetch_amendment_text(client: LegiScanClient, amendment_id: int) -> str | Non
         return None
 
     if mime == "application/pdf":
-        return extract_pdf_text(raw)
+        return strip_amendment_furniture(extract_pdf_text(raw))
     if mime in ("text/html", "application/html"):
-        return extract_html_text(raw)
+        return strip_amendment_furniture(extract_html_text(raw))
 
     logger.warning("Unrecognized amendment mime type %r for amendment_id=%s", mime, amendment_id)
     return None
@@ -169,6 +170,26 @@ def backfill_amendment_texts(db: Session, *, limit: int | None = None, refresh: 
     return fetched, failed
 
 
+def clean_stored_amendment_texts(db: Session, *, apply: bool = False) -> tuple[int, int]:
+    """Strip amendment form furniture from already-stored amendment text
+    (no API calls). Dry run unless `apply`. Returns (changed, checked)."""
+    events = db.execute(select(Event).where(Event.event_type == "AMENDED")).scalars().all()
+    changed = checked = 0
+    for event in events:
+        text = event.attributes.get("amendment_text")
+        if not text:
+            continue
+        checked += 1
+        cleaned = strip_amendment_furniture(text)
+        if cleaned != text:
+            changed += 1
+            if apply:
+                event.attributes = {**event.attributes, "amendment_text": cleaned}
+    if apply:
+        db.commit()
+    return changed, checked
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -179,10 +200,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--refresh", action="store_true", help="Re-fetch amendments that already have text.")
+    parser.add_argument(
+        "--clean-stored",
+        action="store_true",
+        help="Strip form furniture from stored amendment text (no API calls). Dry run unless --apply.",
+    )
+    parser.add_argument("--apply", action="store_true", help="With --clean-stored: write the cleaned text.")
     args = parser.parse_args()
 
     session = SessionLocal()
     try:
+        if args.clean_stored:
+            changed, checked = clean_stored_amendment_texts(session, apply=args.apply)
+            print(f"{'Cleaned' if args.apply else 'Would clean'} {changed} of {checked} amendment texts.")
+            raise SystemExit(0)
         ok, bad = backfill_amendment_texts(session, limit=args.limit, refresh=args.refresh)
         print(f"Done: {ok} fetched, {bad} skipped/failed.")
     finally:
