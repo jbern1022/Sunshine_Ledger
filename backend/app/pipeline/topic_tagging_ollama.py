@@ -1,8 +1,10 @@
-"""Ollama fallback topic classification for local bills.
+"""Ollama topic classification for bills without usable subject data.
 
 Miami/Jacksonville bills (Legistar, iQM2) carry no subject field at all,
-unlike LegiScan's state bills -- this classifies them into the same badge
-taxonomy using the local Ollama model. `tag_source="ollama"` is recorded
+and LegiScan's `subjects` turned out to be empty for every FL state bill
+on this API tier (checked again 2026-09-25 against the session datasets),
+so both are classified into the same badge taxonomy by the local Ollama
+model. `tag_source="ollama"` is recorded
 separately from LegiScan tags (see app.pipeline.topic_tagging) so local-bill
 tag quality can be audited apart from state-verified ones, per the
 2026-09-08 Roadmap decision.
@@ -31,9 +33,12 @@ GOVERNANCE_FALLBACK = ["governance"]
 
 _CATEGORY_LIST = "\n".join(f"- {slug}: {label}" for slug, label in TAGS)
 
+LOCAL_KIND = "local government"
+STATE_KIND = "Florida state"
+
 MAX_DESCRIPTION_CHARS = 4_000  # local bill descriptions are short titles, not full text -- generous headroom
 
-CLASSIFY_PROMPT = """You are categorizing a piece of local government legislation into topic badges for a civic transparency website.
+CLASSIFY_PROMPT = """You are categorizing a piece of {kind} legislation into topic badges for a civic transparency website.
 
 Bill: {title}
 
@@ -42,7 +47,7 @@ Description:
 {description}
 \"\"\"
 
-Choose every badge category below that clearly applies. A bill can have more than one. Do NOT include "governance" alongside another category just because the bill is a piece of local legislation -- every bill is that. Choose "governance" only when nothing more specific applies, and choose it alone in that case.
+Choose every badge category below that clearly applies. A bill can have more than one. Do NOT include "governance" alongside another category just because the bill is a piece of {kind} legislation -- every bill is that. Choose "governance" only when nothing more specific applies, and choose it alone in that case.
 
 Categories (respond using the slug, not the label):
 {category_list}
@@ -63,7 +68,7 @@ def _extract_json_array(text: str) -> list | None:
 
 
 def classify_local_bill_topics(
-    title: str, description: str, client: OllamaClient | None = None
+    title: str, description: str, client: OllamaClient | None = None, *, kind: str = LOCAL_KIND
 ) -> list[str]:
     """Returns a list of valid tag slugs. Never empty -- falls back to
     ["governance"] if the Ollama call fails, the response can't be parsed as
@@ -73,7 +78,10 @@ def classify_local_bill_topics(
     """
     client = client or OllamaClient()
     prompt = CLASSIFY_PROMPT.format(
-        title=title, description=(description or "")[:MAX_DESCRIPTION_CHARS], category_list=_CATEGORY_LIST
+        kind=kind,
+        title=title,
+        description=(description or "")[:MAX_DESCRIPTION_CHARS],
+        category_list=_CATEGORY_LIST,
     )
 
     try:
@@ -108,9 +116,11 @@ def tag_local_bill(
     title: str,
     description: str,
     client: OllamaClient | None = None,
+    kind: str = LOCAL_KIND,
 ) -> list[BillTag]:
-    """Classify and tag a local (Legistar/iQM2) bill, called from the
-    ingestion pipelines.
+    """Classify and tag a bill with the local model, called from the
+    ingestion pipelines: every local (Legistar/iQM2) bill, and state bills
+    whose LegiScan subjects are empty (kind=STATE_KIND).
 
     Skips entirely if this bill already carries any ollama-sourced tag --
     Legistar/iQM2 ingestion has no change_hash skip like LegiScan, so
@@ -131,5 +141,5 @@ def tag_local_bill(
     if already_tagged is not None:
         return []
 
-    slugs = classify_local_bill_topics(title, description, client=client)
+    slugs = classify_local_bill_topics(title, description, client=client, kind=kind)
     return assign_tags_for_bill(db, bill_entity_id, ollama_tag_slugs=slugs)

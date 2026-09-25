@@ -240,3 +240,30 @@ def test_introduced_date_falls_back_to_the_earliest_history_entry():
     assert introduced_date({"introduced": "2026-01-05", "history": HISTORY}) == date(2026, 1, 5)
     assert introduced_date({"history": [{"date": ""}]}) is None
     assert introduced_date({}) is None
+
+
+def test_nightly_ingest_topic_tags_a_state_bill_without_subjects(monkeypatch, db_session):
+    import app.pipeline.legiscan as legiscan_module
+    import app.pipeline.topic_tagging_ollama as tagging
+
+    calls = []
+    monkeypatch.setattr(tagging, "tag_local_bill", lambda db, entity_id, **kw: calls.append(kw) or [])
+
+    class IngestClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_master_list(self, state):
+            return [{"bill_id": 2044116, "number": "HB 1389", "change_hash": "eea7", "status": "4"}]
+
+        def get_bill(self, bill_id):
+            return {"bill_id": bill_id, "bill_number": "H1389", "title": "Affordable Housing", "status": 4,
+                    "description": "An act relating to affordable housing", "subjects": [],
+                    "session": {"session_name": "2026 Regular Session"}, "sponsors": [], "votes": []}
+
+    monkeypatch.setattr(legiscan_module, "LegiScanClient", IngestClient)
+
+    legiscan_module.ingest_state_bills(db_session, state="FL")
+
+    assert calls == [{"title": "Affordable Housing", "description": "An act relating to affordable housing",
+                      "kind": tagging.STATE_KIND}]

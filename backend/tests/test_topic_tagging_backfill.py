@@ -68,3 +68,10 @@ def test_respects_limit(db_session, bill_factory):
         _make_local_bill(db_session, bill_factory, source_key="legistar_matter_id")
 
     assert len(select_local_bills_needing_tags(db_session, limit=2)) == 2
+
+
+def test_state_bills_are_selected_only_with_include_state(db_session, bill_factory):
+    state_bill = _make_local_bill(db_session, bill_factory, source_key="legiscan_id", source_value="2044116")
+
+    assert select_local_bills_needing_tags(db_session) == []
+    assert [e.id for e in select_local_bills_needing_tags(db_session, include_state=True)] == [state_bill.id]
