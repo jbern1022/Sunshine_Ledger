@@ -521,3 +521,27 @@ def test_compare_texts_flags_number_only_lines():
     result = compare_texts(old, new)
     assert result["number_only_lines"] == 1
     assert "numbers" in result["reasons"]
+
+
+def test_h1171_inserted_list_keeps_one_item_per_line():
+    """The whole new s. 379.24312 is one underlined passage. Merging the
+    per-line [added: ...] markers folded it onto a single line; list items
+    now keep their own lines while each item's wrapped lines still join."""
+    text = extract_pdf_text((FIXTURES / "h1171_filed.pdf").read_bytes())
+    lines = text.split("\n")
+    for item in ('(1) As used in this section', '(a) "Collect" means', '(b) "Endangered or threatened species"',
+                 '(e) "Transport" means', "(2) A person may not collect", "(5)(a) This section does not"):
+        assert any(line.startswith(f"[added: {item}") for line in lines), item
+    # A wrapped item is still one line: its continuation isn't left behind.
+    assert any(
+        line.startswith('[added: (c) "Educational or exhibition purposes" means the holding, displaying')
+        for line in lines
+    )
+    assert not any(line.startswith("[added: highway, waterway") for line in lines)
+
+
+def test_merge_keeps_statute_citation_continuation_joined():
+    from app.pipeline.bill_text import _merge_adjacent_markers
+
+    text = "[added: as provided in]\n[added: s. 393.063, the agency shall act.]"
+    assert _merge_adjacent_markers(text) == "[added: as provided in s. 393.063, the agency shall act.]"
