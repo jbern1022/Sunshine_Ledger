@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Event, Relationship, Source
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
@@ -327,7 +328,7 @@ def ingest_state_bills(
     Relationships -- no extra API cost for the chamber-level tallies, one
     getRollCall call per *new* roll call for the individual breakdown. Only
     covers bills this run actually fetches fresh detail for (i.e. new or
-    changed bills); see sync_state_votes for backfilling the rest of an
+    changed bills); see sync_state_bill_history for backfilling the rest of an
     already-ingested corpus.
 
     Returns the list of bill Entities written (new or refreshed).
@@ -536,35 +537,47 @@ def backfill_person_districts(db: Session, *, state: str | None = None, sessions
     return updated
 
 
-def sync_state_votes(
-    db: Session, *, state: str | None = None, limit: int | None = None, fetch_individual: bool = True
+def sync_state_bill_history(
+    db: Session,
+    *,
+    state: str | None = None,
+    limit: int | None = None,
+    fetch_individual: bool = True,
+    client: LegiScanClient | None = None,
 ) -> tuple[int, int]:
-    """Backfill vote data for bills already in the DB that `ingest_state_bills`
-    will never revisit, because their change_hash already matches (that skip
-    exists specifically to protect the API quota, so this is a deliberate,
-    explicit, one-time-per-bill re-fetch rather than something folded into
-    the nightly job).
+    """Backfill amendments and roll-call votes for bills already in the DB
+    that `ingest_state_bills` will never revisit, because their change_hash
+    already matches (that skip exists specifically to protect the API quota,
+    so this is a deliberate, explicit, one-time-per-bill re-fetch rather than
+    something folded into the nightly job).
 
-    Costs one getBill call per already-ingested bill (to see its current
-    votes array) plus one getRollCall call per roll call not already
-    recorded -- idempotent, so a partial or repeated run only pays for what
-    it hasn't already fetched. Pass `limit` to test on a small batch before
-    running the full corpus; at ~2,300 bills this is a meaningful chunk of
-    the 30,000/month free-tier quota and worth running as one deliberate
-    pass, not a repeated habit.
+    Costs one getBill call per bill (its response carries both the
+    amendments and the votes arrays) plus one getRollCall call per roll call
+    not already recorded. Each bill is marked with the change_hash it was
+    synced at (`legiscan_history_hash`), so an interrupted or repeated run
+    skips bills already done instead of paying for them again. Pass `limit`
+    to test on a small batch first: at ~1,900 bills this is a meaningful
+    share of the monthly LegiScan quota.
 
     Returns (bills_processed, roll_calls_fetched).
     """
+    from app.pipeline.amendments import sync_bill_amendments  # circular import, see ingest_state_bills
+
     state = state or settings.legiscan_state
-    client = LegiScanClient()
-    people_by_id = _build_people_by_id(client, state) if fetch_individual else {}
+    client = client or LegiScanClient()
 
     stmt = select(Entity).where(
         Entity.entity_type == "bill", Entity.external_ids.has_key("legiscan_id")
     )
+    bill_entities = [
+        e
+        for e in db.execute(stmt).scalars().all()
+        if not e.external_ids.get("legiscan_history_hash")
+        or e.external_ids.get("legiscan_history_hash") != e.external_ids.get("legiscan_change_hash")
+    ]
     if limit:
-        stmt = stmt.limit(limit)
-    bill_entities = db.execute(stmt).scalars().all()
+        bill_entities = bill_entities[:limit]
+    people_by_id = _build_people_by_id(client, state) if fetch_individual and bill_entities else {}
 
     bills_processed = 0
     roll_calls_fetched = 0
@@ -574,23 +587,26 @@ def sync_state_votes(
         detail = client.get_bill(legiscan_bill_id)
         bills_processed += 1
 
+        sync_bill_amendments(db, bill_entity=entity, amendments=detail.get("amendments") or [])
         votes = detail.get("votes") or []
-        if not votes:
-            continue
-
-        roll_calls_fetched += _sync_bill_votes(
-            db,
-            bill_entity=entity,
-            votes=votes,
-            client=client,
-            state=state,
-            people_by_id=people_by_id,
-            fetch_individual=fetch_individual,
-        )
+        if votes:
+            roll_calls_fetched += _sync_bill_votes(
+                db,
+                bill_entity=entity,
+                votes=votes,
+                client=client,
+                state=state,
+                people_by_id=people_by_id,
+                fetch_individual=fetch_individual,
+            )
+        entity.external_ids = {
+            **entity.external_ids,
+            "legiscan_history_hash": entity.external_ids.get("legiscan_change_hash"),
+        }
         db.commit()
 
     logger.info(
-        "Vote backfill: checked %d bills, fetched %d new roll calls (state=%s)",
+        "Bill history backfill: checked %d bills, fetched %d new roll calls (state=%s)",
         bills_processed,
         roll_calls_fetched,
         state,
@@ -605,3 +621,28 @@ def _parse_date(value: str | None) -> date | None:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from app.db import SessionLocal
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    quiet_http_logging()
+    parser = argparse.ArgumentParser(description="LegiScan backfills.")
+    parser.add_argument(
+        "--sync-history",
+        action="store_true",
+        help="Backfill amendments and roll-call votes for already-ingested bills (costs API quota).",
+    )
+    parser.add_argument("--limit", type=int, default=None)
+    args = parser.parse_args()
+    if not args.sync_history:
+        parser.error("nothing to do: pass --sync-history")
+    session = SessionLocal()
+    try:
+        bills, roll_calls = sync_state_bill_history(session, limit=args.limit)
+        print(f"Done: {bills} bills checked, {roll_calls} new roll calls fetched.")
+    finally:
+        session.close()
