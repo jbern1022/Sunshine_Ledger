@@ -34,7 +34,11 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   flsenate.gov / myfloridahouse.gov page.
 - **Cadence:** nightly. `getMasterList` (1 call) finds bills whose
   `change_hash` changed; only those are re-fetched.
-- **Coverage:** 2026 Regular Session only, 1,897 bills. All have text,
+- **Coverage:** 2026 Regular Session (1,897 bills) plus the three 2026
+  special sessions (4th: 6, 5th: 22, 6th: 5 bills; ingested once from their
+  datasets on 2026-09-25 with `--ingest-dataset`, since nightly ingestion
+  only follows the current session). Special sessions reuse regular-session
+  numbers (the budget is H5001 in both). Regular Session detail: all have text,
   action history (26,432 entries) and an introduced date. 558 have
   amendments (1,186, with text); 877 have roll calls (2,798, with 93,876
   individual votes); 890 have staff analyses (4,308 documents).
@@ -43,7 +47,9 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   Bulk work should use the session dataset (`--from-dataset`, 2 calls per
   session) instead of per-bill calls.
 - **Known gaps:**
-  - The six 2026 special sessions aren't ingested (Todoist 6hchjVPg22c38rqp).
+  - Nightly ingestion doesn't revisit the special sessions; rerun
+    `--ingest-dataset` if one is ever amended or a new one is called.
+  - The 2025 sessions (Regular and 1st-3rd Special) aren't ingested.
   - LegiScan lists fewer amendments than the official record for some
     bills (HB 1389: 3 vs 5 documents), and its `adopted` flag can
     disagree with the official outcome.
@@ -96,9 +102,11 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   Transportation and Labor/Employment bills. ACS 5-year estimates with
   margins of error; BLS at county level only.
 - **Module:** `backend/app/pipeline/demographic_overlay.py`.
-- **Cadence:** a batch loader meant to run after each annual ACS release.
-  **It has never run on production**, and `demographic_overlays` is
-  empty, so no overlay is shown.
+- **Cadence:** a batch loader (`python -m app.pipeline.demographic_overlay`)
+  meant to run after each annual ACS release; BLS updates monthly.
+- **Coverage (2026-09-25):** BLS county unemployment loaded for Duval
+  (5.0%, July 2026) and Miami-Dade (2.7%, August 2026). **ACS is not
+  loaded:** it needs `CENSUS_API_KEY`, which isn't set in production.
 - **Terms:** public domain. Census requires the notice "This product uses
   the Census Bureau Data API but is not endorsed or certified by the
   Census Bureau."
