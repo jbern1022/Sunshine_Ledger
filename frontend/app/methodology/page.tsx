@@ -155,7 +155,7 @@ export default function MethodologyPage() {
         </p>
       </section>
 
-      <p className="mt-8 text-xs text-slate-400">
+      <p className="mt-8 text-xs text-slate-500">
         See also the{" "}
         <Link href="/privacy" className="underline hover:text-slate-600">
           privacy and terms

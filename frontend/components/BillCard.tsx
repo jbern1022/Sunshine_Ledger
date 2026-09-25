@@ -100,7 +100,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               data ever reaches this component again it should be
               conspicuous, not tidied away. */}
           <h2 className="mt-1 text-lg font-semibold text-ledger-900">
-            <Link href={`/bills/${bill.entity_id}`} className="hover:text-sunshine-600 hover:underline">
+            <Link href={`/bills/${bill.entity_id}`} className="hover:text-sunshine-800 hover:underline">
               {bill.bill_number}
             </Link>
           </h2>
@@ -113,7 +113,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
       {bill.what_it_does ? (
         <p className="mt-3 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
       ) : (
-        <p className="mt-3 text-sm italic text-slate-400">
+        <p className="mt-3 text-sm italic text-slate-500">
           No plain-language summary generated yet.
           {bill.full_text_url && (
             <>
@@ -122,7 +122,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 href={bill.full_text_url}
                 target="_blank"
                 rel="noreferrer"
-                className="not-italic text-sunshine-600 underline hover:text-sunshine-500"
+                className="not-italic text-sunshine-700 underline hover:text-sunshine-800"
               >
                 Read the original bill text
               </a>
@@ -132,7 +132,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
         </p>
       )}
 
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
         {bill.primary_sponsor && <span>Sponsored by {bill.primary_sponsor}</span>}
         {bill.geo_scope_names.length > 0 && (
           <span>
@@ -144,7 +144,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
             href={bill.full_text_url}
             target="_blank"
             rel="noreferrer"
-            className="text-sunshine-600 underline hover:text-sunshine-500"
+            className="text-sunshine-700 underline hover:text-sunshine-800"
           >
             View original bill ↗
           </a>
@@ -155,28 +155,28 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
         <div className="flex items-center gap-4">
           <button
             onClick={toggleExpanded}
-            className="flex items-center gap-1.5 text-xs font-medium text-sunshine-600 hover:text-sunshine-500"
+            className="flex items-center gap-1.5 text-xs font-medium text-sunshine-700 hover:text-sunshine-800"
           >
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sunshine-100 px-1.5 text-[10px] font-bold text-sunshine-600">
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sunshine-100 px-1.5 text-[10px] font-bold text-sunshine-700">
               {bill.source_count}
             </span>
             {expanded ? "Hide sources" : `Sources (${bill.source_count})`}
           </button>
           <button
             onClick={() => setShowFlagForm((v) => !v)}
-            className="text-xs font-medium text-slate-400 hover:text-slate-600"
+            className="text-xs font-medium text-slate-500 hover:text-slate-600"
           >
             Flag this
           </button>
         </div>
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-slate-500">
           {bill.last_action_date ? `Last action ${bill.last_action_date}` : ""}
         </span>
       </div>
 
       {expanded && (
         <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs">
-          {loading && <p className="text-slate-400">Loading sources…</p>}
+          {loading && <p className="text-slate-500">Loading sources…</p>}
           {!loading && whoItAffects && (
             <p className="mb-2 text-slate-600">
               <span className="font-semibold">Who it affects: </span>
@@ -199,11 +199,11 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                     href={s.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-sunshine-600 underline hover:text-sunshine-500"
+                    className="text-sunshine-700 underline hover:text-sunshine-800"
                   >
                     {s.publisher ?? s.url}
                   </a>
-                  <span className="text-slate-400"> — retrieved {new Date(s.retrieved_at).toLocaleDateString()}</span>
+                  <span className="text-slate-500"> — retrieved {new Date(s.retrieved_at).toLocaleDateString()}</span>
                 </li>
               ))}
             </ul>
@@ -214,7 +214,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               is that claims are traceable, how the text was produced is
               part of what needs tracing. */}
           {!loading && summaryModels.length > 0 && (
-            <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-400">
+            <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-500">
               Plain-language summaries above were written by an AI model (
               {summaryModels.join(", ")}) from the source{uniqueSources.length === 1 ? "" : "s"} listed
               here, and are published without a human reviewing each one. They can be wrong or
@@ -230,7 +230,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
             </p>
           )}
           {!loading && detail && uniqueSources.length === 0 && (
-            <p className="text-slate-400">
+            <p className="text-slate-500">
               No summary sources yet (no plain-language summary has been generated for this bill) — see
               &quot;View original bill&quot; above for where this data came from.
             </p>
@@ -273,14 +273,14 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 <button
                   type="submit"
                   disabled={flagStatus === "submitting"}
-                  className="rounded-md bg-sunshine-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-sunshine-600 disabled:opacity-50"
+                  className="rounded-md bg-sunshine-500 px-3 py-1.5 text-xs font-medium text-ledger-900 hover:bg-sunshine-400 disabled:opacity-50"
                 >
                   {flagStatus === "submitting" ? "Sending…" : "Submit report"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowFlagForm(false)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
+                  className="text-xs text-slate-500 hover:text-slate-600"
                 >
                   Cancel
                 </button>
@@ -296,10 +296,10 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
           <ul className="space-y-1">
             {detail.news.map((n) => (
               <li key={n.id}>
-                <a href={n.url} target="_blank" rel="noreferrer" className="text-sunshine-600 underline hover:text-sunshine-500">
+                <a href={n.url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline hover:text-sunshine-800">
                   {n.title}
                 </a>
-                <span className="text-slate-400">
+                <span className="text-slate-500">
                   {" "}
                   — {n.publisher ?? "unknown outlet"}
                   {n.published_date ? `, ${new Date(n.published_date).toLocaleDateString()}` : ""}

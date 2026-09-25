@@ -59,7 +59,7 @@ export default async function BillPage({ params }: Props) {
 
   return (
     <article>
-      <Link href="/" className="text-xs text-sunshine-600 underline">
+      <Link href="/" className="text-xs text-sunshine-700 underline">
         ← All bills
       </Link>
 
@@ -110,11 +110,11 @@ export default async function BillPage({ params }: Props) {
           <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
             {bill.sponsors.map((s) => (
               <li key={s.entity_id}>
-                <Link href={`/people/${s.entity_id}`} className="text-sunshine-600 underline">
+                <Link href={`/people/${s.entity_id}`} className="text-sunshine-700 underline">
                   {s.name}
                 </Link>
                 {s.relationship_type === "co_sponsor" && (
-                  <span className="text-slate-400"> (co-sponsor)</span>
+                  <span className="text-slate-500"> (co-sponsor)</span>
                 )}
               </li>
             ))}
@@ -125,7 +125,7 @@ export default async function BillPage({ params }: Props) {
       {bill.votes.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Votes</h2>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Plain vote tallies from official roll calls — not a score, and not a claim about any
             legislator.
           </p>
@@ -134,7 +134,7 @@ export default async function BillPage({ params }: Props) {
               <li key={v.id} className="rounded-md border border-slate-200 p-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-medium text-slate-700">{v.description}</span>
-                  <span className="text-xs text-slate-400">{v.date}</span>
+                  <span className="text-xs text-slate-500">{v.date}</span>
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500">
                   {v.passed ? "Passed" : "Failed"} {v.yea}-{v.nay}
@@ -143,7 +143,7 @@ export default async function BillPage({ params }: Props) {
                 </p>
                 {v.votes.length > 0 && (
                   <details className="mt-1">
-                    <summary className="cursor-pointer text-xs text-sunshine-600 underline">
+                    <summary className="cursor-pointer text-xs text-sunshine-700 underline">
                       {v.votes.length} individual vote{v.votes.length === 1 ? "" : "s"}
                     </summary>
                     <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-3">
@@ -166,7 +166,7 @@ export default async function BillPage({ params }: Props) {
                     href={v.source_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-1 inline-block text-xs text-sunshine-600 underline"
+                    className="mt-1 inline-block text-xs text-sunshine-700 underline"
                   >
                     View roll call ↗
                   </a>
@@ -201,7 +201,7 @@ export default async function BillPage({ params }: Props) {
         <p className="mt-1">
           {bill.status}
           {bill.last_action && <> — {bill.last_action}</>}
-          {bill.last_action_date && <span className="text-slate-400"> ({bill.last_action_date})</span>}
+          {bill.last_action_date && <span className="text-slate-500"> ({bill.last_action_date})</span>}
         </p>
       </section>
 
@@ -211,10 +211,10 @@ export default async function BillPage({ params }: Props) {
           <ul className="mt-1 space-y-1 text-sm">
             {sources.map((s) => (
               <li key={s.id}>
-                <a href={s.url} target="_blank" rel="noreferrer" className="text-sunshine-600 underline">
+                <a href={s.url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
                   {s.publisher ?? s.url}
                 </a>
-                <span className="text-slate-400">
+                <span className="text-slate-500">
                   {" "}
                   — retrieved {new Date(s.retrieved_at).toLocaleDateString("en-US")}
                 </span>
@@ -227,16 +227,16 @@ export default async function BillPage({ params }: Props) {
       {bill.news.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Recent news mentions</h2>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Matched by keyword, unscored — their presence is not a claim about the bill.
           </p>
           <ul className="mt-1 space-y-1 text-sm">
             {bill.news.map((n) => (
               <li key={n.id}>
-                <a href={n.url} target="_blank" rel="noreferrer" className="text-sunshine-600 underline">
+                <a href={n.url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
                   {n.title}
                 </a>
-                <span className="text-slate-400"> — {n.publisher ?? "unknown outlet"}</span>
+                <span className="text-slate-500"> — {n.publisher ?? "unknown outlet"}</span>
               </li>
             ))}
           </ul>
@@ -244,7 +244,7 @@ export default async function BillPage({ params }: Props) {
       )}
 
       {summaryModels.length > 0 && (
-        <p className="mt-6 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-6 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-500">
           The plain-language summaries above were written by an AI model (
           {summaryModels.join(", ")}) from the sources listed here, and are published without a
           human reviewing each one. They can be wrong or incomplete — the linked source is the
@@ -271,7 +271,7 @@ export default async function BillPage({ params }: Props) {
 
       {bill.full_text_url && (
         <p className="mt-3 text-sm">
-          <a href={bill.full_text_url} target="_blank" rel="noreferrer" className="text-sunshine-600 underline">
+          <a href={bill.full_text_url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
             Read the original bill ↗
           </a>
         </p>

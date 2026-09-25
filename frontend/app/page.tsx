@@ -145,7 +145,7 @@ function BrowsePageInner() {
               setJurisdiction("");
               setAutoDetected(false);
             }}
-            className="font-medium text-sunshine-600 hover:text-sunshine-500"
+            className="font-medium text-sunshine-700 hover:text-sunshine-800"
           >
             View all jurisdictions
           </button>
@@ -211,15 +211,15 @@ function BrowsePageInner() {
         </div>
       )}
 
-      {!error && loading && <p className="text-sm text-slate-400">Loading bills…</p>}
+      {!error && loading && <p className="text-sm text-slate-500">Loading bills…</p>}
 
       {!error && !loading && bills.length === 0 && (
-        <p className="text-sm text-slate-400">No bills match your filters.</p>
+        <p className="text-sm text-slate-500">No bills match your filters.</p>
       )}
 
       {!error && !loading && bills.length > 0 && (
         <>
-          <p className="mb-3 text-xs text-slate-400">
+          <p className="mb-3 text-xs text-slate-500">
             {total} bill{total === 1 ? "" : "s"}
             {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
           </p>
@@ -238,7 +238,7 @@ function BrowsePageInner() {
               >
                 ← Previous
               </button>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500">
                 Page {currentPage} of {totalPages}
               </span>
               <button
@@ -258,7 +258,7 @@ function BrowsePageInner() {
 
 export default function BrowsePage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-400">Loading…</p>}>
+    <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
       <BrowsePageInner />
     </Suspense>
   );

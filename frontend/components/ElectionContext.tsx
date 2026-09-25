@@ -45,7 +45,7 @@ export default function ElectionContext() {
               day: "numeric",
               year: "numeric",
             })}{" "}
-            <span className="text-slate-400">
+            <span className="text-slate-500">
               ({next.days_away === 0 ? "today" : `in ${next.days_away} days`})
             </span>
           </span>
@@ -53,7 +53,7 @@ export default function ElectionContext() {
           <span className="text-slate-500">No further dates on the {calendar.year} calendar.</span>
         )}
         {electionDay && next && electionDay.label !== next.label && (
-          <span className="text-slate-400">
+          <span className="text-slate-500">
             · {electionDay.label}{" "}
             {new Date(electionDay.date + "T00:00:00").toLocaleDateString(undefined, {
               month: "short",
@@ -62,7 +62,7 @@ export default function ElectionContext() {
           </span>
         )}
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
         Dates published by the{" "}
         <a
           href={calendar.source.url}

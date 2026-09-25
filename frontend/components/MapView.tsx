@@ -107,7 +107,7 @@ export default function MapView() {
               aria-pressed={mode === key}
               className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 mode === key
-                  ? "bg-sunshine-500 text-white"
+                  ? "bg-sunshine-500 text-ledger-900"
                   : "text-slate-600 hover:bg-slate-50"
               }`}
             >
@@ -119,7 +119,7 @@ export default function MapView() {
       </div>
 
       {!active ? (
-        <p className="text-sm text-slate-400">Loading map…</p>
+        <p className="text-sm text-slate-500">Loading map…</p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-slate-200">
           <MapContainer

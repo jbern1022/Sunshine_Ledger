@@ -47,7 +47,7 @@ export default async function PersonPage({ params }: Props) {
 
   return (
     <div>
-      <Link href="/people" className="text-xs text-sunshine-600 underline">
+      <Link href="/people" className="text-xs text-sunshine-700 underline">
         ← All sponsors
       </Link>
 
@@ -67,7 +67,7 @@ export default async function PersonPage({ params }: Props) {
       {person.votes.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Voting record</h2>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             Plain vote tallies from official roll calls — not a score, and not a claim about this
             sponsor.
           </p>
@@ -75,16 +75,16 @@ export default async function PersonPage({ params }: Props) {
             {person.votes.map((v, i) => (
               <li key={`${v.entity_id}-${i}`} className="flex flex-wrap items-baseline justify-between gap-2">
                 <span>
-                  <Link href={`/bills/${v.entity_id}`} className="text-sunshine-600 underline">
+                  <Link href={`/bills/${v.entity_id}`} className="text-sunshine-700 underline">
                     {v.bill_number}
                   </Link>
                   {v.roll_call_description && (
-                    <span className="text-slate-400"> — {v.roll_call_description}</span>
+                    <span className="text-slate-500"> — {v.roll_call_description}</span>
                   )}
                 </span>
                 <span className="shrink-0 text-xs text-slate-500">
                   {v.vote}
-                  {v.date && <span className="text-slate-400"> · {v.date}</span>}
+                  {v.date && <span className="text-slate-500"> · {v.date}</span>}
                 </span>
               </li>
             ))}
@@ -93,7 +93,7 @@ export default async function PersonPage({ params }: Props) {
       )}
 
       {person.bills.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-400">No tracked bills for this sponsor.</p>
+        <p className="mt-4 text-sm text-slate-500">No tracked bills for this sponsor.</p>
       ) : (
         <ul className="mt-4 space-y-3">
           {person.bills.map((b) => (
@@ -104,11 +104,11 @@ export default async function PersonPage({ params }: Props) {
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <Link
                   href={`/bills/${b.entity_id}`}
-                  className="text-sm font-semibold text-sunshine-600 underline"
+                  className="text-sm font-semibold text-sunshine-700 underline"
                 >
                   {b.bill_number}
                 </Link>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-slate-500">
                   {b.relationship_type === "co_sponsor" ? "co-sponsor" : "sponsor"}
                   {b.last_action_date && ` · last action ${b.last_action_date}`}
                 </span>
@@ -116,9 +116,9 @@ export default async function PersonPage({ params }: Props) {
               {b.what_it_does ? (
                 <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{b.what_it_does}</p>
               ) : (
-                <p className="mt-1.5 text-sm italic text-slate-400">No summary generated yet.</p>
+                <p className="mt-1.5 text-sm italic text-slate-500">No summary generated yet.</p>
               )}
-              <p className="mt-1 text-xs text-slate-400">{b.status}</p>
+              <p className="mt-1 text-xs text-slate-500">{b.status}</p>
             </li>
           ))}
         </ul>
