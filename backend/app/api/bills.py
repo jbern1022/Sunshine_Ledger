@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
+    ActionOut,
     AmendmentOut,
     BillDetail,
     BillLayersOut,
@@ -460,6 +461,19 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         )
     ]
 
+    actions_out = [
+        ActionOut(
+            date=e.event_date,
+            chamber=e.attributes.get("chamber"),
+            action=e.title,
+            important=bool(e.attributes.get("importance")),
+        )
+        for e in sorted(
+            (e for e in entity.events if e.event_type == "action"),
+            key=lambda e: (e.event_date, e.attributes.get("seq", 0)),
+        )
+    ]
+
     return BillDetail(
         **list_item.model_dump(),
         last_action=bill.last_action,
@@ -470,6 +484,7 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         votes=votes_out,
         demographic_overlays=_demographic_overlays_for_bill(db, entity, bill, tags_out),
         amendments=amendments_out,
+        actions=actions_out,
         layers=_layers_for_bill(db, entity_id),
         has_staff_analysis=db.execute(
             select(StaffAnalysis.id).where(

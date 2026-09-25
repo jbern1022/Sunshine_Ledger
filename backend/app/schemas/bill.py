@@ -146,6 +146,17 @@ class BillLayersOut(BaseModel):
     expected_effect: list[LayerBlockOut] = []
 
 
+class ActionOut(BaseModel):
+    """One step of a bill's official action history (LegiScan `history`):
+    filed, referred, reported, passed, signed. `important` is LegiScan's
+    own importance flag, for a compact "how it became law" view."""
+
+    date: date
+    chamber: str | None
+    action: str
+    important: bool
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -157,6 +168,8 @@ class BillDetail(BillListItem):
     votes: list[RollCallOut]
     demographic_overlays: list["DemographicOverlayOut"]
     amendments: list[AmendmentOut]
+    # Oldest first. Empty for sources without an action history (local bills).
+    actions: list[ActionOut] = []
     layers: BillLayersOut
     has_staff_analysis: bool
 

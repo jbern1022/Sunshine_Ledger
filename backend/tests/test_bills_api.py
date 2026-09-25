@@ -130,6 +130,36 @@ def test_get_bill_detail_includes_amendment_timeline_entries(client, db_session,
     ]
 
 
+def test_get_bill_detail_includes_action_history_in_order(client, db_session, bill_factory):
+    entity = bill_factory()
+    for seq, (day, action, importance) in enumerate(
+        [(9, "Filed", 1), (15, "Referred to Rules", 1), (15, "Now in Rules", 0)]
+    ):
+        db_session.add(
+            Event(
+                entity_id=entity.id,
+                event_type="action",
+                event_date=date(2026, 1, day),
+                title=action,
+                attributes={"chamber": "House", "importance": bool(importance), "seq": seq},
+            )
+        )
+    db_session.commit()
+
+    body = client.get(f"/bills/{entity.id}").json()
+
+    assert body["actions"] == [
+        {"date": "2026-01-09", "chamber": "House", "action": "Filed", "important": True},
+        {"date": "2026-01-15", "chamber": "House", "action": "Referred to Rules", "important": True},
+        {"date": "2026-01-15", "chamber": "House", "action": "Now in Rules", "important": False},
+    ]
+
+
+def test_get_bill_detail_actions_empty_when_none(client, bill_factory):
+    entity = bill_factory()
+    assert client.get(f"/bills/{entity.id}").json()["actions"] == []
+
+
 def test_get_bill_detail_amendments_empty_when_none(client, bill_factory):
     entity = bill_factory()
     resp = client.get(f"/bills/{entity.id}")
