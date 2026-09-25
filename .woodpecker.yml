@@ -54,9 +54,13 @@ steps:
       - /home/joe/sunshine-ledger/deploy.env:/run/secrets/deploy.env:ro
     environment:
       DEPLOY_DOCKER_CONTEXT: default
-      DEPLOY_ENV_FILE: /run/secrets/deploy.env
     commands:
       - apk add --no-cache bash curl
+      # docker-compose.yml loads `env_file: .env` from the repo directory for
+      # the containers themselves, so --env-file alone isn't enough: put the
+      # host copy where compose expects it. The workspace is deleted when
+      # the pipeline ends.
+      - install -m 600 /run/secrets/deploy.env .env
       - ./scripts/deploy.sh
     when:
       - event: push
