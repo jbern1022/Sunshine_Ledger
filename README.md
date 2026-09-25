@@ -170,33 +170,21 @@ right now.
 bill it fetches fresh detail for (`sync_votes=True` by default — pass
 `sync_votes=False` to skip it). Bills already ingested before this feature
 existed won't be revisited by that (their `change_hash` already matches, so
-`ingest_state_bills` skips the `getBill` call entirely) — backfill those
-explicitly with `sync_state_votes`:
+`ingest_state_bills` skips the `getBill` call entirely). The same applies to
+amendment timeline entries. Backfill both explicitly with
+`sync_state_bill_history`:
 
 ```bash
 # Test on a small batch first -- also useful to gauge real per-bill cost
 # before running the full corpus.
-docker compose exec backend python -c "
-from app.db import SessionLocal
-from app.pipeline.legiscan import sync_state_votes
-db = SessionLocal()
-bills, roll_calls = sync_state_votes(db, limit=20)
-print(f'{bills} bills checked, {roll_calls} new roll calls fetched')
-"
+docker compose exec backend python -m app.pipeline.legiscan --sync-history --limit 20
 
-# Full corpus (~2,300 bills). Idempotent -- a roll call already recorded is
-# skipped, so a partial or repeated run only pays for what it hasn't
-# already fetched. At full size this is a meaningful chunk of the
-# 30,000/month free-tier quota (~2,300 getBill calls plus one getRollCall
-# call per not-yet-recorded roll call) -- run it as one deliberate pass,
-# not a repeated habit. Omit `limit` for the whole corpus.
-docker compose exec backend python -c "
-from app.db import SessionLocal
-from app.pipeline.legiscan import sync_state_votes
-db = SessionLocal()
-bills, roll_calls = sync_state_votes(db)
-print(f'{bills} bills checked, {roll_calls} new roll calls fetched')
-"
+# Full corpus (~1,900 bills): one getBill call per bill plus one getRollCall
+# call per not-yet-recorded roll call. Each bill is marked with the
+# change_hash it was synced at, so a partial or repeated run skips bills
+# already done. LegiScan's free tier is 30,000 queries/month until
+# 2026-09-30 and 10,000/month from 2026-10-01 -- budget before running.
+docker compose exec backend python -m app.pipeline.legiscan --sync-history
 ```
 
 ## The build-order gates (Roadmap Section 8)

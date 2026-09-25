@@ -10,7 +10,7 @@ that will never populate would spend real API quota for zero result, so this
 only covers the Ollama-classified local bills, which cost compute time, not
 quota.
 
-Modeled on `legiscan.sync_state_votes`'s backfill pattern: a deliberate,
+Modeled on `legiscan.sync_state_bill_history`'s backfill pattern: a deliberate,
 explicit, one-time-per-bill pass over bills the normal ingestion pipelines
 won't revisit, not something folded into the nightly job.
 
