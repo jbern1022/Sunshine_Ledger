@@ -139,3 +139,19 @@ def test_tag_local_bill_does_not_skip_a_legiscan_tagged_bill(db_session, bill_fa
 
     assert len(client.calls) == 1  # guard didn't suppress it
     assert result == []  # but assign_tags_for_bill itself is idempotent per-tag, so no duplicate row
+
+
+def test_classify_prompt_names_the_kind_of_legislation():
+    from app.pipeline.topic_tagging_ollama import STATE_KIND
+
+    class Recording:
+        prompt = ""
+
+        def generate(self, prompt):
+            Recording.prompt = prompt
+            return '["housing"]'
+
+    assert classify_local_bill_topics("Affordable Housing", "An act relating to housing", client=Recording(),
+                                      kind=STATE_KIND) == ["housing"]
+    assert "a piece of Florida state legislation" in Recording.prompt
+    assert "local government" not in Recording.prompt

@@ -105,3 +105,20 @@ def bill_factory(db_session):
         return entity
 
     return _factory
+
+
+@pytest.fixture(autouse=True)
+def _no_real_ollama_for_topic_tagging(monkeypatch):
+    """Ingestion now topic-tags state bills with the local model when
+    LegiScan has no subjects. Without this, any test that ingests a bill
+    would try to reach a real Ollama host (and retry). Tests that exercise
+    the classifier pass their own fake client and are unaffected."""
+    import httpx
+
+    from app.pipeline import topic_tagging_ollama
+
+    class _Unreachable:
+        def generate(self, prompt):
+            raise httpx.ConnectError("no Ollama in tests")
+
+    monkeypatch.setattr(topic_tagging_ollama, "OllamaClient", _Unreachable)

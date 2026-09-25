@@ -572,6 +572,13 @@ def ingest_state_bills(
             )
 
         subjects = _extract_subjects(detail)
+        if not subjects:
+            # LegiScan's subjects are empty for FL on this API tier, so
+            # classify with the local model instead, as local bills are. It
+            # falls back to "governance" if Ollama is unreachable.
+            from app.pipeline.topic_tagging_ollama import STATE_KIND, tag_local_bill
+
+            tag_local_bill(db, entity.id, title=entity.name, description=bill.description or "", kind=STATE_KIND)
         if subjects:
             try:
                 assign_tags_for_bill(db, entity.id, raw_subjects=subjects)
