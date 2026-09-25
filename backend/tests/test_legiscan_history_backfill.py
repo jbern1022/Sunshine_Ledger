@@ -229,3 +229,14 @@ def test_backfill_stores_new_staff_analyses_from_the_same_getbill(monkeypatch, d
     assert stored.committee == "Commerce Committee"
     assert stored.text == "Analysis text"
     assert len(events(db_session, bill, "AMENDED")) == 3  # committed before the analysis step
+
+
+def test_introduced_date_falls_back_to_the_earliest_history_entry():
+    from datetime import date
+
+    from app.pipeline.legiscan import introduced_date
+
+    assert introduced_date({"history": HISTORY}) == date(2026, 1, 9)
+    assert introduced_date({"introduced": "2026-01-05", "history": HISTORY}) == date(2026, 1, 5)
+    assert introduced_date({"history": [{"date": ""}]}) is None
+    assert introduced_date({}) is None
