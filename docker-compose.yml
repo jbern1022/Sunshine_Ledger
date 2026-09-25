@@ -53,8 +53,14 @@ services:
   # connectors with Cloudflare's edge, which load-balances/fails over
   # between them automatically -- one container dying doesn't take the
   # public site down with it.
+  # The Cloudflare tunnel only starts with `--profile tunnel`, which
+  # scripts/deploy.sh passes. A plain `docker compose up` on a laptop whose
+  # .env holds the real token would otherwise register that laptop as a
+  # connector for the production hostnames and Cloudflare would split public
+  # traffic between it and production -- part of the 2026-09-20 outage.
   cloudflared:
     image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
     restart: unless-stopped
     command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
@@ -63,6 +69,7 @@ services:
 
   cloudflared2:
     image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
     restart: unless-stopped
     command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:

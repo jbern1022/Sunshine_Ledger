@@ -308,7 +308,7 @@ host**, only the resolved container env vars are sent over the Docker API.
 | Secret | Where to get a new one |
 |---|---|
 | `LEGISCAN_API_KEY` | legiscan.com account |
-| `CLOUDFLARE_TUNNEL_TOKEN` | Zero Trust → Networks → Tunnels → sunshine-ledger. Rotating requires updating the tunnel in Cloudflare's dashboard, then `docker compose up -d cloudflared` |
+| `CLOUDFLARE_TUNNEL_TOKEN` | Zero Trust → Networks → Tunnels → sunshine-ledger. Rotating requires updating the tunnel in Cloudflare's dashboard, then `./scripts/deploy.sh` (the cloudflared services only start with `--profile tunnel`, which deploy.sh passes) |
 | `POSTGRES_PASSWORD` | Change in `.env`, then `docker compose up -d db backend` -- existing data isn't affected, just the connection credential |
 | `OLLAMA_HOST` | See "Powerstation IP drift" below |
 

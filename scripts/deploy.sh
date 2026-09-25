@@ -56,7 +56,9 @@ echo "==> compose file: $COMPOSE_FILE"
 echo "==> env file:      $ENV_FILE"
 echo "==> context:        $DOCKER_CONTEXT  project: $PROJECT_NAME"
 
-COMPOSE=(docker --context "$DOCKER_CONTEXT" compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE")
+# --profile tunnel: the cloudflared services only start when asked for (see
+# docker-compose.yml), and production is the one place that asks.
+COMPOSE=(docker --context "$DOCKER_CONTEXT" compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" --profile tunnel)
 
 echo "==> Building backend + frontend..."
 "${COMPOSE[@]}" build backend frontend
