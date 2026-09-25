@@ -15,7 +15,9 @@ type Props = {
 const BADGE_STYLE: Record<Origin, string> = {
   bill_text: "bg-slate-100 text-slate-700",
   legislative_staff: "bg-slate-100 text-slate-700",
-  sunshine_ledger_ai: "bg-sunshine-100 text-sunshine-600",
+  // Text on the pale sunshine badge needs the darkest shade: sunshine-600 on
+  // sunshine-100 measured 3.06:1, under WCAG AA's 4.5:1 for 12px text.
+  sunshine_ledger_ai: "bg-sunshine-100 text-sunshine-800",
 };
 
 function VersionBody({ layer, version }: { layer: LayerKey; version: LayerVersion }) {
@@ -96,7 +98,7 @@ function Block({ layer, origin, block, hasStaffAnalysis }: {
               ))}
             </p>
           )}
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-slate-500">
             {version.generated_by.replace(/^llm:/, "Model: ")} · method {version.method_version} · updated{" "}
             {formatDate(version.created_at)}
           </p>
