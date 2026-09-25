@@ -95,6 +95,59 @@ def is_staff_analysis(supplement: dict) -> bool:
     return supplement.get("title") == "Analysis"
 
 
+def store_new_staff_analyses(
+    db: Session, client: LegiScanClient, *, entity: Entity, supplements: list[dict], known_ids: set[int]
+) -> tuple[int, int]:
+    """Fetch and store the staff analyses in a getBill `supplements` array
+    that aren't stored yet: one `getSupplement` call each. Shared by
+    backfill_staff_analyses and legiscan.sync_state_bill_history, which
+    already has the getBill response in hand. Adds stored ids to
+    `known_ids`. Returns (fetched, failed).
+    """
+    fetched = failed = 0
+    for supp in supplements:
+        if not is_staff_analysis(supp):
+            continue
+        supplement_id = supp.get("supplement_id")
+        if not supplement_id or supplement_id in known_ids:
+            continue
+
+        try:
+            doc = client.get_supplement(int(supplement_id))
+            raw = base64.b64decode(doc["doc"])
+            if doc.get("mime") != "application/pdf":
+                logger.warning(
+                    "supplement_id=%s has unsupported mime %s -- skipping",
+                    supplement_id, doc.get("mime"),
+                )
+                failed += 1
+                continue
+
+            text = extract_analysis_pdf_text(raw)
+
+            db.execute(
+                pg_insert(StaffAnalysis)
+                .values(
+                    entity_id=entity.id,
+                    legiscan_supplement_id=int(supplement_id),
+                    committee=html.unescape(supp.get("description") or "") or None,
+                    analysis_date=_parse_date(supp.get("date")),
+                    source_url=supp.get("state_link") or supp.get("url"),
+                    legiscan_url=supp.get("url"),
+                    text=text,
+                )
+                .on_conflict_do_nothing(index_elements=["legiscan_supplement_id"])
+            )
+            db.commit()
+            known_ids.add(supplement_id)
+            fetched += 1
+        except Exception as exc:  # noqa: BLE001 -- one bad document shouldn't kill the backfill
+            db.rollback()
+            failed += 1
+            logger.warning("Supplement fetch failed for supplement_id=%s: %s", supplement_id, exc)
+    return fetched, failed
+
+
 def backfill_staff_analyses(db: Session, *, limit: int | None = None) -> tuple[int, int]:
     """Populate `staff_analyses` for FL LegiScan bills.
 
@@ -135,46 +188,11 @@ def backfill_staff_analyses(db: Session, *, limit: int | None = None) -> tuple[i
             logger.warning("getBill failed for legiscan_id=%s: %s", legiscan_id, exc)
             continue
 
-        for supp in detail.get("supplements") or []:
-            if not is_staff_analysis(supp):
-                continue
-            supplement_id = supp.get("supplement_id")
-            if not supplement_id or supplement_id in known_ids:
-                continue
-
-            try:
-                doc = client.get_supplement(int(supplement_id))
-                raw = base64.b64decode(doc["doc"])
-                if doc.get("mime") != "application/pdf":
-                    logger.warning(
-                        "supplement_id=%s has unsupported mime %s -- skipping",
-                        supplement_id, doc.get("mime"),
-                    )
-                    failed += 1
-                    continue
-
-                text = extract_analysis_pdf_text(raw)
-
-                db.execute(
-                    pg_insert(StaffAnalysis)
-                    .values(
-                        entity_id=entity.id,
-                        legiscan_supplement_id=int(supplement_id),
-                        committee=html.unescape(supp.get("description") or "") or None,
-                        analysis_date=_parse_date(supp.get("date")),
-                        source_url=supp.get("state_link") or supp.get("url"),
-                        legiscan_url=supp.get("url"),
-                        text=text,
-                    )
-                    .on_conflict_do_nothing(index_elements=["legiscan_supplement_id"])
-                )
-                db.commit()
-                known_ids.add(supplement_id)
-                fetched += 1
-            except Exception as exc:  # noqa: BLE001 -- one bad document shouldn't kill the backfill
-                db.rollback()
-                failed += 1
-                logger.warning("Supplement fetch failed for supplement_id=%s: %s", supplement_id, exc)
+        ok, bad = store_new_staff_analyses(
+            db, client, entity=entity, supplements=detail.get("supplements") or [], known_ids=known_ids
+        )
+        fetched += ok
+        failed += bad
 
     logger.info("Staff analyses: %d fetched, %d skipped/failed", fetched, failed)
     return fetched, failed
