@@ -124,3 +124,73 @@ def test_clean_stored_texts_dry_run_then_apply(db_session, bill_factory):
     db_session.refresh(dirty.bill)
     assert dirty.bill.full_text == "Section 1. Text.\nMore text."
     assert clean_stored_texts(db_session, apply=False)["changed"] == 0
+
+
+SENATE_AMENDMENT = (
+    "Florida Senate - 2026                          SENATOR AMENDMENT\n"
+    "Bill No. SB 7040\n"
+    "Ì877368ZÎ877368\n"
+    "LEGISLATIVE ACTION\n"
+    "Senate             .             House\n"
+    ".\n"
+    ".\n"
+    "Floor: 1/AD/RM         .            Floor: C\n"
+    "03/13/2026 02:39 PM       .      03/13/2026 03:12 PM\n"
+    "—————————————————————————————————————————————————————————————————\n"
+    "Senator Hooper moved the following:\n"
+    "Delete lines 6 - 65\n"
+    "and insert:\n"
+    "[added: within the Executive Office of the Governor.]"
+)
+
+HOUSE_AMENDMENT = (
+    "COMMITTEE/SUBCOMMITTEE AMENDMENT\n"
+    "Bill No. HB 657 (2026)\n"
+    "Amendment No.\n"
+    "[added: COMMITTEE/SUBCOMMITTEE ACTION]\n"
+    "ADOPTED (Y/N)\n"
+    "ADOPTED AS AMENDED (Y/N)\n"
+    "ADOPTED W/O OBJECTION (Y/N)\n"
+    "FAILED TO ADOPT (Y/N)\n"
+    "WITHDRAWN (Y/N)\n"
+    "OTHER\n"
+    "Representative Porras offered the following:\n"
+    "Between lines 53 and 54, insert:"
+)
+
+
+def test_strip_amendment_furniture_senate_cover_box():
+    from app.pipeline.text_cleanup import strip_amendment_furniture
+
+    assert strip_amendment_furniture(SENATE_AMENDMENT) == (
+        "Florida Senate - 2026                          SENATOR AMENDMENT\n"
+        "Bill No. SB 7040\n"
+        "Floor: 1/AD/RM         .            Floor: C\n"
+        "03/13/2026 02:39 PM       .      03/13/2026 03:12 PM\n"
+        "Senator Hooper moved the following:\n"
+        "Delete lines 6 - 65\n"
+        "and insert:\n"
+        "[added: within the Executive Office of the Governor.]"
+    )
+
+
+def test_strip_amendment_furniture_house_checkbox_form():
+    from app.pipeline.text_cleanup import strip_amendment_furniture
+
+    assert strip_amendment_furniture(HOUSE_AMENDMENT) == (
+        "COMMITTEE/SUBCOMMITTEE AMENDMENT\n"
+        "Bill No. HB 657 (2026)\n"
+        "Amendment No.\n"
+        "Representative Porras offered the following:\n"
+        "Between lines 53 and 54, insert:"
+    )
+
+
+def test_strip_amendment_furniture_leaves_body_text_alone():
+    from app.pipeline.text_cleanup import strip_amendment_furniture
+
+    body = "Section 1. The fee is $25.\n(a) Other provisions apply.\nSenate Bill 12 is repealed."
+    assert strip_amendment_furniture(body) == body
+    assert strip_amendment_furniture(strip_amendment_furniture(SENATE_AMENDMENT)) == strip_amendment_furniture(
+        SENATE_AMENDMENT
+    )
