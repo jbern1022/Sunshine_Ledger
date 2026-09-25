@@ -76,8 +76,9 @@ step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeli
 # Bill page layers (Bill Says / Interpretation / Expected Effect). Only
 # re-generates blocks whose inputs changed. Capped per night, both by bill
 # count and by wall clock, so a large backlog (e.g. after a prompt change)
-# can't run into the morning.
-step "Bill layers" docker exec "$CONTAINER" python -m app.pipeline.bill_layers_batch --limit 150 --max-minutes 180
+# can't run into the morning. The first nightly run did
+# 150 bills in 31 min (2026-09-25), so 400 should take ~85 min.
+step "Bill layers" docker exec "$CONTAINER" python -m app.pipeline.bill_layers_batch --limit 400 --max-minutes 180
 
 # Not ingestion, but it needs to run daily and this is the daily job. Keeps
 # the privacy page's promise: reporter emails on flags resolved 90+ days ago
