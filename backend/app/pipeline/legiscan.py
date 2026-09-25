@@ -12,6 +12,7 @@ so the rest of the pipeline can still be exercised locally.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from datetime import date, datetime, timezone
 
 import httpx
@@ -44,6 +45,19 @@ class LegiScanError(RuntimeError):
     pass
 
 
+# LegiScan calls made by this process, by operation, counting retries.
+# HTTP request logging is silenced (it would print the API key), so this is
+# the only record of what a run cost against the monthly quota (10,000
+# calls from 2026-10-01).
+API_CALLS: Counter[str] = Counter()
+
+
+def api_usage_summary() -> str:
+    total = sum(API_CALLS.values())
+    detail = ", ".join(f"{op} {n}" for op, n in sorted(API_CALLS.items()))
+    return f"LegiScan API calls this run: {total}" + (f" ({detail})" if detail else "")
+
+
 class LegiScanClient:
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key or settings.legiscan_api_key
@@ -56,6 +70,7 @@ class LegiScanClient:
 
     def _call(self, op: str, **params: str) -> dict:
         def _do_request() -> dict:
+            API_CALLS[op] += 1
             resp = self._client.get("", params={"key": self.api_key, "op": op, **params})
             resp.raise_for_status()
             return resp.json()
@@ -744,3 +759,4 @@ if __name__ == "__main__":
             print(f"API calls beyond the dataset download: {client.fallback_calls}.")
     finally:
         session.close()
+        print(api_usage_summary())
