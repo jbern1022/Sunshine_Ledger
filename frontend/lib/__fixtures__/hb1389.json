@@ -1,0 +1,471 @@
+{
+ "bill_number": "H1389",
+ "actions": [
+  {
+   "date": "2026-01-09",
+   "chamber": "House",
+   "action": "Filed",
+   "important": true
+  },
+  {
+   "date": "2026-01-13",
+   "chamber": "House",
+   "action": "1st Reading (Original Filed Version)",
+   "important": false
+  },
+  {
+   "date": "2026-01-15",
+   "chamber": "House",
+   "action": "Referred to Housing, Agriculture & Tourism Subcommittee",
+   "important": true
+  },
+  {
+   "date": "2026-01-15",
+   "chamber": "House",
+   "action": "Referred to Intergovernmental Affairs Subcommittee",
+   "important": true
+  },
+  {
+   "date": "2026-01-15",
+   "chamber": "House",
+   "action": "Referred to Commerce Committee",
+   "important": true
+  },
+  {
+   "date": "2026-01-15",
+   "chamber": "House",
+   "action": "Now in Housing, Agriculture & Tourism Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-02-09",
+   "chamber": "House",
+   "action": "Added to Housing, Agriculture & Tourism Subcommittee agenda",
+   "important": false
+  },
+  {
+   "date": "2026-02-11",
+   "chamber": "House",
+   "action": "Favorable with CS by Housing, Agriculture & Tourism Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-02-12",
+   "chamber": "House",
+   "action": "Reported out of Housing, Agriculture & Tourism Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-02-12",
+   "chamber": "House",
+   "action": "Laid on Table under Rule 7.18(a)",
+   "important": false
+  },
+  {
+   "date": "2026-02-12",
+   "chamber": "House",
+   "action": "CS Filed",
+   "important": false
+  },
+  {
+   "date": "2026-02-13",
+   "chamber": "House",
+   "action": "Referred to Intergovernmental Affairs Subcommittee",
+   "important": true
+  },
+  {
+   "date": "2026-02-13",
+   "chamber": "House",
+   "action": "Referred to Commerce Committee",
+   "important": true
+  },
+  {
+   "date": "2026-02-13",
+   "chamber": "House",
+   "action": "Now in Intergovernmental Affairs Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-02-13",
+   "chamber": "House",
+   "action": "1st Reading (Committee Substitute 1)",
+   "important": false
+  },
+  {
+   "date": "2026-02-16",
+   "chamber": "House",
+   "action": "Added to Intergovernmental Affairs Subcommittee agenda",
+   "important": false
+  },
+  {
+   "date": "2026-02-18",
+   "chamber": "House",
+   "action": "Favorable by Intergovernmental Affairs Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-02-18",
+   "chamber": "House",
+   "action": "Reported out of Intergovernmental Affairs Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-02-18",
+   "chamber": "House",
+   "action": "Now in Commerce Committee",
+   "important": false
+  },
+  {
+   "date": "2026-02-20",
+   "chamber": "House",
+   "action": "Added to Commerce Committee agenda",
+   "important": false
+  },
+  {
+   "date": "2026-02-24",
+   "chamber": "House",
+   "action": "Favorable with CS by Commerce Committee",
+   "important": false
+  },
+  {
+   "date": "2026-02-25",
+   "chamber": "House",
+   "action": "Reported out of Commerce Committee",
+   "important": false
+  },
+  {
+   "date": "2026-02-25",
+   "chamber": "House",
+   "action": "Laid on Table under Rule 7.18(a)",
+   "important": false
+  },
+  {
+   "date": "2026-02-25",
+   "chamber": "House",
+   "action": "CS Filed",
+   "important": false
+  },
+  {
+   "date": "2026-02-25",
+   "chamber": "House",
+   "action": "Bill referred to House Calendar",
+   "important": true
+  },
+  {
+   "date": "2026-02-25",
+   "chamber": "House",
+   "action": "1st Reading (Committee Substitute 2)",
+   "important": false
+  },
+  {
+   "date": "2026-02-26",
+   "chamber": "House",
+   "action": "Added to Second Reading Calendar",
+   "important": false
+  },
+  {
+   "date": "2026-02-26",
+   "chamber": "House",
+   "action": "Bill added to Special Order Calendar (3/4/2026)",
+   "important": false
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "House",
+   "action": "Read 2nd time",
+   "important": false
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "House",
+   "action": "Added to Third Reading Calendar",
+   "important": false
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "House",
+   "action": "Read 3rd time",
+   "important": false
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "House",
+   "action": "CS passed; YEAS 76, NAYS 29",
+   "important": false
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "Senate",
+   "action": "In Messages",
+   "important": true
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "Senate",
+   "action": "Referred to Rules",
+   "important": true
+  },
+  {
+   "date": "2026-03-04",
+   "chamber": "Senate",
+   "action": "Received",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "Withdrawn from Rules",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "Placed on Calendar, on 2nd reading",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "Substituted for SB 1548",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "Read 2nd time",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "Amendment(s) adopted (668106)",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "Read 3rd time",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "action": "CS passed as amended; YEAS 34 NAYS 0",
+   "important": false
+  },
+  {
+   "date": "2026-03-06",
+   "chamber": "House",
+   "action": "In Messages",
+   "important": true
+  },
+  {
+   "date": "2026-03-12",
+   "chamber": "House",
+   "action": "Added to Senate Message List",
+   "important": false
+  },
+  {
+   "date": "2026-03-12",
+   "chamber": "House",
+   "action": "Amendment 680391 adopted",
+   "important": false
+  },
+  {
+   "date": "2026-03-12",
+   "chamber": "House",
+   "action": "Concurred in Senate amendment 668106 as amended",
+   "important": false
+  },
+  {
+   "date": "2026-03-12",
+   "chamber": "House",
+   "action": "CS passed as amended; YEAS 98, NAYS 4",
+   "important": false
+  },
+  {
+   "date": "2026-03-12",
+   "chamber": "Senate",
+   "action": "In returning messages",
+   "important": false
+  },
+  {
+   "date": "2026-03-13",
+   "chamber": "Senate",
+   "action": "Concurred in House amendment(s) to Senate amendment(s) (680391)",
+   "important": false
+  },
+  {
+   "date": "2026-03-13",
+   "chamber": "Senate",
+   "action": "CS passed; YEAS 35 NAYS 0",
+   "important": false
+  },
+  {
+   "date": "2026-03-13",
+   "chamber": "House",
+   "action": "In Messages",
+   "important": true
+  },
+  {
+   "date": "2026-03-13",
+   "chamber": "House",
+   "action": "Ordered engrossed, then enrolled",
+   "important": true
+  },
+  {
+   "date": "2026-06-15",
+   "chamber": null,
+   "action": "Signed by Officers and presented to Governor",
+   "important": false
+  },
+  {
+   "date": "2026-06-26",
+   "chamber": null,
+   "action": "Approved by Governor",
+   "important": true
+  },
+  {
+   "date": "2026-06-29",
+   "chamber": null,
+   "action": "Chapter No. 2026-179; Companion bill(s) passed, see SB 962 (Ch. 2026-163)",
+   "important": true
+  }
+ ],
+ "votes": [
+  {
+   "id": "02901e65-b3a3-44eb-b7f2-5325859a5b9b",
+   "roll_call_id": "1630351",
+   "chamber": "H",
+   "description": "House Housing, Agriculture & Tourism Subcommittee",
+   "date": "2026-02-11",
+   "yea": 15,
+   "nay": 0,
+   "nv": 0,
+   "absent": 2,
+   "total": 17,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1630351",
+   "votes": []
+  },
+  {
+   "id": "7e0020c5-95bb-485e-abb0-b6102e929217",
+   "roll_call_id": "1637584",
+   "chamber": "H",
+   "description": "House Intergovernmental Affairs Subcommittee",
+   "date": "2026-02-18",
+   "yea": 13,
+   "nay": 2,
+   "nv": 0,
+   "absent": 2,
+   "total": 17,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1637584",
+   "votes": []
+  },
+  {
+   "id": "a1d0b55f-1bf7-4af3-b0e0-aed6d3be79c4",
+   "roll_call_id": "1644346",
+   "chamber": "H",
+   "description": "House Commerce Committee",
+   "date": "2026-02-24",
+   "yea": 18,
+   "nay": 5,
+   "nv": 0,
+   "absent": 3,
+   "total": 26,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1644346",
+   "votes": []
+  },
+  {
+   "id": "42e48c26-7be0-4b42-95b0-10c128873f43",
+   "roll_call_id": "1652248",
+   "chamber": "H",
+   "description": "House: Third Reading RCS#662",
+   "date": "2026-03-04",
+   "yea": 76,
+   "nay": 29,
+   "nv": 12,
+   "absent": 0,
+   "total": 117,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1652248",
+   "votes": []
+  },
+  {
+   "id": "c645fc93-226c-4220-b045-f877f5ff4018",
+   "roll_call_id": "1656565",
+   "chamber": "S",
+   "description": "Senate: Third Reading RCS#32",
+   "date": "2026-03-06",
+   "yea": 34,
+   "nay": 0,
+   "nv": 0,
+   "absent": 5,
+   "total": 39,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1656565",
+   "votes": []
+  },
+  {
+   "id": "8429e946-8a8e-48a2-9dd8-3be09153dba2",
+   "roll_call_id": "1661635",
+   "chamber": "H",
+   "description": "House: Third Reading RCS#846",
+   "date": "2026-03-12",
+   "yea": 98,
+   "nay": 4,
+   "nv": 15,
+   "absent": 0,
+   "total": 117,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1661635",
+   "votes": []
+  },
+  {
+   "id": "0bfdbcf2-ffa8-47c8-bc22-92076f38ba82",
+   "roll_call_id": "1662231",
+   "chamber": "S",
+   "description": "Senate: Third Reading RCS#3",
+   "date": "2026-03-13",
+   "yea": 35,
+   "nay": 0,
+   "nv": 3,
+   "absent": 1,
+   "total": 39,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/H1389/id/1662231",
+   "votes": []
+  }
+ ],
+ "amendments": [
+  {
+   "id": "f7c19e7f-e2e1-4242-937d-d046497754f2",
+   "amendment_id": 271783,
+   "date": "2026-02-10",
+   "chamber": "House",
+   "adopted": false,
+   "description": "House Committee Amendment #208403",
+   "amendment_text": null
+  },
+  {
+   "id": "3fd583f5-fca0-431f-aba9-22dad5dfb8c1",
+   "amendment_id": 283302,
+   "date": "2026-03-06",
+   "chamber": "Senate",
+   "adopted": false,
+   "description": "Senate Floor Amendment (Delete All) #668106",
+   "amendment_text": null
+  },
+  {
+   "id": "9db13290-03e8-410b-a1fc-df91a441324a",
+   "amendment_id": 285930,
+   "date": "2026-03-12",
+   "chamber": "House",
+   "adopted": true,
+   "description": "House Floor Amendment #680391 to Amendment (668106)",
+   "amendment_text": null
+  }
+ ]
+}

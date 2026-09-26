@@ -101,6 +101,14 @@ export interface AmendmentOut {
   amendment_text: string | null;
 }
 
+/** One step of a state bill's official action history (LegiScan). */
+export interface ActionOut {
+  date: string;
+  chamber: string | null;
+  action: string;
+  important: boolean;
+}
+
 export interface BillDetail extends BillListItem {
   last_action: string | null;
   full_text: string | null;
@@ -109,6 +117,8 @@ export interface BillDetail extends BillListItem {
   news: NewsItemOut[];
   votes: RollCallOut[];
   amendments: AmendmentOut[];
+  /** Oldest first; empty for local bills. */
+  actions?: ActionOut[];
   layers: BillLayers;
   has_staff_analysis: boolean;
 }

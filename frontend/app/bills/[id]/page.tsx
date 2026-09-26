@@ -7,6 +7,7 @@ import TagBadges from "@/components/TagBadges";
 import AmendmentDiff from "@/components/AmendmentDiff";
 import MarkedText from "@/components/MarkedText";
 import BillLayers from "@/components/BillLayers";
+import LegislativeTimeline from "@/components/LegislativeTimeline";
 import { hasAnyLayer } from "@/lib/layers";
 
 /** Permalink for a single bill.
@@ -106,6 +107,15 @@ export default async function BillPage({ params }: Props) {
         </>
       )}
 
+      {bill.actions && bill.actions.length > 0 && (
+        <LegislativeTimeline
+          actions={bill.actions}
+          votes={bill.votes}
+          amendments={bill.amendments}
+          officialUrl={bill.full_text_url}
+        />
+      )}
+
       {bill.sponsors.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Sponsors</h2>
@@ -133,7 +143,7 @@ export default async function BillPage({ params }: Props) {
           </p>
           <ul className="mt-1 space-y-2 text-sm">
             {bill.votes.map((v) => (
-              <li key={v.id} className="rounded-md border border-slate-200 p-2">
+              <li key={v.id} id={`roll-call-${v.roll_call_id}`} className="scroll-mt-4 rounded-md border border-slate-200 p-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-medium text-slate-700">{v.description}</span>
                   <span className="text-xs text-slate-500">{v.date}</span>
@@ -184,7 +194,7 @@ export default async function BillPage({ params }: Props) {
           <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
           <ul className="mt-1 space-y-1 text-sm text-slate-700">
             {bill.amendments.map((a) => (
-              <li key={a.id}>
+              <li key={a.id} id={`amendment-${a.id}`} className="scroll-mt-4">
                 Amendment filed {a.date}
                 {a.chamber && <> in {a.chamber}</>}
                 {a.adopted ? " — adopted" : " — not adopted"}
