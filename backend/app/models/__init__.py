@@ -10,6 +10,7 @@ from app.models.tag import BillTag, SubjectMapping, Tag
 from app.models.demographic_overlay import DemographicOverlay
 from app.models.staff_analysis import StaffAnalysis
 from app.models.bill_layer import BillLayer, BillLayerSource, BillLayerReview
+from app.models.source_check import SourceCheck
 
 __all__ = [
     "Entity",
@@ -29,4 +30,5 @@ __all__ = [
     "BillLayer",
     "BillLayerSource",
     "BillLayerReview",
+    "SourceCheck",
 ]

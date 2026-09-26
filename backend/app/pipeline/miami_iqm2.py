@@ -27,6 +27,7 @@ from app.models import Bill, Entity, Relationship, Source
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
+from app.pipeline.source_checks import record_check
 from app.pipeline.topic_tagging_ollama import tag_local_bill
 
 logger = logging.getLogger(__name__)
@@ -272,6 +273,7 @@ def ingest_miami_legislation(db: Session, *, limit: int = 20) -> list[Entity]:
 
     db.commit()
     logger.info("Ingested %d Miami legislation records from iQM2", len(written))
+    record_check(db, "iqm2_miami", f"{len(written)} records ingested")
     return written
 
 

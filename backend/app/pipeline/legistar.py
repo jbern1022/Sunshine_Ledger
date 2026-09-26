@@ -21,6 +21,7 @@ from app.models import Bill, Entity, Relationship, Source
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
+from app.pipeline.source_checks import record_check
 from app.pipeline.topic_tagging_ollama import tag_local_bill
 
 logger = logging.getLogger(__name__)
@@ -217,6 +218,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
     db.commit()
     logger.info("Ingested %d local matters from Legistar client=%s", len(written), client_name)
+    record_check(db, f"legistar_{client_name}", f"{len(written)} matters upserted")
     return written
 
 

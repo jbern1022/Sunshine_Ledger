@@ -10,6 +10,7 @@ vi.mock("@/lib/api", () => ({
   fetchElections: vi.fn(() => Promise.reject(new Error("not under test"))),
   fetchStatuses: vi.fn(() => Promise.resolve([])),
   fetchTags: vi.fn(() => Promise.resolve([])),
+  fetchSourceStatus: vi.fn(() => Promise.reject(new Error("not under test"))),
 }));
 
 vi.mock("@/components/BillCard", () => ({

@@ -433,6 +433,7 @@ def ingest_state_bills(
     state = state or settings.legiscan_state
     client = client or LegiScanClient()
 
+    live = master_list is None  # the nightly path, not a dataset import
     if master_list is None:
         master_list = client.get_master_list(state)
     if limit:
@@ -602,6 +603,10 @@ def ingest_state_bills(
         state,
         roll_calls_fetched,
     )
+    if live:
+        from app.pipeline.source_checks import record_check
+
+        record_check(db, "legiscan", f"{len(written)} bills changed or new")
     return written
 
 

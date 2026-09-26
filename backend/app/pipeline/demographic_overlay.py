@@ -320,6 +320,9 @@ def load_all_overlays(db: Session, *, bls_year: str | None = None) -> dict[str, 
         or load_bls_county_unemployment(db, year=str(date.today().year - 1)),
     }
     logger.info("Demographic overlay batch load complete: %s", results)
+    from app.pipeline.source_checks import record_check
+
+    record_check(db, "census_bls", f"{sum(results.values())} overlays loaded")
     return results
 
 

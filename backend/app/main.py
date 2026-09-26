@@ -5,6 +5,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.api import bill_layers_admin, bills, elections, flags, health as health_router, map as map_router, people
+from app.api import sources as sources_router
 from app.config import settings
 from app.rate_limit import limiter
 
@@ -32,6 +33,7 @@ app.include_router(bill_layers_admin.router)
 app.include_router(elections.router)
 app.include_router(people.router)
 app.include_router(health_router.router)
+app.include_router(sources_router.router)
 
 
 @app.middleware("http")

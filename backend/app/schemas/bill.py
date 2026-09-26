@@ -105,6 +105,9 @@ class BillListItem(BaseModel):
     full_text_url: str | None
     primary_sponsor: str | None
     tags: list["TagOut"]
+    # legiscan | legistar | iqm2 -- which data source the bill came from,
+    # for the "source · last checked" note (GET /sources/status).
+    source_system: str | None = None
 
 
 class LayerItemOut(BaseModel):

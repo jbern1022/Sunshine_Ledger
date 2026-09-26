@@ -7,6 +7,7 @@ import type {
   FlagCreate,
   PersonDetail,
   PersonListResponse,
+  SourceStatus,
   StatusCount,
   TagCount,
 } from "./types";
@@ -101,5 +102,11 @@ export async function fetchStatuses(jurisdictionName?: string): Promise<StatusCo
 export async function fetchTags(): Promise<TagCount[]> {
   const res = await fetch(`${API_URL}/bills/tags`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch tags: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSourceStatus(): Promise<SourceStatus[]> {
+  const res = await fetch(`${API_URL}/sources/status`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch source status: ${res.status}`);
   return res.json();
 }
