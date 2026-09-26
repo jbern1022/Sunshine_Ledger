@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPerson } from "@/lib/server-api";
+import VotingRecord from "@/components/VotingRecord";
 
 /** One sponsor and the bills they're attached to.
  *
@@ -12,10 +13,10 @@ import { getPerson } from "@/lib/server-api";
  *  is a question people put into a search engine, and a client-rendered
  *  page answers it with an empty shell.
  *
- *  Strictly a record of sponsorship drawn from bill data. No voting record,
- *  no consistency score, no characterisation of the sponsor -- those are
- *  Phase 2/3 on the Roadmap and sit behind a legal review that hasn't
- *  happened.
+ *  Sponsorship and recorded roll-call votes drawn from official records,
+ *  filterable by bill topic. No consistency score, no characterisation of
+ *  the sponsor, no reasons for votes -- those are Phase 2/3 on the Roadmap
+ *  and sit behind a legal review that hasn't happened.
  */
 
 type Props = { params: Promise<{ id: string }> };
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description =
     `Bills sponsored or co-sponsored by ${person.name}` +
     `${person.district ? `, ${person.district}` : ""} — ${person.sponsored_count} tracked. ` +
-    "Sponsorship record only; no ratings or voting record.";
+    "Sponsorships and recorded votes; no ratings or scores.";
 
   return {
     title,
@@ -44,6 +45,7 @@ export default async function PersonPage({ params }: Props) {
   const { id } = await params;
   const person = await getPerson(id);
   if (!person) notFound();
+  const isStateLegislator = person.jurisdiction_name === "FL" && !person.is_committee;
 
   return (
     <div>
@@ -59,37 +61,26 @@ export default async function PersonPage({ params }: Props) {
       </p>
 
       <p className="mt-4 text-sm text-slate-600">
-        Attached to <span className="font-medium">{person.sponsored_count}</span> tracked bill
-        {person.sponsored_count === 1 ? "" : "s"}. This is a record of sponsorship only — it is not a
-        voting record, and nothing here rates or characterises this sponsor.
+        {person.is_committee ? (
+          <>
+            A committee, listed as a sponsor on the {person.sponsored_count} committee substitute
+            {person.sponsored_count === 1 ? "" : "s"} it produced. Committees don&apos;t cast recorded votes.
+          </>
+        ) : (
+          <>
+            Sponsor or co-sponsor of <span className="font-medium">{person.sponsored_count}</span> tracked bill
+            {person.sponsored_count === 1 ? "" : "s"}. Nothing here rates or characterises this{" "}
+            {isStateLegislator ? "legislator" : "sponsor"}.
+          </>
+        )}
       </p>
 
-      {person.votes.length > 0 && (
-        <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Voting record</h2>
-          <p className="text-[11px] text-slate-500">
-            Plain vote tallies from official roll calls — not a score, and not a claim about this
-            sponsor.
-          </p>
-          <ul className="mt-1 space-y-1 text-sm">
-            {person.votes.map((v, i) => (
-              <li key={`${v.entity_id}-${i}`} className="flex flex-wrap items-baseline justify-between gap-2">
-                <span>
-                  <Link href={`/bills/${v.entity_id}`} className="text-sunshine-700 underline">
-                    {v.bill_number}
-                  </Link>
-                  {v.roll_call_description && (
-                    <span className="text-slate-500"> — {v.roll_call_description}</span>
-                  )}
-                </span>
-                <span className="shrink-0 text-xs text-slate-500">
-                  {v.vote}
-                  {v.date && <span className="text-slate-500"> · {v.date}</span>}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {person.votes.length > 0 && <VotingRecord votes={person.votes} bills={person.bills} />}
+      {person.votes.length === 0 && isStateLegislator && (
+        <p className="mt-4 text-sm text-slate-500">No recorded votes in the covered roll calls.</p>
+      )}
+      {!isStateLegislator && !person.is_committee && (
+        <p className="mt-4 text-xs text-slate-500">Vote records aren&apos;t collected for local officials.</p>
       )}
 
       {person.bills.length === 0 ? (

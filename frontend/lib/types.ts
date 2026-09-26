@@ -210,6 +210,12 @@ export interface ElectionCalendar {
 
 /** A legislator who sponsors tracked bills. Counts are plain facts drawn
  *  from bill records — deliberately not a ranking or an activity score. */
+/** A bill's active topic badge, for filtering a legislator's record. */
+export interface BillTopic {
+  slug: string;
+  label: string;
+}
+
 export interface PersonListItem {
   entity_id: string;
   name: string;
@@ -218,6 +224,8 @@ export interface PersonListItem {
   party: string | null;
   jurisdiction_name: string | null;
   sponsored_count: number;
+  /** A committee LegiScan lists as a bill sponsor, not a person. */
+  is_committee?: boolean;
 }
 
 export interface PersonBillItem {
@@ -228,6 +236,7 @@ export interface PersonBillItem {
   relationship_type: string;
   last_action_date: string | null;
   what_it_does: string | null;
+  tags?: BillTopic[];
 }
 
 /** One roll-call vote this legislator cast. Plain fact only -- how they
@@ -239,6 +248,11 @@ export interface PersonVoteItem {
   vote: string;
   roll_call_description: string | null;
   date: string | null;
+  roll_call_id?: string | null;
+  /** "floor" (a Third/Second Reading roll call) or "committee". */
+  stage?: string;
+  source_url?: string | null;
+  tags?: BillTopic[];
 }
 
 export interface PersonDetail extends PersonListItem {

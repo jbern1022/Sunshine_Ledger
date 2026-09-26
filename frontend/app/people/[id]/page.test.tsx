@@ -52,7 +52,8 @@ describe("PersonPage", () => {
 
     expect(screen.getByRole("heading", { name: "Jane Smith" })).toBeInTheDocument();
     expect(screen.getByText("Representative · District 10 · N/A · FL")).toBeInTheDocument();
-    expect(screen.getByText(/not a voting record/i)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing here rates or characterises/i)).toBeInTheDocument();
+    expect(screen.queryByText(/not a voting record/i)).not.toBeInTheDocument();
   });
 
   it("shows an empty-state message when there are no tracked bills", async () => {
@@ -99,6 +100,8 @@ describe("PersonPage", () => {
           vote: "Yea",
           roll_call_description: "House: Third Reading RCS#549",
           date: "2026-02-25",
+          stage: "floor",
+          tags: [{ slug: "housing", label: "Housing" }],
         },
       ],
     });
@@ -107,8 +110,21 @@ describe("PersonPage", () => {
     expect(screen.getByText("Voting record")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "HB 7" })).toHaveAttribute("href", "/bills/b1");
     expect(screen.getByText(/House: Third Reading RCS#549/)).toBeInTheDocument();
-    expect(screen.getByText("Yea")).toBeInTheDocument();
-    expect(screen.getByText(/not a score, and not a claim/i)).toBeInTheDocument();
+    expect(screen.getByText("Yes")).toBeInTheDocument();
+    expect(screen.getByText(/not a score or a claim/i)).toBeInTheDocument();
+  });
+
+  it("labels a committee and gives it no voting record", async () => {
+    vi.mocked(serverApi.getPerson).mockResolvedValueOnce({
+      ...basePerson,
+      name: "Commerce Committee",
+      is_committee: true,
+      votes: [],
+    });
+    await renderPersonPage();
+    expect(screen.getByText(/A committee, listed as a sponsor/)).toBeInTheDocument();
+    expect(screen.queryByText("Voting record")).not.toBeInTheDocument();
+    expect(screen.queryByText(/No recorded votes/)).not.toBeInTheDocument();
   });
 
   it("does not render a Voting record section when there are no votes", async () => {

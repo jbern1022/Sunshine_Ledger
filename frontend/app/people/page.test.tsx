@@ -157,3 +157,18 @@ describe("PeoplePage pagination", () => {
     );
   });
 });
+
+describe("PeoplePage committees", () => {
+  it("labels committees and filters by kind", async () => {
+    vi.mocked(api.fetchPeople).mockResolvedValue({
+      total: 1,
+      items: [{ entity_id: "c1", name: "Commerce Committee", district: null, role: "Rep", party: null,
+                jurisdiction_name: "FL", sponsored_count: 12, is_committee: true }],
+    });
+    render(<PeoplePage />);
+
+    expect(await screen.findByText("Committee")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "State committees" }));
+    expect(vi.mocked(api.fetchPeople)).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "committee" }));
+  });
+});

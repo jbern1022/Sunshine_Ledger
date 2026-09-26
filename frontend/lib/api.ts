@@ -76,7 +76,9 @@ export async function fetchElections(state?: string): Promise<ElectionCalendar> 
   return res.json();
 }
 
-export async function fetchPeople(params: { q?: string; limit?: number; offset?: number } = {}): Promise<PersonListResponse> {
+export async function fetchPeople(
+  params: { q?: string; kind?: "legislator" | "committee"; limit?: number; offset?: number } = {},
+): Promise<PersonListResponse> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== "") search.set(k, String(v));
