@@ -19,6 +19,8 @@ export interface SponsorOut {
   entity_id: string;
   name: string;
   relationship_type: string;
+  /** A committee listed as sponsor of a committee substitute, not a person. */
+  is_committee?: boolean;
 }
 
 /** One badge assigned to a bill. `bill_tag_id` (not the tag's own id)

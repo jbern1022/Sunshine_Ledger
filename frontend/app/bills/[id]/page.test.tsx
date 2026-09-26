@@ -167,6 +167,24 @@ describe("BillPage", () => {
     expect(screen.getByText(/\(co-sponsor\)/)).toBeInTheDocument();
   });
 
+  it("lists committee sponsors separately from legislators", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      sponsors: [
+        { entity_id: "c1", name: "Commerce Committee", relationship_type: "sponsor", is_committee: true },
+        { entity_id: "c2", name: "Housing Subcommittee", relationship_type: "sponsor", is_committee: true },
+        { entity_id: "p1", name: "Mike Redondo", relationship_type: "sponsor" },
+      ],
+    });
+    await renderBillPage();
+
+    expect(screen.getByRole("link", { name: "Mike Redondo" })).toHaveAttribute("href", "/people/p1");
+    expect(screen.queryByRole("link", { name: "Commerce Committee" })).not.toBeInTheDocument();
+    expect(screen.getByText("Committee sponsors:")).toBeInTheDocument();
+    expect(screen.getByText("Commerce Committee")).toBeInTheDocument();
+    expect(screen.getByText(/produced this version of the bill/)).toBeInTheDocument();
+  });
+
   it("de-duplicates sources shared across multiple claims", async () => {
     const sharedSource = {
       id: "s1",

@@ -124,7 +124,8 @@ def _pick_primary_sponsor(sponsors: list[Entity]) -> Entity | None:
     district at all.
     """
     for sponsor in sponsors:
-        if (sponsor.attributes or {}).get("district"):
+        attributes = sponsor.attributes or {}
+        if attributes.get("district") and not attributes.get("committee"):
             return sponsor
     return sponsors[0] if sponsors else None
 
@@ -417,7 +418,13 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
     )
     sponsor_rows = db.execute(sponsor_stmt).all()
     sponsors_out = [
-        SponsorOut(entity_id=e.id, name=e.name, relationship_type=r.relationship_type) for r, e in sponsor_rows
+        SponsorOut(
+            entity_id=e.id,
+            name=e.name,
+            relationship_type=r.relationship_type,
+            is_committee=bool((e.attributes or {}).get("committee")),
+        )
+        for r, e in sponsor_rows
     ]
     primary = _pick_primary_sponsor([e for r, e in sponsor_rows if r.relationship_type == "sponsor"])
     primary_sponsor = primary.name if primary else None

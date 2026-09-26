@@ -124,11 +124,21 @@ class LegiScanClient:
         return self._call("getSupplement", id=str(supplement_id))["supplement"]
 
 
-def _person_attributes(*, district: str | None, role: str | None, party: str | None) -> dict:
+def _person_attributes(
+    *, district: str | None, role: str | None, party: str | None, committee: bool = False
+) -> dict:
     """Only the fields LegiScan actually populates -- omitting empties keeps
     `attributes` free of null-valued keys that would otherwise have to be
-    special-cased downstream."""
-    return {k: v for k, v in (("district", district), ("role", role), ("party", party)) if v}
+    special-cased downstream.
+
+    `committee`: LegiScan lists the committees that produced a committee
+    substitute as sponsors (`committee_sponsor: 1`), stored as "person"
+    entities like legislators. The flag lets the site label them as
+    committees rather than people."""
+    attributes = {k: v for k, v in (("district", district), ("role", role), ("party", party)) if v}
+    if committee:
+        attributes["committee"] = True
+    return attributes
 
 
 def _get_or_create_person(
@@ -139,13 +149,14 @@ def _get_or_create_person(
     district: str | None = None,
     role: str | None = None,
     party: str | None = None,
+    committee: bool = False,
 ) -> Entity:
-    """Upsert a legislator. `district` (e.g. "HD-120"/"SD-024") is what the
+    """Upsert a legislator (or a committee sponsor, with committee=True). `district` (e.g. "HD-120"/"SD-024") is what the
     district sponsorship map joins on -- see app/api/map.py. Attributes are
     refreshed on existing rows too, so people ingested before districts were
     tracked get backfilled on the next run that touches their bill.
     """
-    attributes = _person_attributes(district=district, role=role, party=party)
+    attributes = _person_attributes(district=district, role=role, party=party, committee=committee)
 
     existing = db.execute(
         select(Entity).where(
@@ -539,6 +550,7 @@ def ingest_state_bills(
                 district=sponsor.get("district"),
                 role=sponsor.get("role"),
                 party=sponsor.get("party"),
+                committee=bool(sponsor.get("committee_sponsor")),
             )
             rel_type = "sponsor" if sponsor.get("sponsor_type_id") == 1 else "co_sponsor"
             exists = db.execute(
@@ -637,6 +649,28 @@ def ingest_session_dataset(db: Session, *, session_name: str, state: str | None 
         session_name, len(master_list), len(written), client.fallback_calls,
     )
     return written
+
+
+def mark_committee_sponsors(db: Session, people: list[dict]) -> int:
+    """Flag stored sponsor entities that LegiScan marks as committees
+    (`committee_sponsor`), from a session dataset's people list. For
+    sponsors ingested before the flag was recorded. Returns how many
+    entities changed."""
+    committee_ids = {str(p.get("people_id")) for p in people if p.get("committee_sponsor")}
+    if not committee_ids:
+        return 0
+    changed = 0
+    for entity in db.execute(
+        select(Entity).where(
+            Entity.entity_type == "person",
+            Entity.external_ids["legiscan_people_id"].as_string().in_(committee_ids),
+        )
+    ).scalars():
+        if not (entity.attributes or {}).get("committee"):
+            entity.attributes = {**(entity.attributes or {}), "committee": True}
+            changed += 1
+    db.commit()
+    return changed
 
 
 def backfill_person_districts(db: Session, *, state: str | None = None, sessions: int = 2) -> int:
@@ -812,7 +846,25 @@ if __name__ == "__main__":
         help='Ingest every bill of a past session from its LegiScan dataset (repeatable), '
              'e.g. "2026 Fourth Special Session". 2 API calls per session.',
     )
+    parser.add_argument(
+        "--mark-committees",
+        metavar="SESSION_NAME",
+        action="append",
+        help="Flag committee sponsors from a session's LegiScan dataset (repeatable; 2 API calls each).",
+    )
     args = parser.parse_args()
+    if args.mark_committees:
+        from app.pipeline.legiscan_dataset import DatasetClient, fetch_session_dataset
+
+        session = SessionLocal()
+        try:
+            for name in args.mark_committees:
+                people = DatasetClient(fetch_session_dataset(LegiScanClient(), settings.legiscan_state, name)).people
+                print(f"{name}: flagged {mark_committee_sponsors(session, people)} committee sponsors.")
+        finally:
+            session.close()
+            print(api_usage_summary())
+        raise SystemExit(0)
     if args.ingest_dataset:
         session = SessionLocal()
         try:

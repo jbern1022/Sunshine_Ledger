@@ -47,6 +47,8 @@ export default async function BillPage({ params }: Props) {
   const [bill, statuses] = await Promise.all([getBill(id), getSourceStatus()]);
   if (!bill) notFound();
   const dataSource = sourceForBill(statuses, bill.source_system);
+  const legislatorSponsors = bill.sponsors.filter((s) => !s.is_committee);
+  const committeeSponsors = bill.sponsors.filter((s) => s.is_committee);
 
   const summaryModels = Array.from(
     new Set(
@@ -119,18 +121,35 @@ export default async function BillPage({ params }: Props) {
       {bill.sponsors.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Sponsors</h2>
-          <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
-            {bill.sponsors.map((s) => (
-              <li key={s.entity_id}>
-                <Link href={`/people/${s.entity_id}`} className="text-sunshine-700 underline">
+          {legislatorSponsors.length > 0 && (
+            <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
+              {legislatorSponsors.map((s) => (
+                <li key={s.entity_id}>
+                  <Link href={`/people/${s.entity_id}`} className="text-sunshine-700 underline">
+                    {s.name}
+                  </Link>
+                  {s.relationship_type === "co_sponsor" && (
+                    <span className="text-slate-500"> (co-sponsor)</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {committeeSponsors.length > 0 && (
+            <p className="mt-2 text-sm text-slate-700">
+              <span className="font-medium">Committee sponsors: </span>
+              {committeeSponsors.map((s, i) => (
+                <span key={s.entity_id}>
+                  {i > 0 && "; "}
                   {s.name}
-                </Link>
-                {s.relationship_type === "co_sponsor" && (
-                  <span className="text-slate-500"> (co-sponsor)</span>
-                )}
-              </li>
-            ))}
-          </ul>
+                </span>
+              ))}
+              <span className="block text-xs text-slate-500">
+                The committees that produced this version of the bill (a committee substitute). A
+                committee sponsoring a bill is not a legislator&apos;s endorsement.
+              </span>
+            </p>
+          )}
         </section>
       )}
 

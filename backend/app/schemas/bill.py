@@ -46,6 +46,8 @@ class SponsorOut(BaseModel):
     entity_id: uuid.UUID
     name: str
     relationship_type: str
+    # A committee listed as sponsor of a committee substitute, not a person.
+    is_committee: bool = False
 
 
 class NewsItemOut(BaseModel):
