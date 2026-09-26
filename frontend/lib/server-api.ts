@@ -1,4 +1,4 @@
-import type { BillDetail, BillListResponse, PersonDetail, PersonListResponse } from "./types";
+import type { BillDetail, BillListResponse, PersonDetail, PersonListResponse, SourceStatus } from "./types";
 
 /** Server-side API base.
  *
@@ -98,5 +98,17 @@ export async function getRecentBillsForFeed(limit = 50): Promise<BillListRespons
     return page.items;
   } catch {
     return [];
+  }
+}
+
+/** Data source freshness for server-rendered pages. Null if the API is
+ *  unreachable, so a page renders without the note rather than failing. */
+export async function getSourceStatus(): Promise<SourceStatus[] | null> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/sources/status`, { next: { revalidate: 600 } });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
   }
 }

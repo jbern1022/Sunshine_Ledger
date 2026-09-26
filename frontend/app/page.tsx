@@ -6,6 +6,7 @@ import { fetchBills, fetchStatuses, fetchTags } from "@/lib/api";
 import type { BillListItem, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
+import DataFreshness from "@/components/DataFreshness";
 
 const JURISDICTIONS = [
   { label: "All jurisdictions", value: "" },
@@ -131,6 +132,7 @@ function BrowsePageInner() {
             </>
           )}
         </p>
+        <DataFreshness />
       </div>
 
       <ElectionContext />

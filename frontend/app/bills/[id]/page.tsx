@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getBill } from "@/lib/server-api";
+import { getBill, getSourceStatus } from "@/lib/server-api";
+import { formatChecked, sourceForBill } from "@/lib/freshness";
 import TagBadges from "@/components/TagBadges";
 import AmendmentDiff from "@/components/AmendmentDiff";
 import MarkedText from "@/components/MarkedText";
@@ -42,8 +43,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BillPage({ params }: Props) {
   const { id } = await params;
-  const bill = await getBill(id);
+  const [bill, statuses] = await Promise.all([getBill(id), getSourceStatus()]);
   if (!bill) notFound();
+  const dataSource = sourceForBill(statuses, bill.source_system);
 
   const summaryModels = Array.from(
     new Set(
@@ -274,6 +276,23 @@ export default async function BillPage({ params }: Props) {
           <a href={bill.full_text_url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
             Read the original bill ↗
           </a>
+        </p>
+      )}
+
+      {bill.source_system === "iqm2" && (
+        <p className="mt-3 text-xs text-slate-500">
+          Full text isn&apos;t available for Miami items: the city&apos;s portal doesn&apos;t publish it in a form
+          we can collect.
+        </p>
+      )}
+
+      {dataSource && (
+        <p className="mt-3 text-xs text-slate-500">
+          Source: {dataSource.label} · last checked {formatChecked(dataSource.last_checked_at)}
+          {dataSource.stale && <span className="text-amber-800"> · may be out of date</span>} ·{" "}
+          <Link href="/methodology#data-sources" className="text-sunshine-700 underline hover:text-sunshine-800">
+            About our data
+          </Link>
         </p>
       )}
     </article>

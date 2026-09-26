@@ -6,6 +6,7 @@ import type { BillDetail } from "@/lib/types";
 
 vi.mock("@/lib/server-api", () => ({
   getBill: vi.fn(),
+  getSourceStatus: vi.fn(() => Promise.resolve(null)),
 }));
 
 const { notFoundMock } = vi.hoisted(() => ({
@@ -389,5 +390,50 @@ describe("BillPage generateMetadata", () => {
 
     expect(metadata.title).toBe("HB 123 — FL | Sunshine Ledger");
     expect(metadata.description).toBe("This bill does a thing.");
+  });
+});
+
+describe("BillPage data source note", () => {
+  const legiscanStatus = {
+    key: "legiscan",
+    label: "Florida Legislature (via LegiScan)",
+    jurisdiction: "FL",
+    schedule: "Nightly",
+    note: "",
+    last_checked_at: "2026-09-26T08:00:04Z",
+    stale: false,
+    bill_count: 1930,
+    bills_with_text: 1930,
+  };
+
+  beforeEach(() => {
+    vi.mocked(serverApi.getBill).mockReset();
+    vi.mocked(serverApi.getSourceStatus).mockReset();
+  });
+
+  it("names the source and when it was last checked", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({ ...baseBill, source_system: "legiscan" });
+    vi.mocked(serverApi.getSourceStatus).mockResolvedValueOnce([legiscanStatus]);
+    await renderBillPage();
+
+    expect(screen.getByText(/Source: Florida Legislature \(via LegiScan\) · last checked Sep 26/)).toBeInTheDocument();
+    expect(screen.queryByText(/may be out of date/)).not.toBeInTheDocument();
+  });
+
+  it("flags a stale source", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({ ...baseBill, source_system: "legiscan" });
+    vi.mocked(serverApi.getSourceStatus).mockResolvedValueOnce([{ ...legiscanStatus, stale: true }]);
+    await renderBillPage();
+
+    expect(screen.getByText(/may be out of date/)).toBeInTheDocument();
+  });
+
+  it("explains missing full text on Miami items and survives no status", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({ ...baseBill, source_system: "iqm2" });
+    vi.mocked(serverApi.getSourceStatus).mockResolvedValueOnce(null);
+    await renderBillPage();
+
+    expect(screen.getByText(/Full text isn't available for Miami items/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Source:/)).not.toBeInTheDocument();
   });
 });

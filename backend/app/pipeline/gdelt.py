@@ -152,6 +152,9 @@ def pull_headlines_for_all_bills(db: Session, *, max_records: int = 5) -> int:
             total += len(pull_headlines_for_bill(db, entity, client=client))
         except (GDELTError, httpx.HTTPError) as exc:
             logger.warning("Skipping bill %s: %s", entity.id, exc)
+    from app.pipeline.source_checks import record_check
+
+    record_check(db, "gdelt", f"{total} headlines matched")
     return total
 
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import DataSourcesList from "@/components/DataSourcesList";
 import { SECURITY_POLICY_URL } from "@/lib/links";
 
 export const metadata: Metadata = {
@@ -129,6 +130,15 @@ export default function MethodologyPage() {
             legislative-district level using U.S. Census boundaries — never per-address.
           </li>
         </ul>
+      </section>
+
+      <section id="data-sources" className="mt-6 scroll-mt-4">
+        <h2 className="text-base font-semibold text-ledger-900">Data sources and freshness</h2>
+        <p className="mt-1 text-sm text-slate-700">
+          When each source was last checked, what it covers, and what it doesn&apos;t. A check that found
+          nothing new still counts as a check.
+        </p>
+        <DataSourcesList />
       </section>
 
       <section className="mt-6">

@@ -60,6 +60,8 @@ export interface BillListItem {
   full_text_url: string | null;
   primary_sponsor: string | null;
   tags: TagOut[];
+  /** legiscan | legistar | iqm2: which data source the bill came from. */
+  source_system?: string | null;
 }
 
 export interface IndividualVoteOut {
@@ -278,3 +280,16 @@ export interface LayerBlock {
 }
 
 export type BillLayers = Record<LayerKey, LayerBlock[]>;
+
+/** One data source's freshness and coverage (GET /sources/status). */
+export interface SourceStatus {
+  key: string;
+  label: string;
+  jurisdiction: string | null;
+  schedule: string;
+  note: string;
+  last_checked_at: string | null;
+  stale: boolean;
+  bill_count: number | null;
+  bills_with_text: number | null;
+}

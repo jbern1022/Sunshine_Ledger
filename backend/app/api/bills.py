@@ -81,6 +81,7 @@ def _to_list_item(
         full_text_url=bill.full_text_url,
         primary_sponsor=primary_sponsor,
         tags=tags or [],
+        source_system=bill.source_system,
     )
 
 
