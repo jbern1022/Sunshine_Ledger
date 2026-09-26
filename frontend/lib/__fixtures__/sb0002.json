@@ -1,0 +1,107 @@
+{
+ "bill_number": "S0002",
+ "actions": [
+  {
+   "date": "2026-04-24",
+   "chamber": "Senate",
+   "action": "Filed",
+   "important": true
+  },
+  {
+   "date": "2026-04-24",
+   "chamber": "Senate",
+   "action": "Referred to Rules",
+   "important": true
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "On Committee agenda-- Rules, 04/28/26, 2:00 pm, 110 Senate Building",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "Introduced",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "Withdrawn from Rules",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "Placed on Calendar, on 2nd reading",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "Read 2nd time",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "Read 3rd time",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "Senate",
+   "action": "Passed; YEAS 37 NAYS 1",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "House",
+   "action": "In Messages",
+   "important": true
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "House",
+   "action": "Referred to Information Technology Budget & Policy Subcommittee",
+   "important": true
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "House",
+   "action": "Now in Information Technology Budget & Policy Subcommittee",
+   "important": false
+  },
+  {
+   "date": "2026-04-28",
+   "chamber": "House",
+   "action": "1st Reading (Original Filed Version)",
+   "important": false
+  },
+  {
+   "date": "2026-04-29",
+   "chamber": "House",
+   "action": "Died in Information Technology Budget & Policy Subcommittee",
+   "important": true
+  }
+ ],
+ "votes": [
+  {
+   "id": "d99970e7-5cc5-454a-b89a-17022521e7fc",
+   "roll_call_id": "1690363",
+   "chamber": "S",
+   "description": "Senate: Third Reading RCS#2",
+   "date": "2026-04-28",
+   "yea": 37,
+   "nay": 1,
+   "nv": 0,
+   "absent": 2,
+   "total": 40,
+   "passed": true,
+   "source_url": "https://legiscan.com/FL/rollcall/S0002/id/1690363",
+   "votes": []
+  }
+ ],
+ "amendments": []
+}
