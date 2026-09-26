@@ -32,8 +32,12 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
 - **Authority:** secondary. LegiScan aggregates the Florida Legislature's
   official records; `state_link` on each bill points to the official
   flsenate.gov / myfloridahouse.gov page.
-- **Cadence:** nightly. `getMasterList` (1 call) finds bills whose
-  `change_hash` changed; only those are re-fetched.
+- **Cadence:** nightly (`legiscan.nightly_state_sync`). `getMasterList`
+  (1 call) finds changed bills; `getDatasetList` (1 call) shows whether the
+  session dataset was rebuilt, and if so it's imported (1 call) instead of
+  fetching bills one by one. Then `getBill` for bills changed since the
+  dataset, and `getBillText` only when a bill's latest text document is new.
+  Capped at 250 calls a night; anything left waits for the next night.
 - **Coverage:** 2026 Regular Session (1,897 bills) plus the three 2026
   special sessions (4th: 6, 5th: 22, 6th: 5 bills; ingested once from their
   datasets on 2026-09-25 with `--ingest-dataset`, since nightly ingestion

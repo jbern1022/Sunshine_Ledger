@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.logging_setup import quiet_http_logging
-from app.models import Bill, Entity, Event, Relationship, Source
+from app.models import Bill, Entity, Event, Relationship, Source, SourceCheck
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline.topic_tagging import assign_tags_for_bill
@@ -81,9 +81,12 @@ class LegiScanClient:
         return data
 
     def get_master_list(self, state: str) -> list[dict]:
-        """Session bill list: id, number, title, last action/date, status, url."""
+        """Session bill list: id, number, title, last action/date, status, url.
+        The session it covers ({session_id, session_name, ...}) is kept on
+        `last_master_session`."""
         data = self._call("getMasterList", state=state)
         master = data["masterlist"]
+        self.last_master_session = master.get("session") or {}
         return [v for k, v in master.items() if k != "session"]
 
     def get_bill(self, bill_id: int) -> dict:
@@ -206,6 +209,32 @@ def introduced_date(detail: dict) -> date | None:
         return explicit
     dates = [d for d in (_parse_date(h.get("date")) for h in detail.get("history") or []) if d]
     return min(dates) if dates else None
+
+
+def _refresh_bill_text(entity: Entity, bill: Bill, detail: dict, client) -> None:
+    """Refetch full_text only when the bill's latest text document changed.
+
+    The document id is stored as external_ids["legiscan_text_doc_id"]. A
+    bill that already has text but no recorded id (everything ingested
+    before 2026-09-26, whose text was re-extracted on 2026-09-25) just
+    records the current id -- refetching all ~1,900 would spend a fifth of
+    a month's quota to learn nothing. One getBillText call otherwise.
+    """
+    from app.pipeline.bill_text import fetch_bill_text  # bill_text imports this module
+
+    docs = detail.get("texts") or []
+    if not docs:
+        return
+    latest = str(docs[-1]["doc_id"])
+    stored = entity.external_ids.get("legiscan_text_doc_id")
+    if stored == latest:
+        return
+    if stored is not None or not bill.full_text:
+        text = fetch_bill_text(client, int(latest))
+        if not text:
+            return
+        bill.full_text = text
+    entity.external_ids = {**entity.external_ids, "legiscan_text_doc_id": latest}
 
 
 ACTION_CHAMBERS = {"H": "House", "S": "Senate"}
@@ -424,6 +453,8 @@ def ingest_state_bills(
     sync_votes: bool = True,
     client: LegiScanClient | None = None,
     master_list: list[dict] | None = None,
+    max_calls: int | None = None,
+    refresh_text: bool = False,
 ) -> list[Entity]:
     """Pull the master bill list for `state` and upsert each bill + sponsors + source.
 
@@ -438,6 +469,11 @@ def ingest_state_bills(
     `client` and `master_list` let a caller substitute another source for
     the API's current-session master list -- ingest_session_dataset feeds
     a whole session from its LegiScan dataset this way.
+
+    `max_calls` caps the LegiScan calls this run may make (counted from
+    API_CALLS); bills not reached keep their old change_hash, so the next
+    run picks them up. `refresh_text` also refreshes full_text when a
+    bill's latest text document changed (see _refresh_bill_text).
 
     Returns the list of bill Entities written (new or refreshed).
     """
@@ -455,7 +491,10 @@ def ingest_state_bills(
     people_by_id: dict[str, dict] | None = None  # built lazily, at most once
     roll_calls_fetched = 0
 
-    for row in master_list:
+    calls_at_start = sum(API_CALLS.values())
+    skipped_for_budget = 0
+
+    for index, row in enumerate(master_list):
         legiscan_bill_id = int(row["bill_id"])
         row_change_hash = row.get("change_hash")
 
@@ -471,6 +510,10 @@ def ingest_state_bills(
             # already-stable bills every day would blow through that in
             # under a week.
             continue
+
+        if max_calls is not None and sum(API_CALLS.values()) - calls_at_start >= max_calls:
+            skipped_for_budget = len(master_list) - index  # at most; unchanged ones among them cost nothing
+            break
 
         detail = client.get_bill(legiscan_bill_id)
 
@@ -529,6 +572,8 @@ def ingest_state_bills(
         bill.geo_scope_type = "statewide"
         bill.geo_scope_names = [state]
         db.flush()
+        if refresh_text:
+            _refresh_bill_text(entity, bill, detail, client)
 
         # Timeline entries only -- no extra API cost since `amendments` is
         # already present on this getBill response. Amendment *text* (for
@@ -615,6 +660,10 @@ def ingest_state_bills(
         state,
         roll_calls_fetched,
     )
+    if skipped_for_budget:
+        logger.warning(
+            "LegiScan call budget (%d) reached: up to %d bills left for the next run", max_calls, skipped_for_budget
+        )
     if live:
         from app.pipeline.source_checks import record_check
 
@@ -648,6 +697,60 @@ def ingest_session_dataset(db: Session, *, session_name: str, state: str | None 
         "%s: %d bills in dataset, %d written, %d API calls beyond the dataset",
         session_name, len(master_list), len(written), client.fallback_calls,
     )
+    return written
+
+
+NIGHTLY_CALL_BUDGET = 250  # x 31 nights = 7,750, inside 10,000/month with room for manual runs
+
+
+def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int = NIGHTLY_CALL_BUDGET) -> list[Entity]:
+    """The nightly LegiScan step, sized for 10,000 calls/month.
+
+    1. getMasterList (1 call): which bills changed, and which session.
+    2. getDatasetList (1 call): if that session's dataset changed since the
+       last run (LegiScan rebuilds them about weekly), import it (1 call) --
+       every bill, amendment, history step and roll call with individual
+       votes, without per-bill calls.
+    3. getBill for bills that still differ from the master list (changed
+       since the dataset was built), plus getBillText when a bill's latest
+       text document is new -- capped by `max_calls`; the rest wait a night.
+    """
+    from app.pipeline.legiscan_dataset import DatasetClient
+    from app.pipeline.source_checks import record_check
+
+    state = state or settings.legiscan_state
+    api = LegiScanClient()
+    calls_at_start = sum(API_CALLS.values())
+
+    def remaining() -> int:
+        return max(0, max_calls - (sum(API_CALLS.values()) - calls_at_start))
+
+    master_list = api.get_master_list(state)
+    session = getattr(api, "last_master_session", {}) or {}
+
+    listing = api._call("getDatasetList", state=state).get("datasetlist") or []
+    entry = next((d for d in listing if d.get("session_id") == session.get("session_id")), None)
+    marker = f"{entry['session_id']}:{entry['dataset_hash']}" if entry else None
+    last = db.execute(select(SourceCheck.last_result).where(SourceCheck.source_key == "legiscan_dataset")).scalar()
+    if entry and marker != last:
+        import base64
+
+        zip_bytes = base64.b64decode(
+            api._call("getDataset", id=str(entry["session_id"]), access_key=entry["access_key"])["dataset"]["zip"]
+        )
+        dataset = DatasetClient(zip_bytes, fallback=api)
+        rows = [
+            {"bill_id": bill_id, "change_hash": b.get("change_hash"), "number": b.get("bill_number"),
+             "title": b.get("title"), "url": b.get("state_link") or b.get("url") or "", "status": b.get("status")}
+            for bill_id, b in sorted(dataset.bills.items())
+        ]
+        ingest_state_bills(db, state=state, client=dataset, master_list=rows, refresh_text=True,
+                           max_calls=remaining())
+        record_check(db, "legiscan_dataset", marker)
+
+    written = ingest_state_bills(db, state=state, client=api, master_list=master_list, refresh_text=True,
+                                 max_calls=remaining())
+    record_check(db, "legiscan", f"{len(written)} bills changed or new")
     return written
 
 
