@@ -1,4 +1,12 @@
-"""Fetch the filed (first) text version of bills that were amended.
+"""Fetch bill text using the session dataset's document lists.
+
+Two jobs, both one getBillText per document (the dataset download is 2
+calls and tells us every bill's documents for free):
+
+- --latest: bills with no text yet get their latest version as
+  bills.full_text, passed bills first. Half the cost of bill_text's
+  getBill + getBillText per bill.
+- default: the filed (first) text version of bills that were amended.
 
 Bill.full_text holds a bill's latest version; showing "what changed from
 the filed bill to the version that passed" also needs the first. Each
@@ -88,6 +96,56 @@ def backfill_filed_versions(db: Session, bills: dict[int, dict], client, *, max_
     return stored, failed, 0
 
 
+def latest_text_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Entity, dict]]:
+    """(stored bill entity, latest texts[] entry) for dataset bills we hold
+    without full_text. Passed bills first (LegiScan status 4), then the rest."""
+    from app.models import Bill
+
+    entities = {
+        e.external_ids["legiscan_id"]: e
+        for e in db.execute(
+            select(Entity).join(Bill, Bill.entity_id == Entity.id).where(
+                Entity.external_ids.has_key("legiscan_id"), Bill.full_text.is_(None)
+            )
+        ).scalars()
+    }
+    todo = [
+        (entities[str(bill_id)], bill["texts"][-1], bill.get("status") == 4)
+        for bill_id, bill in sorted(bills.items())
+        if bill.get("texts") and str(bill_id) in entities
+    ]
+    todo.sort(key=lambda item: not item[2])  # stable: passed bills first
+    return [(entity, latest) for entity, latest, _ in todo]
+
+
+def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
+    """Set bills.full_text from each bill's latest document and record its
+    doc id (so nightly sync knows it's current). Stops at `max_calls`.
+    Returns (stored, failed, left)."""
+    from app.pipeline.bill_text import fetch_bill_text
+
+    todo = latest_text_to_fetch(db, bills)
+    start = sum(legiscan.API_CALLS.values())
+    stored = failed = 0
+    for index, (entity, latest) in enumerate(todo):
+        if sum(legiscan.API_CALLS.values()) - start >= max_calls:
+            return stored, failed, len(todo) - index
+        try:
+            text = fetch_bill_text(client, int(latest["doc_id"]))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("doc_id=%s failed: %s", latest["doc_id"], exc)
+            failed += 1
+            continue
+        if not text:
+            failed += 1
+            continue
+        entity.bill.full_text = text
+        entity.external_ids = {**entity.external_ids, "legiscan_text_doc_id": str(latest["doc_id"])}
+        db.commit()
+        stored += 1
+    return stored, failed, 0
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -102,17 +160,22 @@ if __name__ == "__main__":
     parser.add_argument("--session", required=True, help='e.g. "2026 Regular Session"')
     parser.add_argument("--max-calls", type=int, default=1500)
     parser.add_argument("--dry-run", action="store_true", help="Count what would be fetched; 2 calls for the dataset.")
+    parser.add_argument("--latest", action="store_true", help="Fill missing bills.full_text instead (passed bills first).")
     args = parser.parse_args()
 
     api = LegiScanClient()
     dataset = DatasetClient(fetch_session_dataset(api, settings.legiscan_state, args.session), fallback=api)
     session = SessionLocal()
     try:
+        pick, run, what = (
+            (latest_text_to_fetch, backfill_latest_text, "missing bill texts")
+            if args.latest
+            else (filed_versions_to_fetch, backfill_filed_versions, "filed versions")
+        )
         if args.dry_run:
-            todo = filed_versions_to_fetch(session, dataset.bills)
-            print(f"{args.session}: {len(todo)} filed versions to fetch (1 call each).")
+            print(f"{args.session}: {len(pick(session, dataset.bills))} {what} to fetch (1 call each).")
         else:
-            stored, failed, left = backfill_filed_versions(session, dataset.bills, api, max_calls=args.max_calls)
+            stored, failed, left = run(session, dataset.bills, api, max_calls=args.max_calls)
             print(f"{args.session}: stored {stored}, failed {failed}, left for a later run {left}.")
     finally:
         session.close()

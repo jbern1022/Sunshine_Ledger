@@ -71,3 +71,33 @@ def test_stops_at_the_call_cap(db_session, fetch):
 
     assert backfill_filed_versions(db_session, BILLS, client=None, max_calls=1) == (1, 0, 1)
     assert fetch == [101]
+
+
+def test_latest_text_fills_missing_text_passed_bills_first(db_session, fetch):
+    from app.models import Bill
+    from app.pipeline.text_versions import backfill_latest_text
+
+    def with_bill(legiscan_id, full_text=None):
+        e = _bill(db_session, legiscan_id)
+        db_session.add(Bill(entity_id=e.id, bill_number=f"H{legiscan_id}", session="2025 Regular Session",
+                            status="Introduced", source_system="legiscan", geo_scope_names=["FL"],
+                            full_text=full_text))
+        db_session.flush()
+        return e
+
+    died, passed, has_text = with_bill(1), with_bill(3), with_bill(9, full_text="already here")
+    db_session.commit()
+    bills = {
+        1: {"status": 1, "texts": [{"doc_id": 101}, {"doc_id": 102}]},
+        3: {"status": 4, "texts": [{"doc_id": 301}, {"doc_id": 303}]},
+        9: {"status": 4, "texts": [{"doc_id": 901}]},
+    }
+
+    assert backfill_latest_text(db_session, bills, client=None, max_calls=1) == (1, 0, 1)
+    assert fetch == [303]  # the passed bill, its latest version
+    assert passed.bill.full_text == "filed text 303"
+    assert passed.external_ids["legiscan_text_doc_id"] == "303"
+
+    backfill_latest_text(db_session, bills, client=None, max_calls=10)
+    assert fetch == [303, 102]  # the bill that already had text was skipped
+    assert has_text.bill.full_text == "already here"
