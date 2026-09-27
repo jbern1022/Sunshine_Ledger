@@ -100,3 +100,7 @@ class DatasetClient:
 
     def get_supplement(self, supplement_id: int) -> dict:
         return self._real().get_supplement(supplement_id)
+
+    def _call(self, op: str, **params: str) -> dict:
+        """Documents (getBillText, getAmendment) aren't in datasets."""
+        return self._real()._call(op, **params)
