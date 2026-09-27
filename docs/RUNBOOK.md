@@ -101,6 +101,17 @@ docker compose -f docker-compose.yml run --rm backend alembic upgrade head
 docker compose -f docker-compose.yml exec backend python -m app.pipeline.topic_tagging_seed
 ```
 
+**Shipping a migration with CI (what worked on 2026-09-26).** A push with a
+new migration makes CI's deploy step stop at deploy.sh's migration check --
+by design, nothing is replaced. CI has already built the new images on
+docker-host, so apply the migration with that image, then deploy:
+
+```bash
+ssh docker 'docker run --rm --network sunshineledger_default \
+  --env-file ~/sunshine-ledger/deploy.env sunshineledger-backend:latest alembic upgrade head'
+./scripts/deploy.sh   # from a Mac checkout at gitea/main (or restart the pipeline in Woodpecker)
+```
+
 **`--project-name`/`-p` matters if your local checkout's folder name differs
 from `sunshineledger`.** Compose derives the project name from the working
 directory by default, so a differently-named clone (e.g. a scratch checkout)
@@ -280,6 +291,25 @@ docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.legi
 # amendment without text. --clean-stored [--apply] strips form furniture
 # from stored text with no API calls.
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.amendments --limit 20
+
+# Ingest a past session nightly ingestion doesn't follow (it only reads the
+# current session's master list), e.g. the 2026 special sessions. 2 calls
+# per session, then run bill_text for their text (2 calls per new bill).
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.legiscan --ingest-dataset "2026 Fourth Special Session"
+
+# Flag committee sponsors (committee substitutes list their committees as
+# sponsors) for sessions ingested before the flag was recorded. 2 calls each.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.legiscan --mark-committees "2026 Regular Session"
+
+# Topic-tag bills with the local model: local bills, plus state bills with
+# --include-state (LegiScan's subjects are empty for FL). No LegiScan quota.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.topic_tagging_backfill --include-state
+# Hide model-assigned Governance badges on bills that have a more specific one.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.topic_tagging_backfill --hide-redundant-governance --apply
+
+# Census/BLS overlay (needs CENSUS_API_KEY). Bump ACS_YEAR in
+# demographic_overlay.py each December when the next 5-year release is out.
+docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.demographic_overlay
 
 # LegiScan quota: 10,000 calls/month from 2026-10-01. Every LegiScan CLI
 # (and the nightly LegiScan step) ends by printing "LegiScan API calls this

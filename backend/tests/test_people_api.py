@@ -193,3 +193,60 @@ def test_detail_404s_for_a_bill_id(client, bill_factory):
     not return a malformed person."""
     bill = bill_factory()
     assert client.get(f"/people/{bill.id}").status_code == 404
+
+
+def _roll_call(db, bill, person, *, roll_call_id, title, vote, when, source_url=None):
+    from app.models import Source
+
+    source_id = None
+    if source_url:
+        from datetime import datetime, timezone
+
+        source = Source(url=source_url, publisher="FL Legislature via LegiScan", source_type="legiscan_roll_call",
+                        retrieved_at=datetime(2026, 9, 25, tzinfo=timezone.utc))
+        db.add(source)
+        db.flush()
+        source_id = source.id
+    db.add(Event(entity_id=bill.id, event_type="vote", event_date=when, title=title,
+                 attributes={"roll_call_id": roll_call_id}, source_id=source_id))
+    db.add(Relationship(from_entity_id=person.id, to_entity_id=bill.id, relationship_type="voted",
+                        attributes={"roll_call_id": roll_call_id, "vote": vote}))
+    db.commit()
+
+
+def test_votes_carry_stage_topics_and_roll_call_link(client, db_session, bill_factory):
+    from app.models import Tag
+    from app.pipeline.topic_tagging import assign_tags_for_bill
+
+    db_session.add(Tag(slug="housing", label="Housing", active=True))
+    db_session.commit()
+    bill = bill_factory(bill_number="HB 1389", name="Affordable Housing")
+    assign_tags_for_bill(db_session, bill.id, ollama_tag_slugs=["housing"])
+    person = _add_person(db_session, name="Mike Redondo", district="HD-118")
+    _roll_call(db_session, bill, person, roll_call_id="1", title="House Commerce Committee", vote="Yea",
+               when=date(2026, 2, 24))
+    _roll_call(db_session, bill, person, roll_call_id="2", title="House: Third Reading RCS#662", vote="Nay",
+               when=date(2026, 3, 4), source_url="https://legiscan.com/FL/rollcall/H1389/id/2")
+
+    votes = client.get(f"/people/{person.id}").json()["votes"]
+
+    assert [(v["roll_call_id"], v["stage"], v["vote"]) for v in votes] == [("2", "floor", "Nay"), ("1", "committee", "Yea")]
+    assert votes[0]["source_url"] == "https://legiscan.com/FL/rollcall/H1389/id/2"
+    assert votes[1]["source_url"] is None
+    assert votes[0]["tags"] == [{"slug": "housing", "label": "Housing"}]
+
+
+def test_committees_are_flagged_and_filterable(client, db_session, bill_factory):
+    bill = bill_factory()
+    rep = _add_person(db_session, name="Mike Redondo", district="HD-118")
+    committee = _add_person(db_session, name="Commerce Committee")
+    committee.attributes = {"committee": True}
+    db_session.commit()
+    _sponsor(db_session, rep, bill)
+    _sponsor(db_session, committee, bill)
+
+    everyone = {p["name"]: p["is_committee"] for p in client.get("/people").json()["items"]}
+    assert everyone == {"Mike Redondo": False, "Commerce Committee": True}
+    assert [p["name"] for p in client.get("/people?kind=legislator").json()["items"]] == ["Mike Redondo"]
+    assert [p["name"] for p in client.get("/people?kind=committee").json()["items"]] == ["Commerce Committee"]
+    assert client.get(f"/people/{committee.id}").json()["is_committee"] is True

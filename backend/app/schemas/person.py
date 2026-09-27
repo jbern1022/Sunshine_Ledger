@@ -5,6 +5,13 @@ import uuid
 from pydantic import BaseModel
 
 
+class BillTopic(BaseModel):
+    """A bill's active topic badge, for filtering a legislator's record."""
+
+    slug: str
+    label: str
+
+
 class PersonListItem(BaseModel):
     """A legislator as shown in a list."""
 
@@ -15,6 +22,9 @@ class PersonListItem(BaseModel):
     party: str | None
     jurisdiction_name: str | None
     sponsored_count: int
+    # A committee LegiScan lists as a bill sponsor (committee substitutes),
+    # not a person.
+    is_committee: bool = False
 
 
 class PersonBillItem(BaseModel):
@@ -27,6 +37,7 @@ class PersonBillItem(BaseModel):
     relationship_type: str  # sponsor | co_sponsor
     last_action_date: str | None
     what_it_does: str | None
+    tags: list[BillTopic] = []
 
 
 class PersonVoteItem(BaseModel):
@@ -39,6 +50,11 @@ class PersonVoteItem(BaseModel):
     vote: str
     roll_call_description: str | None
     date: str | None
+    roll_call_id: str | None = None
+    # "floor" (a Third/Second Reading roll call) or "committee".
+    stage: str = "committee"
+    source_url: str | None = None
+    tags: list[BillTopic] = []
 
 
 class PersonDetail(PersonListItem):

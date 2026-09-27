@@ -24,6 +24,7 @@ export default function PeoplePage() {
   const [people, setPeople] = useState<PersonListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
+  const [kind, setKind] = useState<"" | "legislator" | "committee">("");
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +33,12 @@ export default function PeoplePage() {
   // land on an offset past the end of the new, smaller result set.
   useEffect(() => {
     setOffset(0);
-  }, [q]);
+  }, [q, kind]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchPeople({ q: q || undefined, limit: PAGE_SIZE, offset })
+    fetchPeople({ q: q || undefined, kind: kind || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
         if (cancelled) return;
         setPeople(res.items);
@@ -49,7 +50,7 @@ export default function PeoplePage() {
     return () => {
       cancelled = true;
     };
-  }, [q, offset]);
+  }, [q, kind, offset]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -75,6 +76,30 @@ export default function PeoplePage() {
         className="mt-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
       />
 
+      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Show sponsors of type">
+        {(
+          [
+            ["", "All"],
+            ["legislator", "Legislators and local sponsors"],
+            ["committee", "State committees"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value || "all"}
+            type="button"
+            onClick={() => setKind(value)}
+            aria-pressed={kind === value}
+            className={`rounded-full border px-2.5 py-0.5 text-xs ${
+              kind === value
+                ? "border-ledger-900 bg-ledger-900 text-white"
+                : "border-slate-300 text-slate-700 hover:border-slate-500"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
       {!error && loading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}
       {!error && !loading && people.length === 0 && (
@@ -98,7 +123,7 @@ export default function PeoplePage() {
                     {p.name}
                   </Link>
                   <span className="ml-2 text-xs text-slate-500">
-                    {[p.role, p.district, p.party].filter(Boolean).join(" · ")}
+                    {p.is_committee ? "Committee" : [p.role, p.district, p.party].filter(Boolean).join(" · ")}
                   </span>
                 </div>
                 <span className="shrink-0 text-xs text-slate-500">

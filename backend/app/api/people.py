@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,22 +8,45 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.db import get_db
-from app.models import Bill, Claim, Entity, Event, Relationship
-from app.schemas.person import PersonBillItem, PersonDetail, PersonListItem, PersonListResponse, PersonVoteItem
+from app.api.bills import _active_tags_by_bill
+from app.models import Bill, Claim, Entity, Event, Relationship, Source
+from app.schemas.person import (
+    BillTopic,
+    PersonBillItem,
+    PersonDetail,
+    PersonListItem,
+    PersonListResponse,
+    PersonVoteItem,
+)
 
 router = APIRouter(prefix="/people", tags=["people"])
 
 SPONSOR_TYPES = ("sponsor", "co_sponsor")
 
 
+# Florida floor roll calls read "House: Third Reading RCS#662"; every other
+# roll call is named for the committee that held it (checked 2026-09-26:
+# 800 floor, the rest committees).
+_FLOOR_VOTE = re.compile(r"(Third|Second) Reading|RCS#", re.IGNORECASE)
+
+
 def _attrs(entity: Entity) -> dict:
     return entity.attributes or {}
+
+
+def _is_committee(entity: Entity) -> bool:
+    return bool(_attrs(entity).get("committee"))
+
+
+def _topics(tags_by_bill: dict, bill_id: uuid.UUID) -> list[BillTopic]:
+    return [BillTopic(slug=t.slug, label=t.label) for t in tags_by_bill.get(bill_id, [])]
 
 
 @router.get("", response_model=PersonListResponse)
 def list_people(
     q: str | None = Query(None, description="Free-text search over name and district"),
     jurisdiction_name: str | None = Query(None, description="e.g. FL"),
+    kind: str | None = Query(None, pattern="^(legislator|committee)$", description="legislator | committee"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -52,6 +76,10 @@ def list_people(
 
     if jurisdiction_name:
         stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+    if kind == "committee":
+        stmt = stmt.where(Entity.attributes.has_key("committee"))
+    elif kind == "legislator":
+        stmt = stmt.where(~Entity.attributes.has_key("committee"))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(
@@ -74,6 +102,7 @@ def list_people(
                 party=_attrs(e).get("party"),
                 jurisdiction_name=e.jurisdiction_name,
                 sponsored_count=n,
+                is_committee=_is_committee(e),
             )
             for e, n in rows
         ],
@@ -125,8 +154,9 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
     # to the bill, keyed by the same roll_call_id the `voted` Relationship
     # carries -- joined here rather than duplicated onto the Relationship.
     vote_event = aliased(Event)
+    vote_source = aliased(Source)
     vote_rows = db.execute(
-        select(Bill, Entity, Relationship.attributes, vote_event.event_date, vote_event.title)
+        select(Bill, Entity, Relationship.attributes, vote_event.event_date, vote_event.title, vote_source.url)
         .join(Entity, Entity.id == Bill.entity_id)
         .join(Relationship, Relationship.to_entity_id == Entity.id)
         .outerjoin(
@@ -138,9 +168,16 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
                 == Relationship.attributes["roll_call_id"].as_string()
             ),
         )
+        .outerjoin(vote_source, vote_source.id == vote_event.source_id)
         .where(Relationship.from_entity_id == person.id, Relationship.relationship_type == "voted")
         .order_by(vote_event.event_date.desc().nulls_last())
     ).all()
+
+    tags_by_bill = _active_tags_by_bill(
+        db, list({b.entity_id for b in bills} | {bill_entity.id for _, bill_entity, *_ in vote_rows})
+    )
+    for b in bills:
+        b.tags = _topics(tags_by_bill, b.entity_id)
 
     votes = [
         PersonVoteItem(
@@ -150,8 +187,12 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
             vote=rel_attrs.get("vote", "Unknown"),
             roll_call_description=event_title,
             date=event_date.isoformat() if event_date else None,
+            roll_call_id=rel_attrs.get("roll_call_id"),
+            stage="floor" if event_title and _FLOOR_VOTE.search(event_title) else "committee",
+            source_url=source_url or None,
+            tags=_topics(tags_by_bill, bill_entity.id),
         )
-        for bill, bill_entity, rel_attrs, event_date, event_title in vote_rows
+        for bill, bill_entity, rel_attrs, event_date, event_title, source_url in vote_rows
     ]
 
     return PersonDetail(
@@ -164,6 +205,7 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
         # Distinct bills, since a legislator can appear as both sponsor and
         # co-sponsor on the same bill.
         sponsored_count=len({b.entity_id for b in bills}),
+        is_committee=_is_committee(person),
         bills=bills,
         votes=votes,
     )
