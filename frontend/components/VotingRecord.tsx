@@ -62,7 +62,7 @@ export default function VotingRecord({ votes, bills }: { votes: PersonVoteItem[]
         Voting record
       </h2>
       <p className="text-[11px] text-slate-500">
-        Roll calls recorded by the Florida Legislature in the 2026 Regular and special sessions, via LegiScan.
+        Roll calls recorded by the Florida Legislature in the 2024, 2025 and 2026 sessions (regular and special), via LegiScan.
         Voice votes aren&apos;t recorded. Plain counts, not a score or a claim about this legislator.
       </p>
 

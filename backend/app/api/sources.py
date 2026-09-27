@@ -36,8 +36,8 @@ class SourceInfo:
 SOURCES: tuple[SourceInfo, ...] = (
     SourceInfo(
         "legiscan", "Florida Legislature (via LegiScan)", "FL", "Nightly", 36, "legiscan",
-        "The 2026 Regular Session and the three 2026 special sessions: bill text, amendments, "
-        "votes, action history and staff analyses.",
+        "The 2024, 2025 and 2026 sessions, regular and special: bills, votes, amendments and "
+        "action history. Bill text and staff analyses are most complete for 2026.",
     ),
     SourceInfo(
         "legistar_jaxcityc", "Jacksonville City Council (Legistar)", "Jacksonville", "Nightly", 36, "legistar",

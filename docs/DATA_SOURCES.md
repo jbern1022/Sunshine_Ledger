@@ -38,7 +38,7 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   fetching bills one by one. Then `getBill` for bills changed since the
   dataset, and `getBillText` only when a bill's latest text document is new.
   Capped at 250 calls a night; anything left waits for the next night.
-- **Coverage:** 2026 Regular Session (1,897 bills) plus the three 2026
+- **Coverage:** 2024 Regular (1,902 bills) and 2025 Regular + three special sessions (1,991), ingested once from datasets on 2026-09-27 (text being fetched). 2026 Regular Session (1,897 bills) plus the three 2026
   special sessions (4th: 6, 5th: 22, 6th: 5 bills; ingested once from their
   datasets on 2026-09-25 with `--ingest-dataset`, since nightly ingestion
   only follows the current session). Special sessions reuse regular-session
