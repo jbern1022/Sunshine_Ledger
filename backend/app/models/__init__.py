@@ -11,6 +11,7 @@ from app.models.demographic_overlay import DemographicOverlay
 from app.models.staff_analysis import StaffAnalysis
 from app.models.bill_layer import BillLayer, BillLayerSource, BillLayerReview
 from app.models.source_check import SourceCheck
+from app.models.bill_text_version import BillTextVersion
 
 __all__ = [
     "Entity",
@@ -31,4 +32,5 @@ __all__ = [
     "BillLayerSource",
     "BillLayerReview",
     "SourceCheck",
+    "BillTextVersion",
 ]
