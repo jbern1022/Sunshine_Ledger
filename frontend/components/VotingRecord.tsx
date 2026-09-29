@@ -41,9 +41,22 @@ function StageLine({ label, summary }: { label: string; summary: StageSummary })
 /** A legislator's recorded votes, filterable by bill topic. Plain facts from
  *  official roll calls: counts and the votes themselves, no score, no
  *  percentages, no "for/against" framing, and no reasons -- a topic filter
- *  only says which bills the votes were on. */
-export default function VotingRecord({ votes, bills }: { votes: PersonVoteItem[]; bills: PersonBillItem[] }) {
-  const [topic, setTopic] = useState(ALL_TOPICS);
+ *  only says which bills the votes were on. The topic lives in PersonRecord,
+ *  which filters the sponsored bills by it too. The vote list starts
+ *  collapsed (hundreds of rows for a long-serving member); the slicer and
+ *  counts are always shown. */
+export default function VotingRecord({
+  votes,
+  bills,
+  topic,
+  onTopic,
+}: {
+  votes: PersonVoteItem[];
+  bills: PersonBillItem[];
+  topic: string;
+  onTopic: (slug: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const topics = topicsVotedOn(votes);
   const label = topics.find((t) => t.slug === topic)?.label;
@@ -52,7 +65,7 @@ export default function VotingRecord({ votes, bills }: { votes: PersonVoteItem[]
   const sponsorship = sponsorshipCounts(bills, topic);
 
   const choose = (slug: string) => {
-    setTopic(slug);
+    onTopic(slug);
     setShown(PAGE);
   };
 
@@ -103,37 +116,49 @@ export default function VotingRecord({ votes, bills }: { votes: PersonVoteItem[]
         )}
       </div>
 
-      <ul className="mt-2 space-y-1 text-sm">
-        {matching.slice(0, shown).map((v, i) => (
-          <li key={`${v.roll_call_id ?? v.entity_id}-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <span>
-              <Link href={`/bills/${v.entity_id}`} className="text-sunshine-700 underline">
-                {v.bill_number}
-              </Link>
-              <span className="text-slate-600"> {v.bill_name}</span>
-              {v.roll_call_description && (
-                <span className="block text-xs text-slate-500">
-                  {v.stage === "floor" ? "Floor · " : ""}
-                  {v.roll_call_description}
-                  {v.source_url && (
-                    <>
-                      {" · "}
-                      <a href={v.source_url} target="_blank" rel="noreferrer" className="underline">
-                        roll call ↗
-                      </a>
-                    </>
-                  )}
-                </span>
-              )}
-            </span>
-            <span className="shrink-0 text-xs text-slate-600">
-              <span className="font-medium">{VOTE_KINDS.find((k) => k.value === v.vote)?.label ?? v.vote}</span>
-              {v.date && <span className="text-slate-500"> · {v.date}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {matching.length > shown && (
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls="vote-list"
+        className="mt-2 text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
+      >
+        {open ? "Hide the votes" : `Show the ${matching.length} vote${matching.length === 1 ? "" : "s"}`}
+      </button>
+
+      {open && (
+        <ul id="vote-list" className="mt-2 space-y-1 text-sm">
+          {matching.slice(0, shown).map((v, i) => (
+            <li key={`${v.roll_call_id ?? v.entity_id}-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-2">
+              <span>
+                <Link href={`/bills/${v.entity_id}`} className="text-sunshine-700 underline">
+                  {v.bill_number}
+                </Link>
+                <span className="text-slate-600"> {v.bill_name}</span>
+                {v.roll_call_description && (
+                  <span className="block text-xs text-slate-500">
+                    {v.stage === "floor" ? "Floor · " : ""}
+                    {v.roll_call_description}
+                    {v.source_url && (
+                      <>
+                        {" · "}
+                        <a href={v.source_url} target="_blank" rel="noreferrer" className="underline">
+                          roll call ↗
+                        </a>
+                      </>
+                    )}
+                  </span>
+                )}
+              </span>
+              <span className="shrink-0 text-xs text-slate-600">
+                <span className="font-medium">{VOTE_KINDS.find((k) => k.value === v.vote)?.label ?? v.vote}</span>
+                {v.date && <span className="text-slate-500"> · {v.date}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && matching.length > shown && (
         <button
           type="button"
           onClick={() => setShown(shown + PAGE)}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import PersonPage, { generateMetadata } from "./page";
 import * as serverApi from "@/lib/server-api";
 import type { PersonDetail } from "@/lib/types";
@@ -74,6 +75,7 @@ describe("PersonPage", () => {
 
     expect(screen.getByText("sponsor")).toBeInTheDocument();
     expect(screen.getByText("co-sponsor")).toBeInTheDocument();
+    expect(screen.getByText("Sponsored 1 · Co-sponsored 1 · 0 recorded votes")).toBeInTheDocument();
   });
 
   it("falls back to a placeholder when a bill has no generated summary yet", async () => {
@@ -108,6 +110,8 @@ describe("PersonPage", () => {
     await renderPersonPage();
 
     expect(screen.getByText("Voting record")).toBeInTheDocument();
+    expect(screen.getByText("Sponsored 0 · Co-sponsored 0 · 1 recorded vote")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show the 1 vote" }));
     expect(screen.getByRole("link", { name: "HB 7" })).toHaveAttribute("href", "/bills/b1");
     expect(screen.getByText(/House: Third Reading RCS#549/)).toBeInTheDocument();
     expect(screen.getByText("Yes")).toBeInTheDocument();
