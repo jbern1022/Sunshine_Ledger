@@ -4,10 +4,11 @@ Deliberately split from amendment *text* fetching, the same way bill_text.py
 is split from ordinary ingestion: the amendments array on a getBill response
 already carries enough metadata (date, chamber, adopted, title) for a
 timeline entry at no extra API cost, so that part runs on every ingest.
-Fetching the actual amendment document (for the diff view) costs one extra
-LegiScan call per amendment and is not wired into ingestion -- see
-fetch_amendment_text / backfill_amendment_texts, an opt-in step mirroring
-backfill_bill_texts.
+Fetching the actual amendment document (for the diff view) is not wired
+into ingestion -- see fetch_amendment_text / backfill_amendment_texts, an
+opt-in step mirroring backfill_bill_texts. The document comes from its
+flsenate.gov `state_link` (recorded on the event; verified 2026-09-29 to
+extract identically), with one LegiScan getAmendment call as the fallback.
 
 Response shape verified 2026-09-15 against live FL bills (HB 175, amendment
 278267 among others), not just LegiScan's documentation:
@@ -91,6 +92,7 @@ def sync_bill_amendments(db: Session, *, bill_entity: Entity, amendments: list[d
                     "amendment_id": amendment_id,
                     "chamber": chamber,
                     "adopted": adopted,
+                    **({"state_link": amendment["state_link"]} if amendment.get("state_link") else {}),
                 },
             )
         )
@@ -101,12 +103,28 @@ def sync_bill_amendments(db: Session, *, bill_entity: Entity, amendments: list[d
     return written
 
 
-def fetch_amendment_text(client: LegiScanClient, amendment_id: int) -> str | None:
-    """Fetch and clean one amendment's document text (opt-in, costs one
-    LegiScan call). Mirrors fetch_bill_text's PDF/HTML handling -- LegiScan
-    documents both come from the same document-API family, confirmed live
-    (see module docstring).
+def fetch_amendment_text(
+    client: LegiScanClient, amendment_id: int, *, state_link: str | None = None, fallback: bool = True
+) -> str | None:
+    """Fetch and clean one amendment's document text: from flsenate.gov when
+    there's a `state_link`, otherwise -- or when that fails -- one LegiScan
+    call, unless `fallback` is off (then NeedsLegiScan). Mirrors
+    fetch_bill_text's PDF/HTML handling -- LegiScan documents both come from
+    the same document-API family, confirmed live (see module docstring).
     """
+    from app.pipeline import flsenate
+    from app.pipeline.bill_text import NeedsLegiScan
+
+    if state_link:
+        try:
+            body, kind = flsenate.fetch_document(state_link)
+            return strip_amendment_furniture(extract_pdf_text(body) if kind == "pdf" else extract_html_text(body))
+        except flsenate.BudgetExhausted:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
+            logger.info("flsenate.gov failed for amendment_id=%s (%s); using LegiScan", amendment_id, exc)
+    if not fallback:
+        raise NeedsLegiScan(amendment_id)
     doc = client.get_amendment(amendment_id)
     mime = doc.get("mime")
     raw = base64.b64decode(doc["doc"]) if doc.get("doc") else None
@@ -125,8 +143,8 @@ def fetch_amendment_text(client: LegiScanClient, amendment_id: int) -> str | Non
 def backfill_amendment_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:
     """Populate `amendment_text` on AMENDED events that don't have it yet.
 
-    One getAmendment call per amendment, so it spends real API quota --
-    same reasoning as backfill_bill_texts, hence skipping amendments that
+    flsenate.gov first when the event has a `state_link`, else one
+    getAmendment call -- real API quota, hence skipping amendments that
     already have text unless `refresh` is set. Stored on the event's
     `attributes` JSONB (amendment_text key) rather than a dedicated column:
     this is a per-event attribute like everything else already on Event,
@@ -153,7 +171,7 @@ def backfill_amendment_texts(db: Session, *, limit: int | None = None, refresh: 
             continue
 
         try:
-            text = fetch_amendment_text(client, int(amendment_id))
+            text = fetch_amendment_text(client, int(amendment_id), state_link=event.attributes.get("state_link"))
             if not text:
                 failed += 1
                 continue

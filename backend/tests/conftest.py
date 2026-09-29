@@ -122,3 +122,22 @@ def _no_real_ollama_for_topic_tagging(monkeypatch):
             raise httpx.ConnectError("no Ollama in tests")
 
     monkeypatch.setattr(topic_tagging_ollama, "OllamaClient", _Unreachable)
+
+
+@pytest.fixture(autouse=True)
+def _flsenate_offline(monkeypatch):
+    """flsenate.gov fetching keeps module state (request spacing, counts,
+    a per-run budget). Reset it for every test, never sleep, and refuse real
+    network: tests that fetch documents install a mock transport."""
+    import httpx
+
+    from app.pipeline import flsenate
+
+    def offline(request):
+        raise httpx.ConnectError("no flsenate.gov in tests")
+
+    monkeypatch.setattr(flsenate, "FETCHES", flsenate.FETCHES.__class__())
+    monkeypatch.setattr(flsenate, "_budget", None)
+    monkeypatch.setattr(flsenate, "_last_request", 0.0)
+    monkeypatch.setattr(flsenate, "_sleep", lambda seconds: None)
+    monkeypatch.setattr(flsenate, "_client", httpx.Client(transport=httpx.MockTransport(offline)))

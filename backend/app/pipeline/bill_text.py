@@ -427,6 +427,34 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
     return _merge_adjacent_markers(strip_page_artifacts("\n".join(kept)))
 
 
+class NeedsLegiScan(Exception):
+    """flsenate.gov couldn't serve the document and the LegiScan fallback
+    wasn't allowed (the run's LegiScan call cap is spent)."""
+
+
+def fetch_text_document(client: LegiScanClient, doc: dict, *, fallback: bool = True) -> str | None:
+    """Cleaned text of one bill text document (a getBill / dataset `texts`
+    entry): from flsenate.gov when it has a `state_link`, otherwise -- or
+    when that fails -- through LegiScan (one getBillText call), unless
+    `fallback` is off (then NeedsLegiScan). Lets flsenate.BudgetExhausted
+    through so the caller can stop for the night.
+    """
+    from app.pipeline import flsenate
+
+    link = doc.get("state_link")
+    if link:
+        try:
+            body, kind = flsenate.fetch_document(link)
+            return extract_pdf_text(body) if kind == "pdf" else extract_html_text(body)
+        except flsenate.BudgetExhausted:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
+            logger.info("flsenate.gov failed for doc_id=%s (%s); using LegiScan", doc.get("doc_id"), exc)
+    if not fallback:
+        raise NeedsLegiScan(doc.get("doc_id"))
+    return fetch_bill_text(client, int(doc["doc_id"]))
+
+
 def fetch_bill_text(client: LegiScanClient, doc_id: int) -> str | None:
     """Fetch one document by LegiScan doc_id and return its cleaned text.
 
@@ -562,7 +590,7 @@ def _legiscan_text_for(client: LegiScanClient, entity: Entity) -> str | None:
         return None
     # Last entry is the most recent version (LegiScan orders them
     # oldest-first), which is what should be summarized.
-    return fetch_bill_text(client, int(docs[-1]["doc_id"]))
+    return fetch_text_document(client, docs[-1])
 
 
 def backfill_bill_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:

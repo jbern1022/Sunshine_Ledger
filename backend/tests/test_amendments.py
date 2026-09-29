@@ -130,7 +130,7 @@ def test_backfill_amendment_texts_fetches_missing_text(db_session, bill_factory,
         "app.pipeline.amendments.LegiScanClient", lambda: FakeAmendmentClient({}), raising=True
     )
     monkeypatch.setattr(
-        "app.pipeline.amendments.fetch_amendment_text", lambda client, amendment_id: "Amended text here."
+        "app.pipeline.amendments.fetch_amendment_text", lambda client, amendment_id, **_: "Amended text here."
     )
 
     fetched, failed = backfill_amendment_texts(db_session)
@@ -167,7 +167,7 @@ def test_backfill_amendment_texts_refresh_true_refetches_existing_text(db_sessio
         "app.pipeline.amendments.LegiScanClient", lambda: FakeAmendmentClient({}), raising=True
     )
     monkeypatch.setattr(
-        "app.pipeline.amendments.fetch_amendment_text", lambda client, amendment_id: "Fresh text."
+        "app.pipeline.amendments.fetch_amendment_text", lambda client, amendment_id, **_: "Fresh text."
     )
 
     fetched, failed = backfill_amendment_texts(db_session, refresh=True)

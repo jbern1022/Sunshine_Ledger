@@ -110,7 +110,11 @@ def test_staff_analyses_passed_bills_first_within_the_cap(db_session, monkeypatc
 
     fetched = []
 
-    def fake_store(db, client, *, entity, supplements, known_ids):
+    def fake_store(db, client, *, entity, supplements, known_ids, fallback=True):
+        from app.pipeline.bill_text import NeedsLegiScan
+
+        if not fallback:  # no state_link here, so only LegiScan could serve it
+            raise NeedsLegiScan(supplements[0]["supplement_id"])
         for supp in supplements:
             legiscan.API_CALLS["getSupplement"] += 1
             fetched.append(supp["supplement_id"])

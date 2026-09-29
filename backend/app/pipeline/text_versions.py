@@ -1,26 +1,28 @@
 """Fetch bill text using the session dataset's document lists.
 
-Two jobs, both one getBillText per document (the dataset download is 2
-calls and tells us every bill's documents for free):
+Each document comes from flsenate.gov when it can (its `state_link` in the
+dataset; no LegiScan call, ~10 s each) and otherwise from LegiScan, one
+getBillText / getSupplement each. The dataset download is 2 calls and tells
+us every bill's documents for free. `--max-calls` caps LegiScan calls and
+`--max-documents` caps flsenate.gov fetches; what's left waits for a rerun.
 
 - --latest: bills with no text yet get their latest version as
-  bills.full_text, passed bills first. Half the cost of bill_text's
-  getBill + getBillText per bill.
-- --staff-analyses: committee staff analyses not stored yet (one
-  getSupplement each), passed bills first. The dataset lists every bill's
-  supplements, so this skips the getBill per bill that
-  staff_analysis.backfill_staff_analyses pays.
+  bills.full_text, passed bills first.
+- --staff-analyses: committee staff analyses not stored yet, passed bills
+  first. The dataset lists every bill's supplements, so this skips the
+  getBill per bill that staff_analysis.backfill_staff_analyses pays.
+- --amendments: text of amendments whose timeline entry has none yet
+  (for the amendment diff view), passed bills first; also records each
+  one's flsenate.gov link.
 - default: the filed (first) text version of bills that were amended.
 
 Bill.full_text holds a bill's latest version; showing "what changed from
-the filed bill to the version that passed" also needs the first. Each
-bill's version list comes from the session dataset (free after the 2-call
-download); only the filed documents themselves cost calls, one getBillText
-each, and only for bills with more than one version. Stored versions are
-skipped, so a rerun costs nothing extra.
+the filed bill to the version that passed" also needs the first, and only
+bills with more than one version have one to fetch. Stored documents are
+skipped, so a rerun fetches only what's left.
 
     python -m app.pipeline.text_versions --session "2026 Regular Session" --dry-run
-    python -m app.pipeline.text_versions --session "2026 Regular Session" --max-calls 1500
+    python -m app.pipeline.text_versions --session "2026 Regular Session" --max-calls 0 --max-documents 300
     python -m app.pipeline.text_versions --session "2025 Regular Session" --staff-analyses --dry-run
 """
 
@@ -32,8 +34,8 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import BillTextVersion, Entity
-from app.pipeline import legiscan
+from app.models import BillTextVersion, Entity, Event
+from app.pipeline import flsenate, legiscan
 from app.pipeline.legiscan import LegiScanClient, api_usage_summary
 
 logger = logging.getLogger(__name__)
@@ -68,18 +70,21 @@ def filed_versions_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[E
 
 
 def backfill_filed_versions(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
-    """Fetch and store filed versions, stopping at `max_calls` LegiScan
-    calls. Returns (stored, failed, left for a later run)."""
-    from app.pipeline.bill_text import fetch_bill_text  # bill_text imports legiscan
+    """Fetch and store filed versions; at most `max_calls` of them through
+    LegiScan. Returns (stored, failed, left for a later run)."""
+    from app.pipeline.bill_text import NeedsLegiScan, fetch_text_document  # bill_text imports legiscan
 
     todo = filed_versions_to_fetch(db, bills)
     start = sum(legiscan.API_CALLS.values())
-    stored = failed = 0
+    stored = failed = left = 0
     for index, (entity, first) in enumerate(todo):
-        if sum(legiscan.API_CALLS.values()) - start >= max_calls:
-            return stored, failed, len(todo) - index
         try:
-            text = fetch_bill_text(client, int(first["doc_id"]))
+            text = fetch_text_document(client, first, fallback=sum(legiscan.API_CALLS.values()) - start < max_calls)
+        except flsenate.BudgetExhausted:
+            return stored, failed, left + len(todo) - index
+        except NeedsLegiScan:
+            left += 1
+            continue
         except Exception as exc:  # noqa: BLE001 -- one bad document shouldn't stop the run
             logger.warning("doc_id=%s failed: %s", first["doc_id"], exc)
             failed += 1
@@ -98,7 +103,7 @@ def backfill_filed_versions(db: Session, bills: dict[int, dict], client, *, max_
         )
         db.commit()
         stored += 1
-    return stored, failed, 0
+    return stored, failed, left
 
 
 def latest_text_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Entity, dict]]:
@@ -125,18 +130,21 @@ def latest_text_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Enti
 
 def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
     """Set bills.full_text from each bill's latest document and record its
-    doc id (so nightly sync knows it's current). Stops at `max_calls`.
-    Returns (stored, failed, left)."""
-    from app.pipeline.bill_text import fetch_bill_text
+    doc id (so nightly sync knows it's current); at most `max_calls` through
+    LegiScan. Returns (stored, failed, left)."""
+    from app.pipeline.bill_text import NeedsLegiScan, fetch_text_document
 
     todo = latest_text_to_fetch(db, bills)
     start = sum(legiscan.API_CALLS.values())
-    stored = failed = 0
+    stored = failed = left = 0
     for index, (entity, latest) in enumerate(todo):
-        if sum(legiscan.API_CALLS.values()) - start >= max_calls:
-            return stored, failed, len(todo) - index
         try:
-            text = fetch_bill_text(client, int(latest["doc_id"]))
+            text = fetch_text_document(client, latest, fallback=sum(legiscan.API_CALLS.values()) - start < max_calls)
+        except flsenate.BudgetExhausted:
+            return stored, failed, left + len(todo) - index
+        except NeedsLegiScan:
+            left += 1
+            continue
         except Exception as exc:  # noqa: BLE001
             logger.warning("doc_id=%s failed: %s", latest["doc_id"], exc)
             failed += 1
@@ -148,7 +156,7 @@ def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_cal
         entity.external_ids = {**entity.external_ids, "legiscan_text_doc_id": str(latest["doc_id"])}
         db.commit()
         stored += 1
-    return stored, failed, 0
+    return stored, failed, left
 
 
 def staff_analyses_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Entity, dict]]:
@@ -174,23 +182,82 @@ def staff_analyses_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[E
 
 
 def backfill_staff_analyses(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
-    """Store missing staff analyses, one getSupplement each, stopping at
-    `max_calls`. Returns (stored, failed, left)."""
+    """Store missing staff analyses; at most `max_calls` of them through
+    LegiScan (getSupplement). Returns (stored, failed, left)."""
     from app.pipeline import staff_analysis
+    from app.pipeline.bill_text import NeedsLegiScan
 
     todo = staff_analyses_to_fetch(db, bills)
     known: set[int] = set()
     start = sum(legiscan.API_CALLS.values())
-    stored = failed = 0
+    stored = failed = left = 0
     for index, (entity, supp) in enumerate(todo):
-        if sum(legiscan.API_CALLS.values()) - start >= max_calls:
-            return stored, failed, len(todo) - index
-        ok, bad = staff_analysis.store_new_staff_analyses(
-            db, client, entity=entity, supplements=[supp], known_ids=known
-        )
+        try:
+            ok, bad = staff_analysis.store_new_staff_analyses(
+                db, client, entity=entity, supplements=[supp], known_ids=known,
+                fallback=sum(legiscan.API_CALLS.values()) - start < max_calls,
+            )
+        except flsenate.BudgetExhausted:
+            return stored, failed, left + len(todo) - index
+        except NeedsLegiScan:
+            left += 1
+            continue
         stored += ok
         failed += bad
-    return stored, failed, 0
+    return stored, failed, left
+
+
+def amendment_texts_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Event, dict]]:
+    """(stored AMENDED event, dataset amendment) for amendments of dataset
+    bills whose event has no amendment_text yet, passed bills first."""
+    status = {
+        str(a["amendment_id"]): bill.get("status") == 4
+        for bill in bills.values()
+        for a in bill.get("amendments") or []
+        if a.get("amendment_id")
+    }
+    amendments = {str(a["amendment_id"]): a for bill in bills.values() for a in bill.get("amendments") or []}
+    todo = [
+        (event, amendments[str(event.attributes.get("amendment_id"))])
+        for event in db.execute(select(Event).where(Event.event_type == "AMENDED")).scalars()
+        if not event.attributes.get("amendment_text") and str(event.attributes.get("amendment_id")) in amendments
+    ]
+    todo.sort(key=lambda item: (not status[str(item[1]["amendment_id"])], int(item[1]["amendment_id"])))
+    return todo
+
+
+def backfill_amendment_texts(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
+    """Store missing amendment texts (and each one's flsenate.gov link); at
+    most `max_calls` through LegiScan. Returns (stored, failed, left)."""
+    from app.pipeline.amendments import fetch_amendment_text
+    from app.pipeline.bill_text import NeedsLegiScan
+
+    todo = amendment_texts_to_fetch(db, bills)
+    start = sum(legiscan.API_CALLS.values())
+    stored = failed = left = 0
+    for index, (event, amendment) in enumerate(todo):
+        try:
+            text = fetch_amendment_text(
+                client, int(amendment["amendment_id"]), state_link=amendment.get("state_link"),
+                fallback=sum(legiscan.API_CALLS.values()) - start < max_calls,
+            )
+        except flsenate.BudgetExhausted:
+            return stored, failed, left + len(todo) - index
+        except NeedsLegiScan:
+            left += 1
+            continue
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("amendment_id=%s failed: %s", amendment["amendment_id"], exc)
+            failed += 1
+            continue
+        if not text:
+            failed += 1
+            continue
+        link = {"state_link": amendment["state_link"]} if amendment.get("state_link") else {}
+        event.attributes = {**event.attributes, **link, "amendment_text": text}
+        db.commit()
+        stored += 1
+    return stored, failed, left
 
 
 if __name__ == "__main__":
@@ -206,12 +273,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--session", required=True, help='e.g. "2026 Regular Session"')
     parser.add_argument("--max-calls", type=int, default=1500)
+    parser.add_argument("--max-documents", type=int, default=None, help="Cap flsenate.gov fetches (10 s each).")
     parser.add_argument("--dry-run", action="store_true", help="Count what would be fetched; 2 calls for the dataset.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--latest", action="store_true", help="Fill missing bills.full_text instead (passed bills first).")
     mode.add_argument("--staff-analyses", action="store_true", help="Fetch missing staff analyses (passed bills first).")
+    mode.add_argument("--amendments", action="store_true", help="Fetch missing amendment texts (passed bills first).")
     args = parser.parse_args()
 
+    flsenate.set_budget(args.max_documents)
     api = LegiScanClient()
     dataset = DatasetClient(fetch_session_dataset(api, settings.legiscan_state, args.session), fallback=api)
     session = SessionLocal()
@@ -220,10 +290,12 @@ if __name__ == "__main__":
             pick, run, what = latest_text_to_fetch, backfill_latest_text, "missing bill texts"
         elif args.staff_analyses:
             pick, run, what = staff_analyses_to_fetch, backfill_staff_analyses, "missing staff analyses"
+        elif args.amendments:
+            pick, run, what = amendment_texts_to_fetch, backfill_amendment_texts, "missing amendment texts"
         else:
             pick, run, what = filed_versions_to_fetch, backfill_filed_versions, "filed versions"
         if args.dry_run:
-            print(f"{args.session}: {len(pick(session, dataset.bills))} {what} to fetch (1 call each).")
+            print(f"{args.session}: {len(pick(session, dataset.bills))} {what} to fetch (flsenate.gov first, LegiScan as the fallback).")
         else:
             stored, failed, left = run(session, dataset.bills, api, max_calls=args.max_calls)
             print(f"{args.session}: stored {stored}, failed {failed}, left for a later run {left}.")
