@@ -10,11 +10,11 @@ matched that shape and LegiScan's own `type`/`type_id` fields were uniformly
 "Veto Letter"/8 (a LegiScan taxonomy quirk, not a real veto letter). No
 scraper against flsenate.gov/myfloridahouse.gov is needed or used.
 
-Retrieval: through LegiScan's `getSupplement` op, not the supplement's own
-`state_link` -- that URL soft-404s (200 status, HTML error page instead of
-the PDF) for older/rotated links, confirmed 2026-09-21 against a real
-analysis URL. `getSupplement` returns the same PDF base64-encoded and is the
-same op family already used for bill text and amendments.
+Retrieval: from the supplement's own `state_link` on flsenate.gov first
+(no LegiScan call; the same PDF, verified 2026-09-29), falling back to
+LegiScan's `getSupplement`. Some older/rotated links soft-404 (200 status,
+HTML error page instead of the PDF, seen 2026-09-21); pipeline/flsenate.py
+rejects those, which is when the fallback is used.
 
 One bill can carry several analyses over its life (one per committee stop),
 so ingestion is additive -- see models/staff_analysis.py.
@@ -95,15 +95,51 @@ def is_staff_analysis(supplement: dict) -> bool:
     return supplement.get("title") == "Analysis"
 
 
+def _analysis_pdf(client: LegiScanClient, supp: dict, *, fallback: bool) -> bytes | None:
+    """The analysis PDF: flsenate.gov first, then LegiScan getSupplement
+    (unless `fallback` is off: NeedsLegiScan). None for a non-PDF document."""
+    from app.pipeline import flsenate
+    from app.pipeline.bill_text import NeedsLegiScan
+
+    supplement_id = supp.get("supplement_id")
+    link = supp.get("state_link")
+    if link:
+        try:
+            body, kind = flsenate.fetch_document(link)
+            if kind == "pdf":
+                return body
+        except flsenate.BudgetExhausted:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
+            logger.info("flsenate.gov failed for supplement_id=%s (%s); using LegiScan", supplement_id, exc)
+    if not fallback:
+        raise NeedsLegiScan(supplement_id)
+    doc = client.get_supplement(int(supplement_id))
+    if doc.get("mime") != "application/pdf":
+        logger.warning("supplement_id=%s has unsupported mime %s -- skipping", supplement_id, doc.get("mime"))
+        return None
+    return base64.b64decode(doc["doc"])
+
+
 def store_new_staff_analyses(
-    db: Session, client: LegiScanClient, *, entity: Entity, supplements: list[dict], known_ids: set[int]
+    db: Session,
+    client: LegiScanClient,
+    *,
+    entity: Entity,
+    supplements: list[dict],
+    known_ids: set[int],
+    fallback: bool = True,
 ) -> tuple[int, int]:
     """Fetch and store the staff analyses in a getBill `supplements` array
-    that aren't stored yet: one `getSupplement` call each. Shared by
+    that aren't stored yet: from flsenate.gov, or one `getSupplement` call
+    each (see _analysis_pdf). Shared by
     backfill_staff_analyses and legiscan.sync_state_bill_history, which
     already has the getBill response in hand. Adds stored ids to
     `known_ids`. Returns (fetched, failed).
     """
+    from app.pipeline import flsenate
+    from app.pipeline.bill_text import NeedsLegiScan
+
     fetched = failed = 0
     for supp in supplements:
         if not is_staff_analysis(supp):
@@ -113,13 +149,8 @@ def store_new_staff_analyses(
             continue
 
         try:
-            doc = client.get_supplement(int(supplement_id))
-            raw = base64.b64decode(doc["doc"])
-            if doc.get("mime") != "application/pdf":
-                logger.warning(
-                    "supplement_id=%s has unsupported mime %s -- skipping",
-                    supplement_id, doc.get("mime"),
-                )
+            raw = _analysis_pdf(client, supp, fallback=fallback)
+            if raw is None:
                 failed += 1
                 continue
 
@@ -141,6 +172,8 @@ def store_new_staff_analyses(
             db.commit()
             known_ids.add(supplement_id)
             fetched += 1
+        except (NeedsLegiScan, flsenate.BudgetExhausted):
+            raise
         except Exception as exc:  # noqa: BLE001 -- one bad document shouldn't kill the backfill
             db.rollback()
             failed += 1

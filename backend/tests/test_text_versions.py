@@ -101,3 +101,41 @@ def test_latest_text_fills_missing_text_passed_bills_first(db_session, fetch):
     backfill_latest_text(db_session, bills, client=None, max_calls=10)
     assert fetch == [303, 102]  # the bill that already had text was skipped
     assert has_text.bill.full_text == "already here"
+
+
+def test_staff_analyses_passed_bills_first_within_the_cap(db_session, monkeypatch):
+    import app.pipeline.staff_analysis as staff_analysis
+    from app.models import StaffAnalysis
+    from app.pipeline.text_versions import backfill_staff_analyses, staff_analyses_to_fetch
+
+    fetched = []
+
+    def fake_store(db, client, *, entity, supplements, known_ids, fallback=True):
+        from app.pipeline.bill_text import NeedsLegiScan
+
+        if not fallback:  # no state_link here, so only LegiScan could serve it
+            raise NeedsLegiScan(supplements[0]["supplement_id"])
+        for supp in supplements:
+            legiscan.API_CALLS["getSupplement"] += 1
+            fetched.append(supp["supplement_id"])
+            db.add(StaffAnalysis(entity_id=entity.id, legiscan_supplement_id=supp["supplement_id"],
+                                  source_url="https://example.test", text="t"))
+            known_ids.add(supp["supplement_id"])
+        db.commit()
+        return len(supplements), 0
+
+    monkeypatch.setattr(staff_analysis, "store_new_staff_analyses", fake_store)
+    died, passed = _bill(db_session, 1), _bill(db_session, 3)
+    db_session.commit()
+    analysis = {"title": "Analysis"}
+    bills = {
+        1: {"status": 1, "supplements": [{**analysis, "supplement_id": 11}, {"title": "Vote", "supplement_id": 12}]},
+        3: {"status": 4, "supplements": [{**analysis, "supplement_id": 31}, {**analysis, "supplement_id": 32}]},
+        9: {"status": 4, "supplements": [{**analysis, "supplement_id": 91}]},  # not in our database
+    }
+
+    assert [s["supplement_id"] for _, s in staff_analyses_to_fetch(db_session, bills)] == [31, 32, 11]
+    assert backfill_staff_analyses(db_session, bills, client=None, max_calls=2) == (2, 0, 1)
+    assert fetched == [31, 32]
+    assert backfill_staff_analyses(db_session, bills, client=None, max_calls=10) == (1, 0, 0)
+    assert fetched == [31, 32, 11]

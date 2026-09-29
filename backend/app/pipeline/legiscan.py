@@ -53,9 +53,12 @@ API_CALLS: Counter[str] = Counter()
 
 
 def api_usage_summary() -> str:
+    from app.pipeline import flsenate
+
     total = sum(API_CALLS.values())
     detail = ", ".join(f"{op} {n}" for op, n in sorted(API_CALLS.items()))
-    return f"LegiScan API calls this run: {total}" + (f" ({detail})" if detail else "")
+    summary = f"LegiScan API calls this run: {total}" + (f" ({detail})" if detail else "")
+    return summary + (f"\n{flsenate.usage_summary()}" if flsenate.FETCHES else "")
 
 
 class LegiScanClient:
@@ -218,9 +221,13 @@ def _refresh_bill_text(entity: Entity, bill: Bill, detail: dict, client) -> None
     bill that already has text but no recorded id (everything ingested
     before 2026-09-26, whose text was re-extracted on 2026-09-25) just
     records the current id -- refetching all ~1,900 would spend a fifth of
-    a month's quota to learn nothing. One getBillText call otherwise.
+    a month's quota to learn nothing. Otherwise the document comes from
+    flsenate.gov (LegiScan getBillText as the fallback); once the night's
+    flsenate budget is spent the doc id stays unrecorded, so the next run
+    fetches it.
     """
-    from app.pipeline.bill_text import fetch_bill_text  # bill_text imports this module
+    from app.pipeline import flsenate
+    from app.pipeline.bill_text import fetch_text_document  # bill_text imports this module
 
     docs = detail.get("texts") or []
     if not docs:
@@ -230,7 +237,10 @@ def _refresh_bill_text(entity: Entity, bill: Bill, detail: dict, client) -> None
     if stored == latest:
         return
     if stored is not None or not bill.full_text:
-        text = fetch_bill_text(client, int(latest))
+        try:
+            text = fetch_text_document(client, docs[-1])
+        except flsenate.BudgetExhausted:
+            return
         if not text:
             return
         bill.full_text = text
@@ -701,6 +711,7 @@ def ingest_session_dataset(db: Session, *, session_name: str, state: str | None 
 
 
 NIGHTLY_CALL_BUDGET = 250  # x 31 nights = 7,750, inside 10,000/month with room for manual runs
+NIGHTLY_DOCUMENT_BUDGET = 300  # flsenate.gov documents a night: ~50 min at its 10 s crawl delay
 
 
 def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int = NIGHTLY_CALL_BUDGET) -> list[Entity]:
@@ -714,7 +725,10 @@ def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int 
     3. getBill for bills that still differ from the master list (changed
        since the dataset was built), plus getBillText when a bill's latest
        text document is new -- capped by `max_calls`; the rest wait a night.
+       The text itself comes from flsenate.gov (no LegiScan call), up to
+       NIGHTLY_DOCUMENT_BUDGET documents.
     """
+    from app.pipeline import flsenate
     from app.pipeline.legiscan_dataset import DatasetClient
     from app.pipeline.source_checks import record_check
 
@@ -724,6 +738,8 @@ def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int 
 
     def remaining() -> int:
         return max(0, max_calls - (sum(API_CALLS.values()) - calls_at_start))
+
+    flsenate.set_budget(NIGHTLY_DOCUMENT_BUDGET)
 
     master_list = api.get_master_list(state)
     session = getattr(api, "last_master_session", {}) or {}

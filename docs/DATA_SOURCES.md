@@ -24,9 +24,11 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
 
 ### LegiScan: Florida state bills
 
-- **What:** bill metadata, sponsors, status, full text (`getBillText`),
-  amendments and amendment text (`getAmendment`), action history, roll
-  calls with each legislator's vote, and staff analyses (`getSupplement`).
+- **What:** bill metadata, sponsors, status, amendments, action history,
+  roll calls with each legislator's vote, and each document's official
+  link. Documents (text, amendment text, staff analyses) come from
+  flsenate.gov (below); `getBillText` / `getAmendment` / `getSupplement`
+  are the fallback.
 - **Module:** `backend/app/pipeline/legiscan.py`, `legiscan_dataset.py`,
   `bill_text.py`, `amendments.py`, `staff_analysis.py`.
 - **Authority:** secondary. LegiScan aggregates the Florida Legislature's
@@ -36,7 +38,8 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   (1 call) finds changed bills; `getDatasetList` (1 call) shows whether the
   session dataset was rebuilt, and if so it's imported (1 call) instead of
   fetching bills one by one. Then `getBill` for bills changed since the
-  dataset, and `getBillText` only when a bill's latest text document is new.
+  dataset; when a bill's latest text document is new it's fetched from
+  flsenate.gov.
   Capped at 250 calls a night; anything left waits for the next night.
 - **Coverage:** 2024 Regular (1,902 bills) and 2025 Regular + three special sessions (1,991), ingested once from datasets on 2026-09-27 (text being fetched). 2026 Regular Session (1,897 bills) plus the three 2026
   special sessions (4th: 6, 5th: 22, 6th: 5 bills; ingested once from their
@@ -62,6 +65,31 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
 - **Terms:** LegiScan API terms of service; data is licensed CC BY 4.0
   (attribution to LegiScan). Verify against the current terms before
   redistributing bulk data.
+
+### flsenate.gov: Florida state bill documents
+
+- **What:** the documents themselves -- bill text versions, committee staff
+  analyses, amendments -- fetched from each document's `state_link` in the
+  LegiScan data instead of through LegiScan's document calls.
+- **Module:** `backend/app/pipeline/flsenate.py`; used by `bill_text.py`
+  (`fetch_text_document`), `staff_analysis.py`, `amendments.py`,
+  `text_versions.py` and the nightly text refresh.
+- **Authority:** primary: the Florida Senate's own site (it also hosts
+  House bills, analyses and amendments).
+- **Why:** documents were most of LegiScan's per-session cost, and the
+  copies are the same files: on 2026-09-29 HB 1389 filed (PDF), SB 102
+  enrolled (HTML), HB 565 enrolled (PDF), an HB 565 staff analysis and an
+  HB 1389 amendment all extracted identically to LegiScan's.
+- **Politeness:** robots.txt allows `/Session/` with `Crawl-delay: 10`;
+  requests are spaced 10 s apart (~360 documents an hour) with an honest
+  User-Agent. The nightly job fetches at most 300 (`legiscan.NIGHTLY_DOCUMENT_BUDGET`);
+  the rest wait a night. Backfills take `--max-documents`.
+- **Fallback:** a missing document is a soft 404 (HTTP 200, HTML page
+  "not found for this bill"; House bills have no HTML version). It's
+  rejected and the document comes from LegiScan instead, unless the run's
+  LegiScan cap (`--max-calls`) is spent -- then it waits for a later run.
+- **Counts:** every CLI that fetches documents prints
+  "flsenate.gov documents this run" under the LegiScan call count.
 
 ### Legistar: Jacksonville City Council (`jaxcityc`)
 
