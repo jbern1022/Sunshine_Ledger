@@ -170,9 +170,13 @@ via cron, operating directly on the live `sunshineledger-backend-1`
 container with `docker exec` -- no repo checkout needed on that host.
 
 ```
-0 4 * * *   /home/joe/scripts/run-ingestion.sh              # daily: LegiScan, Legistar, Miami iQM2, summarize
-0 5 * * 0   /home/joe/scripts/run-ingestion.sh --with-gdelt # weekly (Sunday): adds GDELT headline refresh
+0 4 * * *   /home/joe/scripts/run-ingestion.sh              # daily: LegiScan, Legistar, Miami iQM2, summaries, layers
+#0 5 * * 0  /home/joe/scripts/run-ingestion.sh --gdelt-only # weekly (Sunday): GDELT headlines only
 ```
+
+The Sunday line is commented out while GDELT is paused (429s; Todoist
+6hf8XHrH8pHmwJ5G). It used to be `--with-gdelt`, which repeated the whole
+nightly run an hour after the 04:00 one; `--gdelt-only` runs just GDELT.
 
 GDELT is deliberately weekly, not daily -- it re-checks every bill in the
 database against GDELT's free DOC API with an 8s/bill minimum throttle,
