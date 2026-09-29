@@ -50,9 +50,15 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   amendments (1,186, with text); 877 have roll calls (2,798, with 93,876
   individual votes); 890 have staff analyses (4,308 documents).
 - **Quota:** the free tier is 30,000 calls/month through 2026-09-30 and
-  10,000/month from 2026-10-01. Every LegiScan CLI prints its call count.
-  Bulk work should use the session dataset (`--from-dataset`, 2 calls per
-  session) instead of per-bill calls.
+  10,000/month from 2026-10-01. Every LegiScan CLI prints its call count
+  and adds it to the `legiscan_call_counts` ledger (month, operation), so
+  it also prints this month's total. The nightly cap is
+  `LEGISCAN_NIGHTLY_CALL_BUDGET` (default 250); after the nightly run,
+  `usage_alerts` posts to ntfy (`NTFY_ALERT_URL`) once at 70% and once at
+  90% of `LEGISCAN_MONTHLY_LIMIT`. LegiScan's dashboard stays the source of
+  truth (it counts cache hits and anything outside this code); reconcile
+  monthly. Bulk work should use the session dataset (`--from-dataset`, 2
+  calls per session) instead of per-bill calls.
 - **Known gaps:**
   - Nightly ingestion doesn't revisit the special sessions; rerun
     `--ingest-dataset` if one is ever amended or a new one is called.
@@ -82,7 +88,7 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
   HB 1389 amendment all extracted identically to LegiScan's.
 - **Politeness:** robots.txt allows `/Session/` with `Crawl-delay: 10`;
   requests are spaced 10 s apart (~360 documents an hour) with an honest
-  User-Agent. The nightly job fetches at most 300 (`legiscan.NIGHTLY_DOCUMENT_BUDGET`);
+  User-Agent. The nightly job fetches at most 300 (`FLSENATE_NIGHTLY_DOCUMENTS`);
   the rest wait a night. Backfills take `--max-documents`.
 - **Fallback:** a missing document is a soft 404 (HTTP 200, HTML page
   "not found for this bill"; House bills have no HTML version). It's

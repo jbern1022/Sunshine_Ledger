@@ -12,6 +12,7 @@ from app.models.staff_analysis import StaffAnalysis
 from app.models.bill_layer import BillLayer, BillLayerSource, BillLayerReview
 from app.models.source_check import SourceCheck
 from app.models.bill_text_version import BillTextVersion
+from app.models.legiscan_call import LegiScanCallCount
 
 __all__ = [
     "Entity",
@@ -33,4 +34,5 @@ __all__ = [
     "BillLayerReview",
     "SourceCheck",
     "BillTextVersion",
+    "LegiScanCallCount",
 ]

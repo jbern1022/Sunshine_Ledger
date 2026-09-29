@@ -70,16 +70,22 @@ echo "[$(date)] Starting scheduled ingestion run."
 
 # LegiScan's free tier is 10,000 calls/month from 2026-10-01. The nightly
 # sync imports the session dataset when it changes (2 calls), fetches only
-# bills changed since, refetches text only for new documents, and stops at
-# 250 calls a night (legiscan.NIGHTLY_CALL_BUDGET); the rest wait a night.
+# bills changed since, takes new text documents from flsenate.gov, and stops
+# at LEGISCAN_NIGHTLY_CALL_BUDGET calls a night (default 250); the rest wait
+# a night. The calls go into the monthly ledger, and the next step posts an
+# ntfy warning at 70% and 90% of LEGISCAN_MONTHLY_LIMIT.
 step "LegiScan state bills" py "
 from app.db import SessionLocal
-from app.pipeline.legiscan import api_usage_summary, nightly_state_sync
+from app.pipeline.legiscan import nightly_state_sync, report_api_usage
 db = SessionLocal()
-written = nightly_state_sync(db)
-print(f'LegiScan: {len(written)} bills changed/new')
-print(api_usage_summary())
+try:
+    written = nightly_state_sync(db)
+    print(f'LegiScan: {len(written)} bills changed/new')
+finally:
+    print(report_api_usage(db))
 "
+
+step "LegiScan usage check" docker exec "$CONTAINER" python -m app.pipeline.usage_alerts
 
 step "Legistar (jaxcityc)" py "
 from app.db import SessionLocal

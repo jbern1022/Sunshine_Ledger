@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, StaffAnalysis
-from app.pipeline.legiscan import LegiScanClient, api_usage_summary
+from app.pipeline.legiscan import LegiScanClient, report_api_usage
 
 logger = logging.getLogger(__name__)
 
@@ -247,5 +247,5 @@ if __name__ == "__main__":
         ok, bad = backfill_staff_analyses(session, limit=args.limit)
         print(f"Done: {ok} fetched, {bad} skipped/failed.")
     finally:
+        print(report_api_usage(session))
         session.close()
-        print(api_usage_summary())

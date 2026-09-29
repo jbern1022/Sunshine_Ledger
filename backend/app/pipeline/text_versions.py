@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app.models import BillTextVersion, Entity, Event
 from app.pipeline import flsenate, legiscan
-from app.pipeline.legiscan import LegiScanClient, api_usage_summary
+from app.pipeline.legiscan import LegiScanClient, report_api_usage
 
 logger = logging.getLogger(__name__)
 
@@ -300,5 +300,5 @@ if __name__ == "__main__":
             stored, failed, left = run(session, dataset.bills, api, max_calls=args.max_calls)
             print(f"{args.session}: stored {stored}, failed {failed}, left for a later run {left}.")
     finally:
+        print(report_api_usage(session))
         session.close()
-        print(api_usage_summary())
