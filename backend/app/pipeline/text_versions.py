@@ -6,6 +6,10 @@ calls and tells us every bill's documents for free):
 - --latest: bills with no text yet get their latest version as
   bills.full_text, passed bills first. Half the cost of bill_text's
   getBill + getBillText per bill.
+- --staff-analyses: committee staff analyses not stored yet (one
+  getSupplement each), passed bills first. The dataset lists every bill's
+  supplements, so this skips the getBill per bill that
+  staff_analysis.backfill_staff_analyses pays.
 - default: the filed (first) text version of bills that were amended.
 
 Bill.full_text holds a bill's latest version; showing "what changed from
@@ -17,6 +21,7 @@ skipped, so a rerun costs nothing extra.
 
     python -m app.pipeline.text_versions --session "2026 Regular Session" --dry-run
     python -m app.pipeline.text_versions --session "2026 Regular Session" --max-calls 1500
+    python -m app.pipeline.text_versions --session "2025 Regular Session" --staff-analyses --dry-run
 """
 
 from __future__ import annotations
@@ -146,6 +151,48 @@ def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_cal
     return stored, failed, 0
 
 
+def staff_analyses_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Entity, dict]]:
+    """(stored bill entity, supplement) for dataset staff analyses we don't
+    hold yet, passed bills first."""
+    from app.models import StaffAnalysis
+    from app.pipeline.staff_analysis import is_staff_analysis
+
+    known = {row[0] for row in db.execute(select(StaffAnalysis.legiscan_supplement_id))}
+    entities = {
+        e.external_ids["legiscan_id"]: e
+        for e in db.execute(select(Entity).where(Entity.external_ids.has_key("legiscan_id"))).scalars()
+    }
+    todo = [
+        (entities[str(bill_id)], supp, bill.get("status") == 4)
+        for bill_id, bill in sorted(bills.items())
+        if str(bill_id) in entities
+        for supp in bill.get("supplements") or []
+        if is_staff_analysis(supp) and supp.get("supplement_id") and supp["supplement_id"] not in known
+    ]
+    todo.sort(key=lambda item: not item[2])  # stable: passed bills first
+    return [(entity, supp) for entity, supp, _ in todo]
+
+
+def backfill_staff_analyses(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
+    """Store missing staff analyses, one getSupplement each, stopping at
+    `max_calls`. Returns (stored, failed, left)."""
+    from app.pipeline import staff_analysis
+
+    todo = staff_analyses_to_fetch(db, bills)
+    known: set[int] = set()
+    start = sum(legiscan.API_CALLS.values())
+    stored = failed = 0
+    for index, (entity, supp) in enumerate(todo):
+        if sum(legiscan.API_CALLS.values()) - start >= max_calls:
+            return stored, failed, len(todo) - index
+        ok, bad = staff_analysis.store_new_staff_analyses(
+            db, client, entity=entity, supplements=[supp], known_ids=known
+        )
+        stored += ok
+        failed += bad
+    return stored, failed, 0
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -160,18 +207,21 @@ if __name__ == "__main__":
     parser.add_argument("--session", required=True, help='e.g. "2026 Regular Session"')
     parser.add_argument("--max-calls", type=int, default=1500)
     parser.add_argument("--dry-run", action="store_true", help="Count what would be fetched; 2 calls for the dataset.")
-    parser.add_argument("--latest", action="store_true", help="Fill missing bills.full_text instead (passed bills first).")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--latest", action="store_true", help="Fill missing bills.full_text instead (passed bills first).")
+    mode.add_argument("--staff-analyses", action="store_true", help="Fetch missing staff analyses (passed bills first).")
     args = parser.parse_args()
 
     api = LegiScanClient()
     dataset = DatasetClient(fetch_session_dataset(api, settings.legiscan_state, args.session), fallback=api)
     session = SessionLocal()
     try:
-        pick, run, what = (
-            (latest_text_to_fetch, backfill_latest_text, "missing bill texts")
-            if args.latest
-            else (filed_versions_to_fetch, backfill_filed_versions, "filed versions")
-        )
+        if args.latest:
+            pick, run, what = latest_text_to_fetch, backfill_latest_text, "missing bill texts"
+        elif args.staff_analyses:
+            pick, run, what = staff_analyses_to_fetch, backfill_staff_analyses, "missing staff analyses"
+        else:
+            pick, run, what = filed_versions_to_fetch, backfill_filed_versions, "filed versions"
         if args.dry_run:
             print(f"{args.session}: {len(pick(session, dataset.bills))} {what} to fetch (1 call each).")
         else:
