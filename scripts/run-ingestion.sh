@@ -10,15 +10,19 @@
 # local matters (Legistar: Jacksonville only -- Miami's Legistar client
 # is stale, see docs/RUNBOOK.md), scrape Miami's real source (iQM2),
 # summarize anything new, update bill page layers, purge expired flag
-# reporter emails, then (GDELT mode only) refresh news headlines.
+# reporter emails.
 #
 # GDELT is deliberately NOT run on every invocation: it re-checks every
 # bill in the database against GDELT's free DOC API (~8s/bill minimum
 # throttle, heavy 429 rate limiting observed even with backoff), so a
 # full pass takes multiple hours and hammers a free third-party API.
-# Run it weekly, not daily -- see the crontab entries this pairs with.
+# Run it weekly, not daily, and on its own: `--gdelt-only` runs just that
+# step. (The weekly job used to be `--with-gdelt`, which repeated the whole
+# nightly run -- LegiScan calls, summaries, layers -- an hour after the
+# 04:00 run had done it.) It doesn't ping the ingestion monitor, which
+# watches the nightly run.
 #
-# Usage: run-ingestion.sh [--with-gdelt]
+# Usage: run-ingestion.sh [--gdelt-only]
 
 # NOT `set -e`. The steps below are independent data sources, and an
 # earlier failure must not cancel the later ones: a single over-long
@@ -32,7 +36,7 @@ set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitoring.sh"
 
 CONTAINER="sunshineledger-backend-1"
-WITH_GDELT="${1:-}"
+MODE="${1:-}"
 
 FAILED_STEPS=()
 
@@ -50,6 +54,17 @@ step() {
 py() {
     docker exec "$CONTAINER" python -c "$1"
 }
+
+if [ "$MODE" = "--gdelt-only" ]; then
+    echo "[$(date)] Starting GDELT headline refresh."
+    step "GDELT headline refresh" docker exec "$CONTAINER" python -m app.pipeline.gdelt
+    [ ${#FAILED_STEPS[@]} -eq 0 ] || exit 1
+    echo "[$(date)] GDELT headline refresh complete."
+    exit 0
+elif [ -n "$MODE" ]; then
+    echo "Usage: $0 [--gdelt-only]" >&2
+    exit 2
+fi
 
 echo "[$(date)] Starting scheduled ingestion run."
 
@@ -90,10 +105,6 @@ step "Bill layers" docker exec "$CONTAINER" python -m app.pipeline.bill_layers_b
 # are deleted.
 step "Purge old flag reporter emails" docker exec "$CONTAINER" python -m app.pipeline.purge_flag_emails
 
-if [ "$WITH_GDELT" = "--with-gdelt" ]; then
-    step "GDELT headline refresh" docker exec "$CONTAINER" python -m app.pipeline.gdelt
-fi
-
 if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
     # Exit non-zero as well as pinging: the exit code is what a human sees
     # running this by hand, the ping is what reaches someone at 4am.
@@ -107,4 +118,4 @@ if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
 fi
 
 echo "[$(date)] Scheduled ingestion run complete (all steps OK)."
-monitor_ping "${INGESTION_PUSH_URL:-}" up "all steps OK${WITH_GDELT:+ (with GDELT)}" "$SECONDS"
+monitor_ping "${INGESTION_PUSH_URL:-}" up "all steps OK" "$SECONDS"
