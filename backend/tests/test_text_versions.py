@@ -179,3 +179,23 @@ def test_version_meta_labels_stored_texts_without_fetching(db_session):
     assert bill.external_ids["filed_text_url"] == "https://fl/filed"
     assert "text_version" not in other.external_ids
     assert record_version_meta(db_session, bills) == 0  # nothing new
+
+
+def test_version_meta_assumes_the_latest_version_for_text_stored_without_a_doc_id(db_session):
+    from app.models import Bill
+    from app.pipeline.text_versions import record_version_meta
+
+    bill = _bill(db_session, 1)
+    db_session.add(Bill(entity_id=bill.id, bill_number="H1", session="2026 Regular Session", status="Passed",
+                        source_system="legiscan", geo_scope_names=["FL"], full_text="enrolled text"))
+    no_text = _bill(db_session, 2)
+    db_session.commit()
+    bills = {
+        1: {"texts": [{"doc_id": 101, "type": "Introduced"}, {"doc_id": 103, "type": "Enrolled", "date": "2026-03-13"}]},
+        2: {"texts": [{"doc_id": 201, "type": "Introduced"}]},
+    }
+
+    assert record_version_meta(db_session, bills) == 1
+    assert bill.external_ids["legiscan_text_doc_id"] == "103"
+    assert bill.external_ids["text_version"]["type"] == "Enrolled"
+    assert "text_version" not in no_text.external_ids

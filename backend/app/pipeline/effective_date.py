@@ -20,6 +20,7 @@ _CLAUSE = re.compile(
     r"\b(?:takes?|becomes?|shall become) (?:effect|effective)\s+(?P<when>[^.]{3,200}?)\.)(?=\s|$)",
     re.IGNORECASE,
 )
+_VERB = re.compile(r"\b(?:takes?|becomes?|shall become) (?:effect|effective)\s+", re.IGNORECASE)
 _TAIL_CHARS = 20_000  # the clause is the last section; don't scan a 1.6 MB budget
 
 
@@ -33,4 +34,8 @@ def effective_clause(text: str | None) -> tuple[str, bool] | None:
     if not matches:
         return None
     last = matches[-1]
-    return last.group("when").strip(), "except as" in last.group("sentence").lower()
+    # "..., except for this section, which shall take effect upon this act
+    # becoming a law, this act shall take effect July 1, 2026." -- the act's
+    # own date is the last one in the sentence.
+    when = _VERB.split(last.group("sentence"))[-1].strip().rstrip(".").strip()
+    return when, "except" in last.group("sentence").lower()
