@@ -698,3 +698,11 @@ def test_filed_text_endpoint(client, db_session, bill_factory):
     assert body["text"] == "Section 1. Filed wording."
     assert body["version_type"] == "Introduced"
     assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}/versions/filed").status_code == 404
+
+
+def test_bill_detail_reads_the_effective_date_from_the_text(client, db_session, bill_factory):
+    bill = bill_factory()
+    bill.bill.full_text = "Section 1. Things.\nSection 2. This act shall take effect July 1, 2026."
+    db_session.commit()
+    assert client.get(f"/bills/{bill.id}").json()["effective"] == {"when": "July 1, 2026", "has_exceptions": False}
+    assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}").json()["effective"] is None

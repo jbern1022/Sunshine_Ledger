@@ -72,6 +72,50 @@ describe("BillPage", () => {
     expect(notFoundMock).toHaveBeenCalled();
   });
 
+  it("leads with status and the bill's own effective date", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      status: "Passed",
+      last_action: "Chapter No. 2026-12",
+      effective: { when: "July 1, 2026", has_exceptions: true },
+    });
+    await renderBillPage();
+    expect(screen.getByText("Status:")).toBeInTheDocument();
+    expect(screen.getByText(/Chapter No\. 2026-12/)).toBeInTheDocument();
+    expect(screen.getByText("Takes effect:")).toBeInTheDocument();
+    expect(screen.getByText("July 1, 2026", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/some sections have their own dates/)).toBeInTheDocument();
+  });
+
+  it("says a dead bill would have taken effect", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      status: "Failed",
+      effective: { when: "upon becoming a law", has_exceptions: false },
+    });
+    await renderBillPage();
+    expect(screen.getByText("Would have taken effect:")).toBeInTheDocument();
+  });
+
+  it("tells 'none recorded' apart from 'not collected'", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({ ...baseBill, source_system: "legiscan" });
+    await renderBillPage();
+    expect(screen.getByText(/No recorded roll-call votes for this bill/)).toBeInTheDocument();
+    expect(screen.getByText(/No amendments recorded for this bill/)).toBeInTheDocument();
+  });
+
+  it("says city bills' votes and amendments aren't collected", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      source_system: "legistar",
+      jurisdiction_level: "city",
+      jurisdiction_name: "Jacksonville",
+    });
+    await renderBillPage();
+    expect(screen.getByText(/Roll-call votes aren't collected for city legislation/)).toBeInTheDocument();
+    expect(screen.getByText(/Amendments aren't collected for city legislation/)).toBeInTheDocument();
+  });
+
   it("renders the core header fields", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();
@@ -265,10 +309,11 @@ describe("BillPage", () => {
     );
   });
 
-  it("does not render a Votes section when there are no roll calls", async () => {
+  it("keeps the Votes heading with an empty-state note when there are no roll calls", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();
-    expect(screen.queryByText("Votes")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Votes" })).toBeInTheDocument();
+    expect(screen.queryByText(/Plain vote tallies/)).not.toBeInTheDocument();
   });
 
   it("shows the amendment history when present", async () => {
@@ -292,10 +337,11 @@ describe("BillPage", () => {
     expect(screen.getByText(/Amendment filed 2026-02-10 in House — adopted/)).toBeInTheDocument();
   });
 
-  it("does not render an amendment history section when there are none", async () => {
+  it("keeps the amendment heading with an empty-state note when there are none", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();
-    expect(screen.queryByText("Amendment history")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Amendment history" })).toBeInTheDocument();
+    expect(screen.queryByText(/Amendment filed/)).not.toBeInTheDocument();
   });
 
   it("shows a 'View changes' diff toggle when both amendment text and full bill text are present", async () => {

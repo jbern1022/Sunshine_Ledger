@@ -24,6 +24,7 @@ from app.models import (
     StaffAnalysis,
     Tag,
 )
+from app.pipeline.effective_date import effective_clause
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
     ActionOut,
@@ -33,6 +34,7 @@ from app.schemas.bill import (
     BillListItem,
     BillListResponse,
     BillTagUpdate,
+    EffectiveOut,
     ClaimOut,
     DemographicMetricOut,
     DemographicOverlayOut,
@@ -612,6 +614,11 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         actions=actions_out,
         layers=_layers_for_bill(db, entity_id),
         text_versions=_text_versions(db, entity, bill),
+        effective=(
+            EffectiveOut(when=clause[0], has_exceptions=clause[1])
+            if (clause := effective_clause(bill.full_text))
+            else None
+        ),
         has_staff_analysis=db.execute(
             select(StaffAnalysis.id).where(
                 StaffAnalysis.entity_id == entity_id,

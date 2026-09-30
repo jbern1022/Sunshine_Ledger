@@ -185,6 +185,15 @@ class FiledTextOut(TextVersionOut):
     text: str
 
 
+class EffectiveOut(BaseModel):
+    """When the bill says it takes effect, from its own text ("July 1, 2026",
+    "upon becoming a law"). `has_exceptions`: the clause starts "Except as
+    otherwise provided", so some sections carry their own dates."""
+
+    when: str
+    has_exceptions: bool
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -201,6 +210,7 @@ class BillDetail(BillListItem):
     layers: BillLayersOut
     has_staff_analysis: bool
     text_versions: TextVersionsOut | None = None
+    effective: EffectiveOut | None = None
 
 
 class BillListResponse(BaseModel):

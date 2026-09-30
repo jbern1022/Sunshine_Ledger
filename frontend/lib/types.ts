@@ -123,6 +123,8 @@ export interface BillDetail extends BillListItem {
   actions?: ActionOut[];
   layers: BillLayers;
   has_staff_analysis: boolean;
+  /** When the bill says it takes effect, from its own text. */
+  effective?: { when: string; has_exceptions: boolean } | null;
   /** Filed vs current text, when both are stored (see TextComparison). */
   text_versions?: TextVersions | null;
 }
