@@ -22,6 +22,14 @@ def test_build_query(title, query):
     assert gdelt.build_query(title) == query
 
 
+def test_build_query_adds_the_place_and_drops_ordinance_shorthand():
+    assert gdelt.build_query("ORD Approp $55,000 From the Multiyear Progs & Initiatives", "Jacksonville") is None
+    assert (
+        gdelt.build_query("ORD-Q Rezoning at 11713 Alta Dr, Btwn Port Jacksonville Pkwy", "Jacksonville")
+        == "rezoning alta port jacksonville"
+    )
+
+
 def _client(responses, monkeypatch, sleeps):
     """A GDELTClient answering with `responses` in order."""
     monkeypatch.setattr(gdelt.time, "sleep", lambda s: sleeps.append(s))
@@ -72,11 +80,12 @@ def test_only_recent_bills_with_usable_queries(db_session, bill_factory):
     _bill(bill_factory, db_session, "Swimming Pool Requirements", date(2026, 6, 1))  # too old
     _bill(bill_factory, db_session, "Department of Financial Services", date(2026, 9, 21))  # no query
     _bill(bill_factory, db_session, "Coastal Flood Insurance", date(2026, 9, 22))
-    client = FakeClient(reject={"coastal flood insurance"})
+    client = FakeClient(reject={"coastal flood insurance florida"})
 
     written = gdelt.pull_headlines_for_all_bills(db_session, client=client, days=60, today=date(2026, 9, 30))
 
-    assert client.queries == ["coastal flood insurance", "affordable housing"]  # most recent first
+    # Most recent first, each with its place.
+    assert client.queries == ["coastal flood insurance florida", "affordable housing florida"]
     assert written == 1
     from app.models import SourceCheck
 

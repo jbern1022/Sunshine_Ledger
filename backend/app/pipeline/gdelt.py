@@ -53,6 +53,12 @@ GENERIC_WORDS = {
     "government", "into", "jacksonville", "miami", "office", "ordinance", "other", "program",
     "programs", "providing", "public", "regarding", "relating", "resolution", "revising", "section",
     "services", "state", "statutes", "that", "the", "this", "with", "within",
+    # Procedure and the abbreviations Jacksonville ordinance titles use.
+    "adopted", "agencies", "agreement", "amend", "approp", "apv", "auth", "btwn", "conditions",
+    "contract", "corp", "desig", "dist", "estab", "execute", "fund", "funds", "initiatives",
+    "introduced", "mgmt", "misc", "pkwy", "prog", "progs", "proposed", "pursuant", "read",
+    "reappoint", "rerefer", "review", "svc", "svcs", "transmitting", "various",
+    "adopting", "amendmnt", "appt", "approv", "member", "prov", "reappt", "reso",
 }
 
 
@@ -65,15 +71,22 @@ class GDELTQueryRejected(GDELTError):
     keyword that was too short"): not worth retrying."""
 
 
-def build_query(title: str | None) -> str | None:
+def build_query(title: str | None, place: str | None = None) -> str | None:
     """A GDELT query from a bill title's distinctive words, or None when the
     title has fewer than two. GDELT rejects short keywords and punctuation,
-    so words under 4 letters and every non-alphanumeric character go."""
+    so words under 4 letters and every non-alphanumeric character go.
+    `place` ("florida", "jacksonville") is added to keep matches local."""
     words: list[str] = []
     for word in re.sub(r"[^A-Za-z0-9 ]+", " ", title or "").lower().split():
         if len(word) >= 4 and word not in GENERIC_WORDS and not word.isdigit() and word not in words:
             words.append(word)
-    return " ".join(words[:MAX_QUERY_WORDS]) if len(words) >= 2 else None
+    if len(words) < 2:
+        return None
+    return " ".join(words[:MAX_QUERY_WORDS] + ([place.lower()] if place else []))
+
+
+def _place(entity: Entity) -> str:
+    return "florida" if entity.jurisdiction_level == "state" else (entity.jurisdiction_name or "florida")
 
 
 class GDELTClient:
@@ -210,7 +223,7 @@ def pull_headlines_for_all_bills(
     total = searched = no_query = rejected = failed = 0
     stopped_early = False
     for entity in entities:
-        query = build_query(entity.name)
+        query = build_query(entity.name, _place(entity))
         if query is None:
             no_query += 1
             continue
