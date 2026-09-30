@@ -19,6 +19,11 @@ from app.pipeline.effective_date import effective_clause
         ),
         ("Section 2. This ordinance shall become effective upon signature by the Mayor.", ("upon signature by the Mayor", False)),
         ("[deleted: This act shall take effect July 1, 2025.] [added: This act shall take effect July 1, 2026.]", ("July 1, 2026", False)),
+        (
+            "Section 4. Except as otherwise expressly provided in this act and except for this section, which "
+            "shall take effect upon this act becoming a law, this act shall take effect July 1, 2026.",
+            ("July 1, 2026", True),
+        ),
         ("A resolution recognizing a local hero.", None),
         (None, None),
     ],

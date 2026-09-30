@@ -298,9 +298,11 @@ def backfill_amendment_texts(db: Session, bills: dict[int, dict], client, *, max
 
 def record_version_meta(db: Session, bills: dict[int, dict]) -> int:
     """Label stored texts from the dataset, for bills fetched before labels
-    were recorded: the current version's type/date/official link (only when
-    the stored doc id matches one of the bill's documents) and the filed
-    version's official link. No document fetches. Returns bills updated."""
+    were recorded: the current version's type/date/official link (when the
+    stored doc id matches one of the bill's documents, or -- for text
+    stored before doc ids were recorded -- the latest document) and the
+    filed version's official link. No document fetches. Returns bills
+    updated."""
     from app.pipeline.bill_text import text_version_meta
 
     filed = {row[0]: row[1] for row in db.execute(select(BillTextVersion.bill_entity_id, BillTextVersion.legiscan_doc_id))}
@@ -316,7 +318,15 @@ def record_version_meta(db: Session, bills: dict[int, dict]) -> int:
             continue
         by_doc = {str(t["doc_id"]): t for t in texts}
         extra = {}
-        current = by_doc.get(str(entity.external_ids.get("legiscan_text_doc_id")))
+        stored_doc = entity.external_ids.get("legiscan_text_doc_id")
+        current = by_doc.get(str(stored_doc))
+        if stored_doc is None and entity.bill is not None and entity.bill.full_text:
+            # Text fetched before doc ids were recorded (everything before
+            # 2026-09-26) is the latest version at the time, as ingestion
+            # always fetches the newest document; record it, as
+            # legiscan._refresh_bill_text would on its first look.
+            current = texts[-1]
+            extra["legiscan_text_doc_id"] = str(current["doc_id"])
         if current:
             extra["text_version"] = text_version_meta(current)
         first = by_doc.get(str(filed.get(entity.id)))
