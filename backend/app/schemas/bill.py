@@ -162,6 +162,29 @@ class ActionOut(BaseModel):
     important: bool
 
 
+class TextVersionOut(BaseModel):
+    """One version of a bill's text: its label, date, official copy."""
+
+    version_type: str | None
+    version_date: date | None
+    url: str | None
+    characters: int
+
+
+class TextVersionsOut(BaseModel):
+    """The filed and current text versions, when both are stored -- what
+    the "How the text changed" comparison needs. The filed text itself is
+    fetched separately (GET /bills/{id}/versions/filed): it can run to
+    1.6 MB, and most readers never open the comparison."""
+
+    filed: TextVersionOut
+    current: TextVersionOut
+
+
+class FiledTextOut(TextVersionOut):
+    text: str
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -177,6 +200,7 @@ class BillDetail(BillListItem):
     actions: list[ActionOut] = []
     layers: BillLayersOut
     has_staff_analysis: bool
+    text_versions: TextVersionsOut | None = None
 
 
 class BillListResponse(BaseModel):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
@@ -12,6 +13,7 @@ from app.db import get_db
 from app.models import (
     Bill,
     BillLayer,
+    BillTextVersion,
     BillLayerSource,
     BillTag,
     Claim,
@@ -42,10 +44,13 @@ from app.schemas.bill import (
     RollCallOut,
     SourceOut,
     SponsorOut,
+    FiledTextOut,
     SessionCount,
     StatusCount,
     TagCount,
     TagOut,
+    TextVersionOut,
+    TextVersionsOut,
 )
 
 router = APIRouter(prefix="/bills", tags=["bills"])
@@ -310,6 +315,45 @@ def list_statuses(
     return [StatusCount(status=status, count=n) for status, n in db.execute(stmt).all()]
 
 
+def _parse_iso_date(value: str | None) -> date | None:
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _filed_version(db: Session, entity_id: uuid.UUID) -> BillTextVersion | None:
+    return db.execute(
+        select(BillTextVersion).where(BillTextVersion.bill_entity_id == entity_id)
+        .order_by(BillTextVersion.version_date.asc().nulls_last()).limit(1)
+    ).scalar_one_or_none()
+
+
+def _text_versions(db: Session, entity: Entity, bill: Bill) -> TextVersionsOut | None:
+    """Filed vs current text versions, only when both texts are stored.
+    Lengths only: the filed text is served by /bills/{id}/versions/filed."""
+    if not bill.full_text:
+        return None
+    filed = _filed_version(db, entity.id)
+    if filed is None:
+        return None
+    current = (entity.external_ids or {}).get("text_version") or {}
+    return TextVersionsOut(
+        filed=TextVersionOut(
+            version_type=filed.version_type,
+            version_date=filed.version_date,
+            url=(entity.external_ids or {}).get("filed_text_url"),
+            characters=len(filed.text),
+        ),
+        current=TextVersionOut(
+            version_type=current.get("type"),
+            version_date=_parse_iso_date(current.get("date")),
+            url=current.get("url") or bill.full_text_url,
+            characters=len(bill.full_text),
+        ),
+    )
+
+
 def _bill_geography(db: Session, entity: Entity, bill: Bill) -> tuple[str, str] | None:
     """Which geography a bill's demographic overlay should be keyed to.
     Local bills already carry a real county (geo_scope_names); state bills
@@ -411,6 +455,22 @@ def _layers_for_bill(db: Session, entity_id: uuid.UUID) -> BillLayersOut:
             earlier_versions=[_layer_version_out(v) for v in versions if v.id != current.id],
         ))
     return out
+
+
+@router.get("/{entity_id}/versions/filed", response_model=FiledTextOut)
+def get_filed_text(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> FiledTextOut:
+    """The bill's filed (first) text version, for the text comparison."""
+    filed = _filed_version(db, entity_id)
+    if filed is None:
+        raise HTTPException(status_code=404, detail="No filed version stored for this bill")
+    entity = db.get(Entity, entity_id)
+    return FiledTextOut(
+        version_type=filed.version_type,
+        version_date=filed.version_date,
+        url=((entity.external_ids or {}) if entity else {}).get("filed_text_url"),
+        characters=len(filed.text),
+        text=filed.text,
+    )
 
 
 @router.get("/{entity_id}", response_model=BillDetail)
@@ -551,6 +611,7 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         amendments=amendments_out,
         actions=actions_out,
         layers=_layers_for_bill(db, entity_id),
+        text_versions=_text_versions(db, entity, bill),
         has_staff_analysis=db.execute(
             select(StaffAnalysis.id).where(
                 StaffAnalysis.entity_id == entity_id,

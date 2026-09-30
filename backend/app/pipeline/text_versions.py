@@ -73,7 +73,7 @@ def filed_versions_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[E
 def backfill_filed_versions(db: Session, bills: dict[int, dict], client, *, max_calls: int) -> tuple[int, int, int]:
     """Fetch and store filed versions; at most `max_calls` of them through
     LegiScan. Returns (stored, failed, left for a later run)."""
-    from app.pipeline.bill_text import NeedsLegiScan, fetch_text_document  # bill_text imports legiscan
+    from app.pipeline.bill_text import NeedsLegiScan, fetch_text_document, text_version_meta  # bill_text imports legiscan
 
     todo = filed_versions_to_fetch(db, bills)
     start = sum(legiscan.API_CALLS.values())
@@ -102,6 +102,7 @@ def backfill_filed_versions(db: Session, bills: dict[int, dict], client, *, max_
                 text=text,
             )
         )
+        entity.external_ids = {**entity.external_ids, "filed_text_url": text_version_meta(first)["url"]}
         db.commit()
         stored += 1
     return stored, failed, left
@@ -133,7 +134,7 @@ def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_cal
     """Set bills.full_text from each bill's latest document and record its
     doc id (so nightly sync knows it's current); at most `max_calls` through
     LegiScan. Returns (stored, failed, left)."""
-    from app.pipeline.bill_text import NeedsLegiScan, fetch_text_document
+    from app.pipeline.bill_text import NeedsLegiScan, fetch_text_document, text_version_meta
 
     todo = latest_text_to_fetch(db, bills)
     start = sum(legiscan.API_CALLS.values())
@@ -154,7 +155,11 @@ def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_cal
             failed += 1
             continue
         entity.bill.full_text = text
-        entity.external_ids = {**entity.external_ids, "legiscan_text_doc_id": str(latest["doc_id"])}
+        entity.external_ids = {
+            **entity.external_ids,
+            "legiscan_text_doc_id": str(latest["doc_id"]),
+            "text_version": text_version_meta(latest),
+        }
         db.commit()
         stored += 1
     return stored, failed, left
@@ -291,6 +296,39 @@ def backfill_amendment_texts(db: Session, bills: dict[int, dict], client, *, max
     return stored, failed, left
 
 
+def record_version_meta(db: Session, bills: dict[int, dict]) -> int:
+    """Label stored texts from the dataset, for bills fetched before labels
+    were recorded: the current version's type/date/official link (only when
+    the stored doc id matches one of the bill's documents) and the filed
+    version's official link. No document fetches. Returns bills updated."""
+    from app.pipeline.bill_text import text_version_meta
+
+    filed = {row[0]: row[1] for row in db.execute(select(BillTextVersion.bill_entity_id, BillTextVersion.legiscan_doc_id))}
+    entities = {
+        e.external_ids["legiscan_id"]: e
+        for e in db.execute(select(Entity).where(Entity.external_ids.has_key("legiscan_id"))).scalars()
+    }
+    updated = 0
+    for bill_id, bill in bills.items():
+        entity = entities.get(str(bill_id))
+        texts = bill.get("texts") or []
+        if entity is None or not texts:
+            continue
+        by_doc = {str(t["doc_id"]): t for t in texts}
+        extra = {}
+        current = by_doc.get(str(entity.external_ids.get("legiscan_text_doc_id")))
+        if current:
+            extra["text_version"] = text_version_meta(current)
+        first = by_doc.get(str(filed.get(entity.id)))
+        if first:
+            extra["filed_text_url"] = text_version_meta(first)["url"]
+        if extra and any(entity.external_ids.get(k) != v for k, v in extra.items()):
+            entity.external_ids = {**entity.external_ids, **extra}
+            updated += 1
+    db.commit()
+    return updated
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -310,6 +348,7 @@ if __name__ == "__main__":
     mode.add_argument("--latest", action="store_true", help="Fill missing bills.full_text instead (passed bills first).")
     mode.add_argument("--staff-analyses", action="store_true", help="Fetch missing staff analyses (passed bills first).")
     mode.add_argument("--amendments", action="store_true", help="Fetch missing amendment texts (passed bills first).")
+    mode.add_argument("--version-meta", action="store_true", help="Label stored texts' versions from the dataset (no fetches).")
     args = parser.parse_args()
 
     flsenate.set_budget(args.max_documents)
@@ -317,6 +356,9 @@ if __name__ == "__main__":
     dataset = DatasetClient(fetch_session_dataset(api, settings.legiscan_state, args.session), fallback=api)
     session = SessionLocal()
     try:
+        if args.version_meta:
+            print(f"{args.session}: labelled {record_version_meta(session, dataset.bills)} bills' text versions.")
+            raise SystemExit(0)
         if args.latest:
             pick, run, what = latest_text_to_fetch, backfill_latest_text, "missing bill texts"
         elif args.staff_analyses:

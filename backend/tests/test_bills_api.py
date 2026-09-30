@@ -653,3 +653,48 @@ def test_committee_only_sponsor_is_still_shown(client, db_session, bill_factory)
     db_session.commit()
 
     assert client.get(f"/bills/{entity.id}").json()["primary_sponsor"] == "Rules Committee"
+
+
+# --- filed vs current text versions -----------------------------------------
+
+
+def _with_filed_version(db_session, entity, text="Section 1. Filed wording."):
+    from app.models import BillTextVersion
+
+    entity.bill.full_text = "Section 1. Current wording, longer."
+    entity.external_ids = {
+        "legiscan_id": "1",
+        "filed_text_url": "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/Filed/PDF",
+        "text_version": {"type": "Enrolled", "date": "2026-03-13",
+                         "url": "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF"},
+    }
+    db_session.add(BillTextVersion(bill_entity_id=entity.id, legiscan_doc_id=101, version_type="Introduced",
+                                   version_date=date(2026, 1, 9), text=text))
+    db_session.commit()
+    return entity
+
+
+def test_bill_detail_describes_filed_and_current_versions(client, db_session, bill_factory):
+    bill = _with_filed_version(db_session, bill_factory())
+
+    versions = client.get(f"/bills/{bill.id}").json()["text_versions"]
+    assert versions["filed"] == {
+        "version_type": "Introduced", "version_date": "2026-01-09",
+        "url": "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/Filed/PDF", "characters": 25,
+    }
+    assert versions["current"]["version_type"] == "Enrolled"
+    assert versions["current"]["version_date"] == "2026-03-13"
+    assert versions["current"]["characters"] == len("Section 1. Current wording, longer.")
+    assert "text" not in versions["filed"]  # the filed text is fetched on demand
+
+
+def test_no_text_versions_without_a_filed_version(client, bill_factory):
+    assert client.get(f"/bills/{bill_factory().id}").json()["text_versions"] is None
+
+
+def test_filed_text_endpoint(client, db_session, bill_factory):
+    bill = _with_filed_version(db_session, bill_factory())
+    body = client.get(f"/bills/{bill.id}/versions/filed").json()
+    assert body["text"] == "Section 1. Filed wording."
+    assert body["version_type"] == "Introduced"
+    assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}/versions/filed").status_code == 404

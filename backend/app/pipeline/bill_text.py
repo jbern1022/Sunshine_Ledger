@@ -427,6 +427,13 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
     return _merge_adjacent_markers(strip_page_artifacts("\n".join(kept)))
 
 
+def text_version_meta(doc: dict) -> dict:
+    """What to remember about a bill text document (a getBill / dataset
+    `texts` entry) so the site can name the version and link the official
+    copy: {"type": "Enrolled", "date": "2026-03-13", "url": ...}."""
+    return {"type": doc.get("type"), "date": doc.get("date"), "url": doc.get("state_link") or doc.get("url")}
+
+
 class NeedsLegiScan(Exception):
     """flsenate.gov couldn't serve the document and the LegiScan fallback
     wasn't allowed (the run's LegiScan call cap is spent)."""
