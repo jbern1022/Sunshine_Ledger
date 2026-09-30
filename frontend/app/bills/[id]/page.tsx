@@ -8,6 +8,7 @@ import AmendmentDiff from "@/components/AmendmentDiff";
 import MarkedText from "@/components/MarkedText";
 import BillLayers from "@/components/BillLayers";
 import LegislativeTimeline from "@/components/LegislativeTimeline";
+import TextComparison from "@/components/TextComparison";
 import { hasAnyLayer } from "@/lib/layers";
 
 /** Permalink for a single bill.
@@ -116,6 +117,10 @@ export default async function BillPage({ params }: Props) {
           amendments={bill.amendments}
           officialUrl={bill.full_text_url}
         />
+      )}
+
+      {bill.text_versions && bill.full_text && (
+        <TextComparison entityId={bill.entity_id} versions={bill.text_versions} currentText={bill.full_text} />
       )}
 
       {bill.sponsors.length > 0 && (

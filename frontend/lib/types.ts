@@ -123,6 +123,24 @@ export interface BillDetail extends BillListItem {
   actions?: ActionOut[];
   layers: BillLayers;
   has_staff_analysis: boolean;
+  /** Filed vs current text, when both are stored (see TextComparison). */
+  text_versions?: TextVersions | null;
+}
+
+export interface TextVersion {
+  version_type: string | null;
+  version_date: string | null;
+  url: string | null;
+  characters: number;
+}
+
+export interface TextVersions {
+  filed: TextVersion;
+  current: TextVersion;
+}
+
+export interface FiledText extends TextVersion {
+  text: string;
 }
 
 export interface BillListResponse {

@@ -8,6 +8,7 @@ import type {
   PersonDetail,
   PersonListResponse,
   SourceStatus,
+  FiledText,
   SessionCount,
   StatusCount,
   TagCount,
@@ -113,6 +114,12 @@ export async function fetchStatuses(jurisdictionName?: string): Promise<StatusCo
 export async function fetchTags(): Promise<TagCount[]> {
   const res = await fetch(`${API_URL}/bills/tags`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch tags: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchFiledText(entityId: string): Promise<FiledText> {
+  const res = await fetch(`${API_URL}/bills/${entityId}/versions/filed`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch the filed text: ${res.status}`);
   return res.json();
 }
 
