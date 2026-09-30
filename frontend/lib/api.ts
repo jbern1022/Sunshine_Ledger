@@ -8,6 +8,7 @@ import type {
   PersonDetail,
   PersonListResponse,
   SourceStatus,
+  SessionCount,
   StatusCount,
   TagCount,
 } from "./types";
@@ -19,6 +20,7 @@ export interface BillSearchParams {
   jurisdiction_name?: string;
   jurisdiction_level?: string;
   status?: string;
+  session?: string;
   geo_scope_name?: string;
   tag?: string;
   sponsor_entity_id?: string;
@@ -91,6 +93,13 @@ export async function fetchPeople(
 export async function fetchPerson(entityId: string): Promise<PersonDetail> {
   const res = await fetch(`${API_URL}/people/${entityId}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch legislator: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchSessions(jurisdictionName?: string): Promise<SessionCount[]> {
+  const qs = jurisdictionName ? `?jurisdiction_name=${encodeURIComponent(jurisdictionName)}` : "";
+  const res = await fetch(`${API_URL}/bills/sessions${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
   return res.json();
 }
 

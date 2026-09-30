@@ -268,6 +268,11 @@ export interface PersonListResponse {
 /** A status and how many bills carry it. Options come from the data rather
  *  than a hardcoded list, because the three sources use different
  *  vocabularies and any fixed list would drift. */
+export interface SessionCount {
+  session: string;
+  count: number;
+}
+
 export interface StatusCount {
   status: string;
   count: number;

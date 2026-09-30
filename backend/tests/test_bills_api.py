@@ -299,6 +299,34 @@ def test_statuses_route_is_not_shadowed_by_the_bill_detail_route(client, bill_fa
     assert client.get("/bills/statuses").status_code == 200
 
 
+def _in_session(db_session, entity, session):
+    entity.bill.session = session
+    db_session.commit()
+    return entity
+
+
+def test_sessions_newest_first_regular_before_specials(client, db_session, bill_factory):
+    _in_session(db_session, bill_factory(bill_number="H0117"), "2024 Regular Session")
+    _in_session(db_session, bill_factory(bill_number="H0118"), "2024 Regular Session")
+    _in_session(db_session, bill_factory(bill_number="H5001"), "2026 Fifth Special Session")
+    bill_factory(bill_number="H0117")  # 2026 Regular Session
+
+    assert client.get("/bills/sessions").json() == [
+        {"session": "2026 Regular Session", "count": 1},
+        {"session": "2026 Fifth Special Session", "count": 1},
+        {"session": "2024 Regular Session", "count": 2},
+    ]
+
+
+def test_bill_list_filters_by_session(client, db_session, bill_factory):
+    old = _in_session(db_session, bill_factory(bill_number="H0117", name="Grand Jury"), "2024 Regular Session")
+    bill_factory(bill_number="H0117", name="Swimming Pools")
+
+    body = client.get("/bills", params={"session": "2024 Regular Session"}).json()
+    assert body["total"] == 1
+    assert body["items"][0]["entity_id"] == str(old.id)
+
+
 # --- bill topic tagging ----------------------------------------------------
 
 

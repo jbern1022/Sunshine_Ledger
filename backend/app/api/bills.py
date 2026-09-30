@@ -42,6 +42,7 @@ from app.schemas.bill import (
     RollCallOut,
     SourceOut,
     SponsorOut,
+    SessionCount,
     StatusCount,
     TagCount,
     TagOut,
@@ -155,6 +156,7 @@ def list_bills(
     jurisdiction_name: str | None = Query(None, description="e.g. FL, Miami, Jacksonville"),
     jurisdiction_level: str | None = Query(None, description="state | city"),
     status: str | None = Query(None),
+    session: str | None = Query(None, description="e.g. '2025 Regular Session' (see /bills/sessions)"),
     geo_scope_name: str | None = Query(None, description="e.g. 'Miami-Dade County' -- matches Bill.geo_scope_names"),
     tag: str | None = Query(None, description="Tag slug, e.g. 'housing' -- matches bills with that active badge"),
     sponsor_entity_id: uuid.UUID | None = Query(
@@ -177,6 +179,8 @@ def list_bills(
         stmt = stmt.where(Entity.jurisdiction_level == jurisdiction_level)
     if status:
         stmt = stmt.where(Bill.status == status)
+    if session:
+        stmt = stmt.where(Bill.session == session)
     if geo_scope_name:
         stmt = stmt.where(Bill.geo_scope_names.any(geo_scope_name))
     if tag:
@@ -249,6 +253,33 @@ def update_bill_tag(
 # Declared before /{entity_id}: FastAPI matches routes in definition order,
 # so a dynamic path defined first would swallow "/bills/statuses" and try to
 # parse "statuses" as a UUID.
+def _session_order(session: str) -> tuple[int, bool, str]:
+    """Newest year first; within a year the regular session, then specials."""
+    year = int(session[:4]) if session[:4].isdigit() else 0
+    return (-year, "Regular" not in session, session)
+
+
+# Declared before /{entity_id} for the same route-ordering reason as /statuses.
+@router.get("/sessions", response_model=list[SessionCount])
+def list_sessions(
+    jurisdiction_name: str | None = Query(None, description="Scope counts to one jurisdiction"),
+    db: Session = Depends(get_db),
+) -> list[SessionCount]:
+    """Legislative sessions with bill counts, newest first. State bill
+    numbers repeat every session (HB 117 exists in 2024, 2025 and 2026), so
+    this is how to look at one session at a time."""
+    stmt = (
+        select(Bill.session, func.count().label("n"))
+        .join(Entity, Entity.id == Bill.entity_id)
+        .where(Entity.entity_type == "bill", Bill.session.isnot(None))
+        .group_by(Bill.session)
+    )
+    if jurisdiction_name:
+        stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+    rows = sorted(db.execute(stmt).all(), key=lambda row: _session_order(row[0]))
+    return [SessionCount(session=session, count=n) for session, n in rows]
+
+
 @router.get("/statuses", response_model=list[StatusCount])
 def list_statuses(
     jurisdiction_name: str | None = Query(None, description="Scope counts to one jurisdiction"),

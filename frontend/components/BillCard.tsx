@@ -92,9 +92,11 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 <span>{bill.chamber}</span>
               </>
             )}
-            {/* Special-session bills reuse regular-session numbers (the 2026
-                budget is H5001 in both), so name the session on the card. */}
-            {bill.session.includes("Special Session") && (
+            {/* State bill numbers repeat: every session has an HB 117, and
+                special sessions reuse regular-session numbers (the 2026
+                budget is H5001 in both), so name the session on the card.
+                Local bills carry just a year and unique numbers. */}
+            {bill.session.includes("Session") && (
               <>
                 <span>·</span>
                 <span>{bill.session}</span>

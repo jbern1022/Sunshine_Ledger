@@ -184,6 +184,13 @@ class BillListResponse(BaseModel):
     items: list[BillListItem]
 
 
+class SessionCount(BaseModel):
+    """One legislative session and how many bills it has, for a filter UI."""
+
+    session: str
+    count: int
+
+
 class StatusCount(BaseModel):
     """One status and how many bills carry it, for building a filter UI."""
 
