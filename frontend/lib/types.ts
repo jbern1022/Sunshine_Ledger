@@ -123,6 +123,26 @@ export interface BillDetail extends BillListItem {
   actions?: ActionOut[];
   layers: BillLayers;
   has_staff_analysis: boolean;
+  /** When the bill says it takes effect, from its own text. */
+  effective?: { when: string; has_exceptions: boolean } | null;
+  /** Filed vs current text, when both are stored (see TextComparison). */
+  text_versions?: TextVersions | null;
+}
+
+export interface TextVersion {
+  version_type: string | null;
+  version_date: string | null;
+  url: string | null;
+  characters: number;
+}
+
+export interface TextVersions {
+  filed: TextVersion;
+  current: TextVersion;
+}
+
+export interface FiledText extends TextVersion {
+  text: string;
 }
 
 export interface BillListResponse {
@@ -268,6 +288,11 @@ export interface PersonListResponse {
 /** A status and how many bills carry it. Options come from the data rather
  *  than a hardcoded list, because the three sources use different
  *  vocabularies and any fixed list would drift. */
+export interface SessionCount {
+  session: string;
+  count: number;
+}
+
 export interface StatusCount {
   status: string;
   count: number;

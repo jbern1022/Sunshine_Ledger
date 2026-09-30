@@ -127,9 +127,14 @@ describe("BillCard", () => {
     expect(screen.getByText("2026 Fifth Special Session")).toBeInTheDocument();
   });
 
-  it("does not label regular-session bills with their session", () => {
-    render(<BillCard bill={baseBill} />);
-    expect(screen.queryByText("2026 Regular Session")).not.toBeInTheDocument();
+  it("names the session of every state bill, since numbers repeat each session", () => {
+    render(<BillCard bill={{ ...baseBill, session: "2024 Regular Session" }} />);
+    expect(screen.getByText("2024 Regular Session")).toBeInTheDocument();
+  });
+
+  it("does not label local bills, which carry just a year", () => {
+    render(<BillCard bill={{ ...baseBill, session: "2026" }} />);
+    expect(screen.queryByText("2026")).not.toBeInTheDocument();
   });
 
   it("shows an error state if flag submission fails", async () => {

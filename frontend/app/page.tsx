@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBills, fetchStatuses, fetchTags } from "@/lib/api";
-import type { BillListItem, StatusCount, TagCount } from "@/lib/types";
+import { fetchBills, fetchSessions, fetchStatuses, fetchTags } from "@/lib/api";
+import type { BillListItem, SessionCount, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
 import DataFreshness from "@/components/DataFreshness";
@@ -28,6 +28,8 @@ function BrowsePageInner() {
   const [autoDetected, setAutoDetected] = useState(() => searchParams.get("auto") === "1");
   const [status, setStatus] = useState("");
   const [statuses, setStatuses] = useState<StatusCount[]>([]);
+  const [session, setSession] = useState(() => searchParams.get("session") ?? "");
+  const [sessions, setSessions] = useState<SessionCount[]>([]);
   const [tag, setTag] = useState(() => searchParams.get("tag") ?? "");
   const [tags, setTags] = useState<TagCount[]>([]);
   const [offset, setOffset] = useState(0);
@@ -40,7 +42,7 @@ function BrowsePageInner() {
   // an offset past the end of a newly-narrowed result set.
   useEffect(() => {
     setOffset(0);
-  }, [q, jurisdiction, status, tag, geoFilter, sponsorFilter]);
+  }, [q, jurisdiction, status, session, tag, geoFilter, sponsorFilter]);
 
   // Tag badges aren't jurisdiction-scoped in the API (unlike statuses), so
   // this fetches once rather than re-running when jurisdiction changes.
@@ -67,6 +69,24 @@ function BrowsePageInner() {
     };
   }, [jurisdiction]);
 
+  // State bill numbers repeat every session (HB 117 exists in 2024, 2025 and
+  // 2026), so sessions are a filter too, scoped like statuses.
+  useEffect(() => {
+    let cancelled = false;
+    fetchSessions(jurisdiction || undefined)
+      .then((s) => !cancelled && setSessions(s))
+      .catch(() => !cancelled && setSessions([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [jurisdiction]);
+
+  useEffect(() => {
+    if (session && sessions.length > 0 && !sessions.some((s) => s.session === session)) {
+      setSession("");
+    }
+  }, [sessions, session]);
+
   // A status that doesn't exist in the newly-chosen jurisdiction would
   // silently return nothing, so drop it rather than leave a dead filter on.
   useEffect(() => {
@@ -84,6 +104,7 @@ function BrowsePageInner() {
       q: q || undefined,
       jurisdiction_name: jurisdiction || undefined,
       status: status || undefined,
+      session: session || undefined,
       tag: tag || undefined,
       geo_scope_name: geoFilter || undefined,
       sponsor_entity_id: sponsorFilter || undefined,
@@ -105,7 +126,7 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, jurisdiction, status, tag, geoFilter, sponsorFilter, offset]);
+  }, [q, jurisdiction, status, session, tag, geoFilter, sponsorFilter, offset]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -188,6 +209,19 @@ function BrowsePageInner() {
           {statuses.map((s) => (
             <option key={s.status} value={s.status}>
               {s.status} ({s.count})
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="Filter by session"
+          value={session}
+          onChange={(e) => setSession(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
+        >
+          <option value="">All sessions</option>
+          {sessions.map((s) => (
+            <option key={s.session} value={s.session}>
+              {s.session} ({s.count})
             </option>
           ))}
         </select>

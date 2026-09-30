@@ -299,6 +299,34 @@ def test_statuses_route_is_not_shadowed_by_the_bill_detail_route(client, bill_fa
     assert client.get("/bills/statuses").status_code == 200
 
 
+def _in_session(db_session, entity, session):
+    entity.bill.session = session
+    db_session.commit()
+    return entity
+
+
+def test_sessions_newest_first_regular_before_specials(client, db_session, bill_factory):
+    _in_session(db_session, bill_factory(bill_number="H0117"), "2024 Regular Session")
+    _in_session(db_session, bill_factory(bill_number="H0118"), "2024 Regular Session")
+    _in_session(db_session, bill_factory(bill_number="H5001"), "2026 Fifth Special Session")
+    bill_factory(bill_number="H0117")  # 2026 Regular Session
+
+    assert client.get("/bills/sessions").json() == [
+        {"session": "2026 Regular Session", "count": 1},
+        {"session": "2026 Fifth Special Session", "count": 1},
+        {"session": "2024 Regular Session", "count": 2},
+    ]
+
+
+def test_bill_list_filters_by_session(client, db_session, bill_factory):
+    old = _in_session(db_session, bill_factory(bill_number="H0117", name="Grand Jury"), "2024 Regular Session")
+    bill_factory(bill_number="H0117", name="Swimming Pools")
+
+    body = client.get("/bills", params={"session": "2024 Regular Session"}).json()
+    assert body["total"] == 1
+    assert body["items"][0]["entity_id"] == str(old.id)
+
+
 # --- bill topic tagging ----------------------------------------------------
 
 
@@ -625,3 +653,56 @@ def test_committee_only_sponsor_is_still_shown(client, db_session, bill_factory)
     db_session.commit()
 
     assert client.get(f"/bills/{entity.id}").json()["primary_sponsor"] == "Rules Committee"
+
+
+# --- filed vs current text versions -----------------------------------------
+
+
+def _with_filed_version(db_session, entity, text="Section 1. Filed wording."):
+    from app.models import BillTextVersion
+
+    entity.bill.full_text = "Section 1. Current wording, longer."
+    entity.external_ids = {
+        "legiscan_id": "1",
+        "filed_text_url": "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/Filed/PDF",
+        "text_version": {"type": "Enrolled", "date": "2026-03-13",
+                         "url": "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF"},
+    }
+    db_session.add(BillTextVersion(bill_entity_id=entity.id, legiscan_doc_id=101, version_type="Introduced",
+                                   version_date=date(2026, 1, 9), text=text))
+    db_session.commit()
+    return entity
+
+
+def test_bill_detail_describes_filed_and_current_versions(client, db_session, bill_factory):
+    bill = _with_filed_version(db_session, bill_factory())
+
+    versions = client.get(f"/bills/{bill.id}").json()["text_versions"]
+    assert versions["filed"] == {
+        "version_type": "Introduced", "version_date": "2026-01-09",
+        "url": "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/Filed/PDF", "characters": 25,
+    }
+    assert versions["current"]["version_type"] == "Enrolled"
+    assert versions["current"]["version_date"] == "2026-03-13"
+    assert versions["current"]["characters"] == len("Section 1. Current wording, longer.")
+    assert "text" not in versions["filed"]  # the filed text is fetched on demand
+
+
+def test_no_text_versions_without_a_filed_version(client, bill_factory):
+    assert client.get(f"/bills/{bill_factory().id}").json()["text_versions"] is None
+
+
+def test_filed_text_endpoint(client, db_session, bill_factory):
+    bill = _with_filed_version(db_session, bill_factory())
+    body = client.get(f"/bills/{bill.id}/versions/filed").json()
+    assert body["text"] == "Section 1. Filed wording."
+    assert body["version_type"] == "Introduced"
+    assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}/versions/filed").status_code == 404
+
+
+def test_bill_detail_reads_the_effective_date_from_the_text(client, db_session, bill_factory):
+    bill = bill_factory()
+    bill.bill.full_text = "Section 1. Things.\nSection 2. This act shall take effect July 1, 2026."
+    db_session.commit()
+    assert client.get(f"/bills/{bill.id}").json()["effective"] == {"when": "July 1, 2026", "has_exceptions": False}
+    assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}").json()["effective"] is None

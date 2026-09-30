@@ -290,7 +290,7 @@ def _refresh_bill_text(entity: Entity, bill: Bill, detail: dict, client) -> None
     fetches it.
     """
     from app.pipeline import flsenate
-    from app.pipeline.bill_text import fetch_text_document  # bill_text imports this module
+    from app.pipeline.bill_text import fetch_text_document, text_version_meta  # bill_text imports this module
 
     docs = detail.get("texts") or []
     if not docs:
@@ -307,7 +307,11 @@ def _refresh_bill_text(entity: Entity, bill: Bill, detail: dict, client) -> None
         if not text:
             return
         bill.full_text = text
-    entity.external_ids = {**entity.external_ids, "legiscan_text_doc_id": latest}
+    entity.external_ids = {
+        **entity.external_ids,
+        "legiscan_text_doc_id": latest,
+        "text_version": text_version_meta(docs[-1]),
+    }
 
 
 ACTION_CHAMBERS = {"H": "House", "S": "Senate"}

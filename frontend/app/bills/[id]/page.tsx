@@ -8,7 +8,9 @@ import AmendmentDiff from "@/components/AmendmentDiff";
 import MarkedText from "@/components/MarkedText";
 import BillLayers from "@/components/BillLayers";
 import LegislativeTimeline from "@/components/LegislativeTimeline";
+import TextComparison from "@/components/TextComparison";
 import { hasAnyLayer } from "@/lib/layers";
+import { effectiveLabel } from "@/lib/billStatus";
 
 /** Permalink for a single bill.
  *
@@ -57,6 +59,9 @@ export default async function BillPage({ params }: Props) {
         .map((c) => c.generated_by.slice("llm:".length)),
     ),
   );
+  // State bills come from LegiScan, which records votes and amendments; the
+  // city sources don't (yet), so an empty list means different things.
+  const isStateBill = bill.source_system === "legiscan";
   const whoItAffects = bill.claims.find((c) => c.claim_type === "who_it_affects")?.claim_text;
   const sources = Array.from(
     new Map(bill.claims.flatMap((c) => c.sources).map((s) => [s.id, s])).values(),
@@ -87,6 +92,24 @@ export default async function BillPage({ params }: Props) {
         <h1 className="mt-1 text-2xl font-bold text-ledger-900">{bill.bill_number}</h1>
         <p className="mt-1 text-sm text-slate-600">{bill.name}</p>
         <TagBadges tags={bill.tags} />
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+          <p>
+            <span className="font-medium text-ledger-900">Status: </span>
+            {bill.status}
+            {bill.last_action && <> — {bill.last_action}</>}
+            {bill.last_action_date && <span className="text-slate-500"> ({bill.last_action_date})</span>}
+          </p>
+          {bill.effective && (
+            <p className="mt-0.5">
+              <span className="font-medium text-ledger-900">{effectiveLabel(bill.status)}: </span>
+              {bill.effective.when}
+              <span className="text-xs text-slate-500">
+                {" "}
+                (per the bill text{bill.effective.has_exceptions ? "; some sections have their own dates" : ""})
+              </span>
+            </p>
+          )}
+        </div>
       </header>
 
       {hasAnyLayer(bill.layers) ? (
@@ -116,6 +139,10 @@ export default async function BillPage({ params }: Props) {
           amendments={bill.amendments}
           officialUrl={bill.full_text_url}
         />
+      )}
+
+      {bill.text_versions && bill.full_text && (
+        <TextComparison entityId={bill.entity_id} versions={bill.text_versions} currentText={bill.full_text} />
       )}
 
       {bill.sponsors.length > 0 && (
@@ -150,6 +177,17 @@ export default async function BillPage({ params }: Props) {
               </span>
             </p>
           )}
+        </section>
+      )}
+
+      {bill.votes.length === 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold text-ledger-900">Votes</h2>
+          <p className="text-xs text-slate-500">
+            {isStateBill
+              ? "No recorded roll-call votes for this bill in LegiScan's record."
+              : "Roll-call votes aren't collected for city legislation yet."}
+          </p>
         </section>
       )}
 
@@ -208,6 +246,17 @@ export default async function BillPage({ params }: Props) {
         </section>
       )}
 
+      {bill.amendments.length === 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
+          <p className="text-xs text-slate-500">
+            {isStateBill
+              ? "No amendments recorded for this bill in LegiScan's record."
+              : "Amendments aren't collected for city legislation yet."}
+          </p>
+        </section>
+      )}
+
       {bill.amendments.length > 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
@@ -226,15 +275,6 @@ export default async function BillPage({ params }: Props) {
           </ul>
         </section>
       )}
-
-      <section className="mt-4 text-sm text-slate-600">
-        <h2 className="text-sm font-semibold text-ledger-900">Status</h2>
-        <p className="mt-1">
-          {bill.status}
-          {bill.last_action && <> — {bill.last_action}</>}
-          {bill.last_action_date && <span className="text-slate-500"> ({bill.last_action_date})</span>}
-        </p>
-      </section>
 
       {sources.length > 0 && (
         <section className="mt-4">

@@ -139,3 +139,43 @@ def test_staff_analyses_passed_bills_first_within_the_cap(db_session, monkeypatc
     assert fetched == [31, 32]
     assert backfill_staff_analyses(db_session, bills, client=None, max_calls=10) == (1, 0, 0)
     assert fetched == [31, 32, 11]
+
+
+def test_superseded_house_analysis_drafts_are_skipped(db_session):
+    from app.pipeline.text_versions import staff_analyses_to_fetch
+
+    _bill(db_session, 1)
+    db_session.commit()
+    base = "https://www.flsenate.gov/Session/Bill/2024/117/Analyses/"
+    names = ["h0117a.CRJ.PDF", "h0117b.EEG.PDF", "h0117c.EEG.PDF", "h0117d.JDC.PDF",
+             "h0117e.JDC.PDF", "h0117z.CRJ.PDF", "h0117z1.CRJ.PDF"]
+    supplements = [{"title": "Analysis", "supplement_id": i, "state_link": base + n} for i, n in enumerate(names, 1)]
+    supplements.append({"title": "Analysis", "supplement_id": 99,
+                        "state_link": "https://www.flsenate.gov/Session/Bill/2024/117/Analyses/2024s00117.pre.cj.PDF"})
+    bills = {1: {"status": 4, "supplements": supplements}}
+
+    kept = [s["state_link"].rsplit("/", 1)[1] for _, s in staff_analyses_to_fetch(db_session, bills)]
+    # Only the latest revision per committee is still published; Senate names aren't touched.
+    assert kept == ["h0117c.EEG.PDF", "h0117e.JDC.PDF", "h0117z1.CRJ.PDF", "2024s00117.pre.cj.PDF"]
+
+
+def test_version_meta_labels_stored_texts_without_fetching(db_session):
+    from app.pipeline.text_versions import record_version_meta
+
+    bill = _bill(db_session, 1)
+    bill.external_ids = {**bill.external_ids, "legiscan_text_doc_id": "103"}
+    db_session.add(BillTextVersion(bill_entity_id=bill.id, legiscan_doc_id=101, version_type="Introduced", text="x"))
+    other = _bill(db_session, 2)  # stored doc id no longer in the dataset: left alone
+    other.external_ids = {**other.external_ids, "legiscan_text_doc_id": "999"}
+    db_session.commit()
+    bills = {
+        1: {"texts": [{"doc_id": 101, "type": "Introduced", "date": "2026-01-09", "state_link": "https://fl/filed"},
+                      {"doc_id": 103, "type": "Enrolled", "date": "2026-03-13", "state_link": "https://fl/er"}]},
+        2: {"texts": [{"doc_id": 201, "type": "Introduced"}]},
+    }
+
+    assert record_version_meta(db_session, bills) == 1
+    assert bill.external_ids["text_version"] == {"type": "Enrolled", "date": "2026-03-13", "url": "https://fl/er"}
+    assert bill.external_ids["filed_text_url"] == "https://fl/filed"
+    assert "text_version" not in other.external_ids
+    assert record_version_meta(db_session, bills) == 0  # nothing new

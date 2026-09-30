@@ -8,6 +8,7 @@ import type { BillListItem } from "@/lib/types";
 vi.mock("@/lib/api", () => ({
   fetchBills: vi.fn(),
   fetchElections: vi.fn(() => Promise.reject(new Error("not under test"))),
+  fetchSessions: vi.fn(() => Promise.resolve([])),
   fetchStatuses: vi.fn(() => Promise.resolve([])),
   fetchTags: vi.fn(() => Promise.resolve([])),
   fetchSourceStatus: vi.fn(() => Promise.reject(new Error("not under test"))),
@@ -199,6 +200,32 @@ describe("BrowsePage topic filter", () => {
 
     await waitFor(() =>
       expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ tag: "housing" })),
+    );
+  });
+});
+
+describe("BrowsePage session filter", () => {
+  beforeEach(() => {
+    searchParams = new URLSearchParams();
+    vi.mocked(api.fetchBills).mockReset();
+    vi.mocked(api.fetchSessions).mockReset();
+    vi.mocked(api.fetchStatuses).mockResolvedValue([]);
+  });
+
+  it("offers sessions from the data and passes the chosen one to the API", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    vi.mocked(api.fetchSessions).mockResolvedValue([
+      { session: "2026 Regular Session", count: 1897 },
+      { session: "2024 Regular Session", count: 1902 },
+    ]);
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+
+    await screen.findByRole("option", { name: "2024 Regular Session (1902)" });
+    await user.selectOptions(screen.getByLabelText(/filter by session/i), "2024 Regular Session");
+
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ session: "2024 Regular Session" })),
     );
   });
 });

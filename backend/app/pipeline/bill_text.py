@@ -427,6 +427,13 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
     return _merge_adjacent_markers(strip_page_artifacts("\n".join(kept)))
 
 
+def text_version_meta(doc: dict) -> dict:
+    """What to remember about a bill text document (a getBill / dataset
+    `texts` entry) so the site can name the version and link the official
+    copy: {"type": "Enrolled", "date": "2026-03-13", "url": ...}."""
+    return {"type": doc.get("type"), "date": doc.get("date"), "url": doc.get("state_link") or doc.get("url")}
+
+
 class NeedsLegiScan(Exception):
     """flsenate.gov couldn't serve the document and the LegiScan fallback
     wasn't allowed (the run's LegiScan call cap is spent)."""
@@ -449,7 +456,7 @@ def fetch_text_document(client: LegiScanClient, doc: dict, *, fallback: bool = T
         except flsenate.BudgetExhausted:
             raise
         except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
-            logger.info("flsenate.gov failed for doc_id=%s (%s); using LegiScan", doc.get("doc_id"), exc)
+            logger.info("flsenate.gov failed for doc_id=%s (%s)", doc.get("doc_id"), exc)
     if not fallback:
         raise NeedsLegiScan(doc.get("doc_id"))
     return fetch_bill_text(client, int(doc["doc_id"]))

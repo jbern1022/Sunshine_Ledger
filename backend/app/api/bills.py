@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
@@ -12,6 +13,7 @@ from app.db import get_db
 from app.models import (
     Bill,
     BillLayer,
+    BillTextVersion,
     BillLayerSource,
     BillTag,
     Claim,
@@ -22,6 +24,7 @@ from app.models import (
     StaffAnalysis,
     Tag,
 )
+from app.pipeline.effective_date import effective_clause
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
     ActionOut,
@@ -31,6 +34,7 @@ from app.schemas.bill import (
     BillListItem,
     BillListResponse,
     BillTagUpdate,
+    EffectiveOut,
     ClaimOut,
     DemographicMetricOut,
     DemographicOverlayOut,
@@ -42,9 +46,13 @@ from app.schemas.bill import (
     RollCallOut,
     SourceOut,
     SponsorOut,
+    FiledTextOut,
+    SessionCount,
     StatusCount,
     TagCount,
     TagOut,
+    TextVersionOut,
+    TextVersionsOut,
 )
 
 router = APIRouter(prefix="/bills", tags=["bills"])
@@ -155,6 +163,7 @@ def list_bills(
     jurisdiction_name: str | None = Query(None, description="e.g. FL, Miami, Jacksonville"),
     jurisdiction_level: str | None = Query(None, description="state | city"),
     status: str | None = Query(None),
+    session: str | None = Query(None, description="e.g. '2025 Regular Session' (see /bills/sessions)"),
     geo_scope_name: str | None = Query(None, description="e.g. 'Miami-Dade County' -- matches Bill.geo_scope_names"),
     tag: str | None = Query(None, description="Tag slug, e.g. 'housing' -- matches bills with that active badge"),
     sponsor_entity_id: uuid.UUID | None = Query(
@@ -177,6 +186,8 @@ def list_bills(
         stmt = stmt.where(Entity.jurisdiction_level == jurisdiction_level)
     if status:
         stmt = stmt.where(Bill.status == status)
+    if session:
+        stmt = stmt.where(Bill.session == session)
     if geo_scope_name:
         stmt = stmt.where(Bill.geo_scope_names.any(geo_scope_name))
     if tag:
@@ -249,6 +260,33 @@ def update_bill_tag(
 # Declared before /{entity_id}: FastAPI matches routes in definition order,
 # so a dynamic path defined first would swallow "/bills/statuses" and try to
 # parse "statuses" as a UUID.
+def _session_order(session: str) -> tuple[int, bool, str]:
+    """Newest year first; within a year the regular session, then specials."""
+    year = int(session[:4]) if session[:4].isdigit() else 0
+    return (-year, "Regular" not in session, session)
+
+
+# Declared before /{entity_id} for the same route-ordering reason as /statuses.
+@router.get("/sessions", response_model=list[SessionCount])
+def list_sessions(
+    jurisdiction_name: str | None = Query(None, description="Scope counts to one jurisdiction"),
+    db: Session = Depends(get_db),
+) -> list[SessionCount]:
+    """Legislative sessions with bill counts, newest first. State bill
+    numbers repeat every session (HB 117 exists in 2024, 2025 and 2026), so
+    this is how to look at one session at a time."""
+    stmt = (
+        select(Bill.session, func.count().label("n"))
+        .join(Entity, Entity.id == Bill.entity_id)
+        .where(Entity.entity_type == "bill", Bill.session.isnot(None))
+        .group_by(Bill.session)
+    )
+    if jurisdiction_name:
+        stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+    rows = sorted(db.execute(stmt).all(), key=lambda row: _session_order(row[0]))
+    return [SessionCount(session=session, count=n) for session, n in rows]
+
+
 @router.get("/statuses", response_model=list[StatusCount])
 def list_statuses(
     jurisdiction_name: str | None = Query(None, description="Scope counts to one jurisdiction"),
@@ -277,6 +315,45 @@ def list_statuses(
         stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
 
     return [StatusCount(status=status, count=n) for status, n in db.execute(stmt).all()]
+
+
+def _parse_iso_date(value: str | None) -> date | None:
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _filed_version(db: Session, entity_id: uuid.UUID) -> BillTextVersion | None:
+    return db.execute(
+        select(BillTextVersion).where(BillTextVersion.bill_entity_id == entity_id)
+        .order_by(BillTextVersion.version_date.asc().nulls_last()).limit(1)
+    ).scalar_one_or_none()
+
+
+def _text_versions(db: Session, entity: Entity, bill: Bill) -> TextVersionsOut | None:
+    """Filed vs current text versions, only when both texts are stored.
+    Lengths only: the filed text is served by /bills/{id}/versions/filed."""
+    if not bill.full_text:
+        return None
+    filed = _filed_version(db, entity.id)
+    if filed is None:
+        return None
+    current = (entity.external_ids or {}).get("text_version") or {}
+    return TextVersionsOut(
+        filed=TextVersionOut(
+            version_type=filed.version_type,
+            version_date=filed.version_date,
+            url=(entity.external_ids or {}).get("filed_text_url"),
+            characters=len(filed.text),
+        ),
+        current=TextVersionOut(
+            version_type=current.get("type"),
+            version_date=_parse_iso_date(current.get("date")),
+            url=current.get("url") or bill.full_text_url,
+            characters=len(bill.full_text),
+        ),
+    )
 
 
 def _bill_geography(db: Session, entity: Entity, bill: Bill) -> tuple[str, str] | None:
@@ -380,6 +457,22 @@ def _layers_for_bill(db: Session, entity_id: uuid.UUID) -> BillLayersOut:
             earlier_versions=[_layer_version_out(v) for v in versions if v.id != current.id],
         ))
     return out
+
+
+@router.get("/{entity_id}/versions/filed", response_model=FiledTextOut)
+def get_filed_text(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> FiledTextOut:
+    """The bill's filed (first) text version, for the text comparison."""
+    filed = _filed_version(db, entity_id)
+    if filed is None:
+        raise HTTPException(status_code=404, detail="No filed version stored for this bill")
+    entity = db.get(Entity, entity_id)
+    return FiledTextOut(
+        version_type=filed.version_type,
+        version_date=filed.version_date,
+        url=((entity.external_ids or {}) if entity else {}).get("filed_text_url"),
+        characters=len(filed.text),
+        text=filed.text,
+    )
 
 
 @router.get("/{entity_id}", response_model=BillDetail)
@@ -520,6 +613,12 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         amendments=amendments_out,
         actions=actions_out,
         layers=_layers_for_bill(db, entity_id),
+        text_versions=_text_versions(db, entity, bill),
+        effective=(
+            EffectiveOut(when=clause[0], has_exceptions=clause[1])
+            if (clause := effective_clause(bill.full_text))
+            else None
+        ),
         has_staff_analysis=db.execute(
             select(StaffAnalysis.id).where(
                 StaffAnalysis.entity_id == entity_id,

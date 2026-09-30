@@ -162,6 +162,38 @@ class ActionOut(BaseModel):
     important: bool
 
 
+class TextVersionOut(BaseModel):
+    """One version of a bill's text: its label, date, official copy."""
+
+    version_type: str | None
+    version_date: date | None
+    url: str | None
+    characters: int
+
+
+class TextVersionsOut(BaseModel):
+    """The filed and current text versions, when both are stored -- what
+    the "How the text changed" comparison needs. The filed text itself is
+    fetched separately (GET /bills/{id}/versions/filed): it can run to
+    1.6 MB, and most readers never open the comparison."""
+
+    filed: TextVersionOut
+    current: TextVersionOut
+
+
+class FiledTextOut(TextVersionOut):
+    text: str
+
+
+class EffectiveOut(BaseModel):
+    """When the bill says it takes effect, from its own text ("July 1, 2026",
+    "upon becoming a law"). `has_exceptions`: the clause starts "Except as
+    otherwise provided", so some sections carry their own dates."""
+
+    when: str
+    has_exceptions: bool
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -177,11 +209,20 @@ class BillDetail(BillListItem):
     actions: list[ActionOut] = []
     layers: BillLayersOut
     has_staff_analysis: bool
+    text_versions: TextVersionsOut | None = None
+    effective: EffectiveOut | None = None
 
 
 class BillListResponse(BaseModel):
     total: int
     items: list[BillListItem]
+
+
+class SessionCount(BaseModel):
+    """One legislative session and how many bills it has, for a filter UI."""
+
+    session: str
+    count: int
 
 
 class StatusCount(BaseModel):

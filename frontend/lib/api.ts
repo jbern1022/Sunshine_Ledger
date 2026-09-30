@@ -8,6 +8,8 @@ import type {
   PersonDetail,
   PersonListResponse,
   SourceStatus,
+  FiledText,
+  SessionCount,
   StatusCount,
   TagCount,
 } from "./types";
@@ -19,6 +21,7 @@ export interface BillSearchParams {
   jurisdiction_name?: string;
   jurisdiction_level?: string;
   status?: string;
+  session?: string;
   geo_scope_name?: string;
   tag?: string;
   sponsor_entity_id?: string;
@@ -94,6 +97,13 @@ export async function fetchPerson(entityId: string): Promise<PersonDetail> {
   return res.json();
 }
 
+export async function fetchSessions(jurisdictionName?: string): Promise<SessionCount[]> {
+  const qs = jurisdictionName ? `?jurisdiction_name=${encodeURIComponent(jurisdictionName)}` : "";
+  const res = await fetch(`${API_URL}/bills/sessions${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch sessions: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchStatuses(jurisdictionName?: string): Promise<StatusCount[]> {
   const qs = jurisdictionName ? `?jurisdiction_name=${encodeURIComponent(jurisdictionName)}` : "";
   const res = await fetch(`${API_URL}/bills/statuses${qs}`, { cache: "no-store" });
@@ -104,6 +114,12 @@ export async function fetchStatuses(jurisdictionName?: string): Promise<StatusCo
 export async function fetchTags(): Promise<TagCount[]> {
   const res = await fetch(`${API_URL}/bills/tags`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch tags: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchFiledText(entityId: string): Promise<FiledText> {
+  const res = await fetch(`${API_URL}/bills/${entityId}/versions/filed`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch the filed text: ${res.status}`);
   return res.json();
 }
 
