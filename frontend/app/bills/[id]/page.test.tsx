@@ -116,6 +116,25 @@ describe("BillPage", () => {
     expect(screen.getByText(/Amendments aren't collected for city legislation/)).toBeInTheDocument();
   });
 
+  it("labels a city agenda item that isn't legislation and skips bill-only sections", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      name: "*",
+      source_system: "iqm2",
+      jurisdiction_level: "city",
+      jurisdiction_name: "Miami",
+      item_type: "Discussion Item",
+      item_kind: "discussion",
+      effective: { when: "July 1, 2026", has_exceptions: false },
+    });
+    await renderBillPage();
+    expect(screen.getByText("Untitled item")).toBeInTheDocument();
+    expect(screen.getByText(/A record from Miami's agenda \(Discussion Item\), not legislation/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Votes" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Amendment history" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/takes effect/i)).not.toBeInTheDocument();
+  });
+
   it("renders the core header fields", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();

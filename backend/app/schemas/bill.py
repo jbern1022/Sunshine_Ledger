@@ -107,6 +107,11 @@ class BillListItem(BaseModel):
     full_text_url: str | None
     primary_sponsor: str | None
     tags: list["TagOut"]
+    # The source's own type for city items ("Discussion Item", "Ordinance")
+    # and the kind it maps to: legislation | discussion | agenda | other
+    # (app/pipeline/item_kind.py). State bills: None / legislation.
+    item_type: str | None = None
+    item_kind: str = "legislation"
     # legiscan | legistar | iqm2 -- which data source the bill came from,
     # for the "source · last checked" note (GET /sources/status).
     source_system: str | None = None
