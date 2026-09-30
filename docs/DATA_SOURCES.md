@@ -130,7 +130,13 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
 - **What:** recent headlines matched to bills by keyword. No sentiment or
   stance scoring.
 - **Module:** `backend/app/pipeline/gdelt.py`.
-- **Cadence:** weekly (Sunday run), rate-limited to roughly 8 s per bill.
+- **Cadence:** weekly (Sunday 05:00, `run-ingestion.sh --gdelt-only`), at
+  least 8 s between requests. Only bills with an action in the last 60 days
+  (`--days`), most recent first, capped at 45 minutes (`--max-minutes`).
+  Queries are a title's distinctive words (up to five; short and generic
+  words and punctuation dropped, since GDELT rejects them); titles with
+  fewer than two are skipped. 429s back off (Retry-After, else 30 s
+  doubling, 4 tries).
 - **Coverage:** 540 article sources; last retrieved 2026-09-21.
 - **Terms:** free, no key; cite GDELT.
 

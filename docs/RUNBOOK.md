@@ -171,12 +171,12 @@ container with `docker exec` -- no repo checkout needed on that host.
 
 ```
 0 4 * * *   /home/joe/scripts/run-ingestion.sh              # daily: LegiScan, Legistar, Miami iQM2, summaries, layers
-#0 5 * * 0  /home/joe/scripts/run-ingestion.sh --gdelt-only # weekly (Sunday): GDELT headlines only
+0 5 * * 0   /home/joe/scripts/run-ingestion.sh --gdelt-only # weekly (Sunday): GDELT headlines only
 ```
 
-The Sunday line is commented out while GDELT is paused (429s; Todoist
-6hf8XHrH8pHmwJ5G). It used to be `--with-gdelt`, which repeated the whole
-nightly run an hour after the 04:00 one; `--gdelt-only` runs just GDELT.
+The Sunday line used to be `--with-gdelt`, which repeated the whole nightly
+run an hour after the 04:00 one; `--gdelt-only` runs just GDELT, now limited
+to recently active bills and 45 minutes (see docs/DATA_SOURCES.md).
 
 GDELT is deliberately weekly, not daily -- it re-checks every bill in the
 database against GDELT's free DOC API with an 8s/bill minimum throttle,
