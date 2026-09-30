@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.logging_setup import quiet_http_logging
-from app.models import Bill, Entity, Event, Relationship, Source, SourceCheck
+from app.models import Bill, Entity, Event, LegiScanCallCount, Relationship, Source, SourceCheck
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline.topic_tagging import assign_tags_for_bill
@@ -50,6 +50,69 @@ class LegiScanError(RuntimeError):
 # the only record of what a run cost against the monthly quota (10,000
 # calls from 2026-10-01).
 API_CALLS: Counter[str] = Counter()
+# The part of API_CALLS already added to the database ledger.
+_RECORDED: Counter[str] = Counter()
+
+
+def month_start(today: date | None = None) -> date:
+    today = today or datetime.now(timezone.utc).date()
+    return today.replace(day=1)
+
+
+def record_api_usage(db: Session) -> int:
+    """Add this process's not-yet-recorded calls to the monthly ledger
+    (legiscan_call_counts). Safe to call more than once. Returns the
+    number of calls added."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    added = 0
+    month = month_start()
+    for operation, n in list(API_CALLS.items()):
+        new = n - _RECORDED[operation]
+        if new <= 0:
+            continue
+        db.execute(
+            pg_insert(LegiScanCallCount)
+            .values(month=month, operation=operation, calls=new)
+            .on_conflict_do_update(
+                index_elements=["month", "operation"],
+                set_={"calls": LegiScanCallCount.calls + new},
+            )
+        )
+        _RECORDED[operation] = n
+        added += new
+    db.commit()
+    return added
+
+
+def month_to_date(db: Session) -> int:
+    """LegiScan calls recorded this calendar month (UTC)."""
+    from sqlalchemy import func
+
+    return db.execute(
+        select(func.coalesce(func.sum(LegiScanCallCount.calls), 0)).where(
+            LegiScanCallCount.month == month_start()
+        )
+    ).scalar_one()
+
+
+def report_api_usage(db: Session) -> str:
+    """Record this run's calls in the ledger and return the summary to
+    print, with the month-to-date total. What every CLI prints at the end,
+    including after a failed run: its own work is committed or lost by
+    then, so anything still pending is rolled back first, and a ledger
+    failure still returns the plain summary."""
+    try:
+        db.rollback()
+        record_api_usage(db)
+        mtd = month_to_date(db)
+    except Exception as exc:  # noqa: BLE001 -- the summary must still print
+        logger.warning("Couldn't record LegiScan usage: %s", exc)
+        return api_usage_summary()
+    return (
+        f"{api_usage_summary()}\nLegiScan calls this month (our ledger): "
+        f"{mtd:,} of {settings.legiscan_monthly_limit:,}"
+    )
 
 
 def api_usage_summary() -> str:
@@ -710,11 +773,9 @@ def ingest_session_dataset(db: Session, *, session_name: str, state: str | None 
     return written
 
 
-NIGHTLY_CALL_BUDGET = 250  # x 31 nights = 7,750, inside 10,000/month with room for manual runs
-NIGHTLY_DOCUMENT_BUDGET = 300  # flsenate.gov documents a night: ~50 min at its 10 s crawl delay
 
 
-def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int = NIGHTLY_CALL_BUDGET) -> list[Entity]:
+def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int | None = None) -> list[Entity]:
     """The nightly LegiScan step, sized for 10,000 calls/month.
 
     1. getMasterList (1 call): which bills changed, and which session.
@@ -726,20 +787,23 @@ def nightly_state_sync(db: Session, *, state: str | None = None, max_calls: int 
        since the dataset was built), plus getBillText when a bill's latest
        text document is new -- capped by `max_calls`; the rest wait a night.
        The text itself comes from flsenate.gov (no LegiScan call), up to
-       NIGHTLY_DOCUMENT_BUDGET documents.
+       settings.flsenate_nightly_documents documents.
+
+    `max_calls` defaults to settings.legiscan_nightly_call_budget.
     """
     from app.pipeline import flsenate
     from app.pipeline.legiscan_dataset import DatasetClient
     from app.pipeline.source_checks import record_check
 
     state = state or settings.legiscan_state
+    max_calls = settings.legiscan_nightly_call_budget if max_calls is None else max_calls
     api = LegiScanClient()
     calls_at_start = sum(API_CALLS.values())
 
     def remaining() -> int:
         return max(0, max_calls - (sum(API_CALLS.values()) - calls_at_start))
 
-    flsenate.set_budget(NIGHTLY_DOCUMENT_BUDGET)
+    flsenate.set_budget(settings.flsenate_nightly_documents)
 
     master_list = api.get_master_list(state)
     session = getattr(api, "last_master_session", {}) or {}
@@ -981,8 +1045,8 @@ if __name__ == "__main__":
                 people = DatasetClient(fetch_session_dataset(LegiScanClient(), settings.legiscan_state, name)).people
                 print(f"{name}: flagged {mark_committee_sponsors(session, people)} committee sponsors.")
         finally:
+            print(report_api_usage(session))
             session.close()
-            print(api_usage_summary())
         raise SystemExit(0)
     if args.ingest_dataset:
         session = SessionLocal()
@@ -991,8 +1055,8 @@ if __name__ == "__main__":
                 written = ingest_session_dataset(session, session_name=name)
                 print(f"{name}: {len(written)} bills written.")
         finally:
+            print(report_api_usage(session))
             session.close()
-            print(api_usage_summary())
         raise SystemExit(0)
     if not args.sync_history:
         parser.error("nothing to do: pass --sync-history or --ingest-dataset")
@@ -1013,5 +1077,5 @@ if __name__ == "__main__":
         if client is not None:
             print(f"API calls beyond the dataset download: {client.fallback_calls}.")
     finally:
+        print(report_api_usage(session))
         session.close()
-        print(api_usage_summary())

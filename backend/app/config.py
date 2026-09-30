@@ -16,6 +16,20 @@ class Settings(BaseSettings):
     legiscan_api_key: str = ""
     legiscan_state: str = "FL"
 
+    # LegiScan's free tier: 10,000 calls a month from 2026-10-01. The
+    # nightly cap (x 31 nights = 7,750 at 250) leaves room for manual runs;
+    # raise it in the busiest weeks of session, lower it in summer. The
+    # monthly limit drives the 70%/90% ntfy alerts. Documents come from
+    # flsenate.gov (10 s apart), capped per night so a busy night can't run
+    # for hours.
+    legiscan_nightly_call_budget: int = 250
+    legiscan_monthly_limit: int = 10000
+    flsenate_nightly_documents: int = 300
+
+    # ntfy topic URL for operational alerts (e.g. the LegiScan usage
+    # warnings), the same topic Kuma notifies. Empty: alerts are only logged.
+    ntfy_alert_url: str = ""
+
     # Free signup: https://api.census.gov/data/key_signup.html. Required as
     # of 2026-09 -- unauthenticated requests now redirect to a key-missing
     # error page rather than serving data.

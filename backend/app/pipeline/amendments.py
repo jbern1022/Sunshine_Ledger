@@ -37,7 +37,7 @@ from app.logging_setup import quiet_http_logging
 from app.models import Entity, Event
 from app.pipeline.bill_text import extract_html_text, extract_pdf_text
 from app.pipeline.text_cleanup import strip_amendment_furniture
-from app.pipeline.legiscan import LegiScanClient, api_usage_summary
+from app.pipeline.legiscan import LegiScanClient, report_api_usage
 
 logger = logging.getLogger(__name__)
 
@@ -235,5 +235,5 @@ if __name__ == "__main__":
         ok, bad = backfill_amendment_texts(session, limit=args.limit, refresh=args.refresh)
         print(f"Done: {ok} fetched, {bad} skipped/failed.")
     finally:
+        print(report_api_usage(session))
         session.close()
-        print(api_usage_summary())
