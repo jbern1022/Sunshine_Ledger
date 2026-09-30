@@ -139,3 +139,21 @@ def test_staff_analyses_passed_bills_first_within_the_cap(db_session, monkeypatc
     assert fetched == [31, 32]
     assert backfill_staff_analyses(db_session, bills, client=None, max_calls=10) == (1, 0, 0)
     assert fetched == [31, 32, 11]
+
+
+def test_superseded_house_analysis_drafts_are_skipped(db_session):
+    from app.pipeline.text_versions import staff_analyses_to_fetch
+
+    _bill(db_session, 1)
+    db_session.commit()
+    base = "https://www.flsenate.gov/Session/Bill/2024/117/Analyses/"
+    names = ["h0117a.CRJ.PDF", "h0117b.EEG.PDF", "h0117c.EEG.PDF", "h0117d.JDC.PDF",
+             "h0117e.JDC.PDF", "h0117z.CRJ.PDF", "h0117z1.CRJ.PDF"]
+    supplements = [{"title": "Analysis", "supplement_id": i, "state_link": base + n} for i, n in enumerate(names, 1)]
+    supplements.append({"title": "Analysis", "supplement_id": 99,
+                        "state_link": "https://www.flsenate.gov/Session/Bill/2024/117/Analyses/2024s00117.pre.cj.PDF"})
+    bills = {1: {"status": 4, "supplements": supplements}}
+
+    kept = [s["state_link"].rsplit("/", 1)[1] for _, s in staff_analyses_to_fetch(db_session, bills)]
+    # Only the latest revision per committee is still published; Senate names aren't touched.
+    assert kept == ["h0117c.EEG.PDF", "h0117e.JDC.PDF", "h0117z1.CRJ.PDF", "2024s00117.pre.cj.PDF"]

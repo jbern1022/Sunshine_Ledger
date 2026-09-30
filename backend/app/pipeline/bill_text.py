@@ -449,7 +449,7 @@ def fetch_text_document(client: LegiScanClient, doc: dict, *, fallback: bool = T
         except flsenate.BudgetExhausted:
             raise
         except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
-            logger.info("flsenate.gov failed for doc_id=%s (%s); using LegiScan", doc.get("doc_id"), exc)
+            logger.info("flsenate.gov failed for doc_id=%s (%s)", doc.get("doc_id"), exc)
     if not fallback:
         raise NeedsLegiScan(doc.get("doc_id"))
     return fetch_bill_text(client, int(doc["doc_id"]))

@@ -122,7 +122,7 @@ def fetch_amendment_text(
         except flsenate.BudgetExhausted:
             raise
         except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
-            logger.info("flsenate.gov failed for amendment_id=%s (%s); using LegiScan", amendment_id, exc)
+            logger.info("flsenate.gov failed for amendment_id=%s (%s)", amendment_id, exc)
     if not fallback:
         raise NeedsLegiScan(amendment_id)
     doc = client.get_amendment(amendment_id)

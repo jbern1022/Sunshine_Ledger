@@ -111,7 +111,7 @@ def _analysis_pdf(client: LegiScanClient, supp: dict, *, fallback: bool) -> byte
         except flsenate.BudgetExhausted:
             raise
         except Exception as exc:  # noqa: BLE001 -- LegiScan has the same document
-            logger.info("flsenate.gov failed for supplement_id=%s (%s); using LegiScan", supplement_id, exc)
+            logger.info("flsenate.gov failed for supplement_id=%s (%s)", supplement_id, exc)
     if not fallback:
         raise NeedsLegiScan(supplement_id)
     doc = client.get_supplement(int(supplement_id))

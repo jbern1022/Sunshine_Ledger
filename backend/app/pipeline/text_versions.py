@@ -29,6 +29,7 @@ skipped, so a rerun fetches only what's left.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime
 
 from sqlalchemy import select
@@ -159,9 +160,39 @@ def backfill_latest_text(db: Session, bills: dict[int, dict], client, *, max_cal
     return stored, failed, left
 
 
+# House analysis file names: h0117.CRJ.PDF, h0117a.CRJ.PDF, ..., h0117z.CRJ.PDF,
+# h0117z1.CRJ.PDF -- bill, revision (none, a-y, then z for the final analysis
+# and z1, z2 for its revisions), committee. The House publishes only the
+# latest revision per committee; LegiScan still lists the earlier ones, whose
+# links soft-404 (815 of 820 flsenate.gov failures on 2026-09-29 had a later
+# revision of the same committee stored).
+_HOUSE_ANALYSIS = re.compile(r"/h\d+([a-z]?)(\d*)\.([A-Za-z0-9]+)\.PDF$", re.IGNORECASE)
+
+
+def _house_revision(supp: dict) -> tuple[str, tuple[str, int]] | None:
+    """(committee, sortable revision) for a House analysis link, else None."""
+    match = _HOUSE_ANALYSIS.search(supp.get("state_link") or "")
+    if not match:
+        return None
+    letter, number, committee = match.groups()
+    return committee.upper(), (letter.lower(), int(number or 0))
+
+
+def _drop_superseded(supplements: list[dict]) -> list[dict]:
+    """One bill's supplements without House analyses that a later revision
+    for the same committee replaced."""
+    latest: dict[str, tuple[str, int]] = {}
+    for supp in supplements:
+        rev = _house_revision(supp)
+        if rev and rev[1] > latest.get(rev[0], ("", -1)):
+            latest[rev[0]] = rev[1]
+    return [s for s in supplements if (rev := _house_revision(s)) is None or latest[rev[0]] == rev[1]]
+
+
 def staff_analyses_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[Entity, dict]]:
     """(stored bill entity, supplement) for dataset staff analyses we don't
-    hold yet, passed bills first."""
+    hold yet, passed bills first. Superseded House revisions are skipped:
+    they're no longer published, and the latest one is fetched instead."""
     from app.models import StaffAnalysis
     from app.pipeline.staff_analysis import is_staff_analysis
 
@@ -174,8 +205,8 @@ def staff_analyses_to_fetch(db: Session, bills: dict[int, dict]) -> list[tuple[E
         (entities[str(bill_id)], supp, bill.get("status") == 4)
         for bill_id, bill in sorted(bills.items())
         if str(bill_id) in entities
-        for supp in bill.get("supplements") or []
-        if is_staff_analysis(supp) and supp.get("supplement_id") and supp["supplement_id"] not in known
+        for supp in _drop_superseded([s for s in bill.get("supplements") or [] if is_staff_analysis(s)])
+        if supp.get("supplement_id") and supp["supplement_id"] not in known
     ]
     todo.sort(key=lambda item: not item[2])  # stable: passed bills first
     return [(entity, supp) for entity, supp, _ in todo]
