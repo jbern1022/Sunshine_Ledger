@@ -158,7 +158,7 @@ The text below is the law as it will read once this bill takes effect (struck la
 \"\"\"
 
 List up to 6 entries. Each entry is one group and one thing the bill directly changes for that group. Rules:
-- "group": the specific group the provision names or defines (e.g. "Landlords", "County tax collectors"), not "residents" or "everyone".
+- "group": the specific group the provision names or defines (e.g. "Landlords", "County tax collectors"). If the provision applies to any person (as most criminal offenses do), write "Anyone" -- that broad coverage is what the text says.
 - "change": what changes for that group, in plain language: an obligation, eligibility, protection, cost, service, or prohibition. Keep the bill's modal strength: "shall"/"must" is a requirement, "may" is permission.
 - "change_kind": one of "obligation", "eligibility", "protection", "cost", "service", "prohibition", "other".
 - "quote": the one sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses.

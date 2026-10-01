@@ -46,6 +46,13 @@ describe("WhoItAffects", () => {
     expect(screen.getByText("not reviewed by a person", { exact: false })).toBeInTheDocument();
   });
 
+  it("shows an exception once when its text just repeats the bill's sentence", () => {
+    const b = block();
+    b.current.items[0].exceptions = [{ text: "(a) Law enforcement agencies.", quote: "(a) Law enforcement agencies." }];
+    render(<WhoItAffects block={b} status="Introduced" effective={null} />);
+    expect(screen.getAllByText(/Law enforcement agencies/)).toHaveLength(1);
+  });
+
   it("uses the bill's fate for the verb", () => {
     render(<WhoItAffects block={block()} status="Vetoed" effective={{ when: "July 1, 2027", has_exceptions: false }} />);
     expect(screen.getAllByText(/Would have applied to/)).toHaveLength(2);
