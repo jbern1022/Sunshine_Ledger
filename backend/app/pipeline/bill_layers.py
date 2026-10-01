@@ -339,13 +339,22 @@ _MANDATORY = re.compile(r"\b(?:shall|must|(?:is|are) required)\b", re.IGNORECASE
 _PERMITS = re.compile(r"\bmay\b(?!\s+not\b)", re.IGNORECASE)
 
 
-def _operative(amended: str) -> str:
+def _operative(amended: str, full_text: str) -> str:
     """The law itself, from the first "Section N." heading on. A Florida
     bill opens with a title paragraph paraphrasing every change ("amending
     s. 641.26, F.S.; revising requirements ..."); quoting that is quoting a
-    summary, not the provision. Text with no section headings is used whole."""
+    summary, not the provision. Text with no section headings is used whole,
+    unless the full bill has them: then the window shown to the model is all
+    title (H1141, 2026-10-01) and nothing operative is visible."""
     first = _BILL_SECTION_HEADING.search(amended)
-    return amended[first.start():] if first else amended
+    if first:
+        return amended[first.start():]
+    return "" if _BILL_SECTION_HEADING.search(law_as_amended(full_text)) else amended
+
+
+# Title-paragraph phrasing, should one slip past _operative (no headings).
+_TITLE_STYLE = re.compile(r"\bamending s(?:s)?\.\s*[\d.]+,\s*F\.S\.;|^(?:requiring|prohibiting|authorizing|revising|providing|creating|removing|specifying)\b", re.IGNORECASE)
+_NEGATION = re.compile(r"\b(?:not|no|never|unlawful|prohibit\w*|may not|shall not)\b", re.IGNORECASE)
 
 # Who it affects is direct applicability only. A consequence -- rents rising,
 # fewer permits -- needs its own evidence and belongs in Expected Effect.
@@ -382,7 +391,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     raw = _parse_items(client.generate(
         WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, text=amended), json_mode=True
     ))
-    operative = _operative(amended)
+    operative = _operative(amended, full_text)
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:
@@ -397,6 +406,10 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
             or _DOWNSTREAM.search(change)
             or overstates_modal(change, text)
             or (_REQUIRES.search(change) and not _MANDATORY.search(verified[0]["quote"]))
+            or _TITLE_STYLE.search(verified[0]["quote"])
+            # A "prohibition" worded as a bare permission is a misreading
+            # (S0814: "Anyone [prohibition]: may possess any firearm ...").
+            or (str(r.get("change_kind") or "").lower() == "prohibition" and not _NEGATION.search(change))
         ):
             dropped.append(r)
             continue
