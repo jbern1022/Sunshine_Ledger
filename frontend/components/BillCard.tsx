@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { fetchBill, submitFlag } from "@/lib/api";
+import { fetchBill } from "@/lib/api";
+import ChallengeForm from "@/components/ChallengeForm";
 import type { BillDetail, BillListItem, SourceOut } from "@/lib/types";
 import TagBadges from "@/components/TagBadges";
 
@@ -19,7 +20,6 @@ function statusClass(status: string): string {
   return STATUS_COLORS[status] ?? "bg-slate-100 text-slate-700";
 }
 
-type FlagStatus = "idle" | "submitting" | "sent" | "error";
 
 export default function BillCard({ bill }: { bill: BillListItem }) {
   const [expanded, setExpanded] = useState(false);
@@ -27,9 +27,6 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
   const [detail, setDetail] = useState<BillDetail | null>(null);
 
   const [showFlagForm, setShowFlagForm] = useState(false);
-  const [flagReason, setFlagReason] = useState("");
-  const [flagEmail, setFlagEmail] = useState("");
-  const [flagStatus, setFlagStatus] = useState<FlagStatus>("idle");
 
   async function toggleExpanded() {
     if (!expanded && detail === null) {
@@ -43,23 +40,6 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
       }
     }
     setExpanded((v) => !v);
-  }
-
-  async function handleFlagSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFlagStatus("submitting");
-    try {
-      await submitFlag({
-        bill_entity_id: bill.entity_id,
-        reason_text: flagReason,
-        reporter_email: flagEmail || null,
-      });
-      setFlagStatus("sent");
-      setFlagReason("");
-      setFlagEmail("");
-    } catch {
-      setFlagStatus("error");
-    }
   }
 
   const uniqueSources: SourceOut[] = detail
@@ -254,57 +234,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
         </div>
       )}
 
-      {showFlagForm && (
-        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-          {flagStatus === "sent" ? (
-            <p className="text-xs text-emerald-700">
-              Thanks — this has been sent for manual review. We don&apos;t edit bill data automatically from reports.
-            </p>
-          ) : (
-            <form onSubmit={handleFlagSubmit} className="space-y-2">
-              <label className="block text-xs font-medium text-slate-600">
-                What looks wrong?
-                <textarea
-                  required
-                  minLength={5}
-                  maxLength={2000}
-                  value={flagReason}
-                  onChange={(e) => setFlagReason(e.target.value)}
-                  rows={3}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
-                  placeholder="e.g. the &quot;who it affects&quot; summary misses that this only applies to counties over 500,000 residents"
-                />
-              </label>
-              <label className="block text-xs font-medium text-slate-600">
-                Email (optional, if you want a reply)
-                <input
-                  type="email"
-                  value={flagEmail}
-                  onChange={(e) => setFlagEmail(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
-                />
-              </label>
-              {flagStatus === "error" && <p className="text-xs text-red-600">Couldn&apos;t submit — try again.</p>}
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={flagStatus === "submitting"}
-                  className="rounded-md bg-sunshine-500 px-3 py-1.5 text-xs font-medium text-ledger-900 hover:bg-sunshine-400 disabled:opacity-50"
-                >
-                  {flagStatus === "submitting" ? "Sending…" : "Submit report"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowFlagForm(false)}
-                  className="text-xs text-slate-500 hover:text-slate-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
+      {showFlagForm && <ChallengeForm billEntityId={bill.entity_id} onClose={() => setShowFlagForm(false)} />}
 
       {expanded && !loading && detail && detail.news.length > 0 && (
         <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs">

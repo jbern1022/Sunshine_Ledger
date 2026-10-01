@@ -10,6 +10,7 @@ import BillLayers from "@/components/BillLayers";
 import LegislativeTimeline from "@/components/LegislativeTimeline";
 import TextComparison from "@/components/TextComparison";
 import WhoItAffects from "@/components/WhoItAffects";
+import { FlagThis } from "@/components/ChallengeForm";
 import { hasAnyLayer } from "@/lib/layers";
 import { effectiveLabel } from "@/lib/billStatus";
 
@@ -127,8 +128,8 @@ export default async function BillPage({ params }: Props) {
 
       {hasAnyLayer(bill.layers) ? (
         <>
-          <BillLayers layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} />
-          {whoBlock && <WhoItAffects block={whoBlock} status={bill.status} effective={bill.effective} />}
+          <BillLayers billEntityId={bill.entity_id} layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} />
+          {whoBlock && <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} />}
         </>
       ) : (
         <>
@@ -145,7 +146,7 @@ export default async function BillPage({ params }: Props) {
           )}
 
           {whoBlock ? (
-            <WhoItAffects block={whoBlock} status={bill.status} effective={bill.effective} />
+            <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} />
           ) : isLegislation && whoItAffects && (
             <section className="mt-4">
               <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
@@ -300,6 +301,10 @@ export default async function BillPage({ params }: Props) {
           </ul>
         </section>
       )}
+
+      <section className="mt-4">
+        <FlagThis billEntityId={bill.entity_id} label="Report a problem with this bill" />
+      </section>
 
       {sources.length > 0 && (
         <section className="mt-4">

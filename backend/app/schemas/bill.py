@@ -230,6 +230,12 @@ class BillDetail(BillListItem):
     has_staff_analysis: bool
     text_versions: TextVersionsOut | None = None
     effective: EffectiveOut | None = None
+    # The correction process: statements under challenge (labelled on the
+    # page, never hidden), every correction with its before/after and
+    # evidence, and verified right-of-reply responses.
+    disputes: list["DisputeOut"] = []
+    corrections: list["CorrectionOut"] = []
+    responses: list["ResponseOut"] = []
 
 
 class BillListResponse(BaseModel):
@@ -294,3 +300,8 @@ class DemographicOverlayOut(BaseModel):
     geography_id: str
     as_of: str
     metrics: list[DemographicMetricOut]
+
+
+from app.schemas.flag import CorrectionOut, DisputeOut, ResponseOut  # noqa: E402
+
+BillDetail.model_rebuild()

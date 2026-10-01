@@ -503,26 +503,55 @@ and the browse page (`geo`-filter passthrough to the API, pagination).
 No component/integration tests for the map view yet (Leaflet + jsdom is
 more friction than it's worth right now).
 
-## Reviewing flags
+## Reviewing flags (the correction process)
 
-`GET /flags/admin` (HTTP Basic Auth, credentials in `.env` as
-`ADMIN_USERNAME`/`ADMIN_PASSWORD`) lists submitted "flag this" reports,
-newest first, defaulting to `status=pending`. Each includes the bill
-number/name, the reporter's text, and their email if they gave one.
+Rules: Notion "Correction, Dispute & Right-of-Reply Process" (decisions
+agreed 2026-10-01). Targets: Critical, triage in 2 days and decide in 7;
+Material, 7 and 30; Minor, as time allows. A disputed statement stays
+visible with a label, never hidden. Every correction keeps the earlier
+text, the corrected text and the evidence. All endpoints use HTTP Basic
+(`ADMIN_USERNAME`/`ADMIN_PASSWORD`; unset = every request rejected).
 
 ```bash
-curl -u admin:<password> "https://sunshineledger-api.josephbernal.com/flags/admin"
+API=https://sunshineledger-api.josephbernal.com; AUTH="-u admin:<password>"
+# Queue: open (pending + triaged), Critical first, then oldest.
+curl $AUTH "$API/flags/admin"                      # ?status=pending|triaged|decided|dismissed|all
 
-# after acting on one:
-curl -X PATCH -u admin:<password> -H "Content-Type: application/json" \
-  -d '{"status": "reviewed"}' \
-  "https://sunshineledger-api.josephbernal.com/flags/admin/<flag-id>"
+# Triage: dismiss spam/off-topic/duplicates...
+curl $AUTH -H "Content-Type: application/json" -d '{"dismiss": true, "note": "spam"}' "$API/flags/admin/<id>/triage"
+curl $AUTH -H "Content-Type: application/json" -d '{"duplicate_of_id": "<other-id>"}' "$API/flags/admin/<id>/triage"
+# ...or set severity; "disputed": true puts the Disputed label on the page
+# (material/critical only).
+curl $AUTH -H "Content-Type: application/json" -d '{"severity": "critical", "disputed": true}' "$API/flags/admin/<id>/triage"
+
+# Decide. no_change needs an explanation only:
+curl $AUTH -H "Content-Type: application/json" \
+  -d '{"decision": "no_change", "explanation": "Section 1 does say 15 days."}' "$API/flags/admin/<id>/decide"
+# Anything else records a correction (change_type must match the decision):
+curl $AUTH -H "Content-Type: application/json" -d '{
+  "decision": "correction", "explanation": "The deadline is 30 days.",
+  "correction": {"change_type": "correction", "severity": "material",
+    "explanation": "Interpretation misread Section 1.",
+    "prior_text": "...", "current_text": "...", "prior_version": 1, "current_version": 2,
+    "evidence_links": [{"url": "https://www.flsenate.gov/...", "role": "supporting"}],
+    "origin": "sunshine_ledger_ai", "was_reviewed": false}}' "$API/flags/admin/<id>/decide"
+
+# A correction nobody reported (internal_review | source_change | methodology_change):
+curl $AUTH -H "Content-Type: application/json" -d '{"bill_entity_id": "<bill>", "object_type": "page_copy",
+  "trigger": "internal_review", "change_type": "correction", "severity": "minor",
+  "explanation": "Fixed a broken source link."}' "$API/corrections/admin"
+
+# A verified right-of-reply response (verify via the contact on their
+# official filing first; verified_via is shown publicly):
+curl $AUTH -H "Content-Type: application/json" -d '{"bill_entity_id": "<bill>", "responder_name": "...",
+  "responder_role": "Sponsor", "text": "...", "received_at": "2026-10-01T12:00:00Z",
+  "verified_via": "confirmed via the email on the Division of Elections candidate filing"}' "$API/responses/admin"
 ```
 
-Valid statuses: `pending` (default filter), `reviewed`, `dismissed`, or
-pass `?status=all` to see everything. If `ADMIN_PASSWORD` isn't set, these
-endpoints reject every request rather than falling back to a guessable
-default.
+Public: `GET /corrections` (Material + Critical; `?severity=all` adds
+Minor), and each `GET /bills/{id}` carries `disputes`, `corrections` and
+`responses`. Decided and dismissed flags start the 90-day reporter-email
+retention clock (`purge_flag_emails`).
 
 ## Monitoring
 

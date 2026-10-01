@@ -24,6 +24,7 @@ from app.models import (
     StaffAnalysis,
     Tag,
 )
+from app.api.corrections import bill_accountability
 from app.pipeline.effective_date import effective_clause
 from app.pipeline.item_kind import item_kind
 from app.pipeline.topic_tagging import set_bill_tag_active
@@ -620,6 +621,7 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
         amendments=amendments_out,
         actions=actions_out,
         layers=_layers_for_bill(db, entity_id),
+        **dict(zip(("disputes", "corrections", "responses"), bill_accountability(db, entity_id))),
         text_versions=_text_versions(db, entity, bill),
         effective=(
             EffectiveOut(when=clause[0], has_exceptions=clause[1])

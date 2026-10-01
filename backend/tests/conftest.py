@@ -141,3 +141,13 @@ def _flsenate_offline(monkeypatch):
     monkeypatch.setattr(flsenate, "_last_request", 0.0)
     monkeypatch.setattr(flsenate, "_sleep", lambda seconds: None)
     monkeypatch.setattr(flsenate, "_client", httpx.Client(transport=httpx.MockTransport(offline)))
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Each test starts with fresh rate-limit windows: the public form allows
+    5 challenges a minute, which a test module can exceed on its own."""
+    from app.rate_limit import limiter
+
+    limiter.reset()
+    yield
