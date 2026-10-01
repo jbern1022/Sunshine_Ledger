@@ -25,6 +25,7 @@ from app.models import (
     Tag,
 )
 from app.pipeline.effective_date import effective_clause
+from app.pipeline.item_kind import item_kind
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
     ActionOut,
@@ -90,6 +91,8 @@ def _to_list_item(
         primary_sponsor=primary_sponsor,
         tags=tags or [],
         source_system=bill.source_system,
+        item_type=(entity.attributes or {}).get("item_type"),
+        item_kind=item_kind((entity.attributes or {}).get("item_type")),
     )
 
 

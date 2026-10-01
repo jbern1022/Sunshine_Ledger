@@ -64,6 +64,9 @@ export interface BillListItem {
   tags: TagOut[];
   /** legiscan | legistar | iqm2: which data source the bill came from. */
   source_system?: string | null;
+  /** The source's own type for city items ("Discussion Item") and its kind. */
+  item_type?: string | null;
+  item_kind?: "legislation" | "discussion" | "agenda" | "other";
 }
 
 export interface IndividualVoteOut {

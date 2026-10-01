@@ -132,6 +132,11 @@ describe("BillCard", () => {
     expect(screen.getByText("2024 Regular Session")).toBeInTheDocument();
   });
 
+  it("shows a city item's type when it isn't legislation", () => {
+    render(<BillCard bill={{ ...baseBill, session: "2026", item_type: "Protocol Item", item_kind: "other" }} />);
+    expect(screen.getByText("Protocol Item")).toBeInTheDocument();
+  });
+
   it("does not label local bills, which carry just a year", () => {
     render(<BillCard bill={{ ...baseBill, session: "2026" }} />);
     expect(screen.queryByText("2026")).not.toBeInTheDocument();

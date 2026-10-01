@@ -62,6 +62,9 @@ export default async function BillPage({ params }: Props) {
   // State bills come from LegiScan, which records votes and amendments; the
   // city sources don't (yet), so an empty list means different things.
   const isStateBill = bill.source_system === "legiscan";
+  // City feeds also carry discussion items, agendas, proclamations...
+  // (app/pipeline/item_kind.py). Those get none of the bill-only sections.
+  const isLegislation = (bill.item_kind ?? "legislation") === "legislation";
   const whoItAffects = bill.claims.find((c) => c.claim_type === "who_it_affects")?.claim_text;
   const sources = Array.from(
     new Map(bill.claims.flatMap((c) => c.sources).map((s) => [s.id, s])).values(),
@@ -90,7 +93,14 @@ export default async function BillPage({ params }: Props) {
           )}
         </div>
         <h1 className="mt-1 text-2xl font-bold text-ledger-900">{bill.bill_number}</h1>
-        <p className="mt-1 text-sm text-slate-600">{bill.name}</p>
+        <p className="mt-1 text-sm text-slate-600">{bill.name.trim() === "*" ? "Untitled item" : bill.name}</p>
+        {!isLegislation && (
+          <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            A record from {bill.jurisdiction_name ?? "the city"}&apos;s agenda
+            {bill.item_type ? ` (${bill.item_type})` : ""}, not legislation: it has no bill text, recorded votes or
+            amendments.
+          </p>
+        )}
         <TagBadges tags={bill.tags} />
         <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <p>
@@ -99,7 +109,7 @@ export default async function BillPage({ params }: Props) {
             {bill.last_action && <> — {bill.last_action}</>}
             {bill.last_action_date && <span className="text-slate-500"> ({bill.last_action_date})</span>}
           </p>
-          {bill.effective && (
+          {isLegislation && bill.effective && (
             <p className="mt-0.5">
               <span className="font-medium text-ledger-900">{effectiveLabel(bill.status)}: </span>
               {bill.effective.when}
@@ -141,7 +151,7 @@ export default async function BillPage({ params }: Props) {
         />
       )}
 
-      {bill.text_versions && bill.full_text && (
+      {isLegislation && bill.text_versions && bill.full_text && (
         <TextComparison entityId={bill.entity_id} versions={bill.text_versions} currentText={bill.full_text} />
       )}
 
@@ -180,7 +190,7 @@ export default async function BillPage({ params }: Props) {
         </section>
       )}
 
-      {bill.votes.length === 0 && (
+      {isLegislation && bill.votes.length === 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Votes</h2>
           <p className="text-xs text-slate-500">
@@ -246,7 +256,7 @@ export default async function BillPage({ params }: Props) {
         </section>
       )}
 
-      {bill.amendments.length === 0 && (
+      {isLegislation && bill.amendments.length === 0 && (
         <section className="mt-4">
           <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
           <p className="text-xs text-slate-500">

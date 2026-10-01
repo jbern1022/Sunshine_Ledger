@@ -155,6 +155,8 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
             "legistar_matter_id": str(matter_id),
             "legistar_client": client_name,
         }
+        if matter.get("MatterTypeName"):
+            entity.attributes = {**(entity.attributes or {}), "item_type": matter["MatterTypeName"]}  # see item_kind.py
         db.flush()
 
         source = Source(

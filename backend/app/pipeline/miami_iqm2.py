@@ -214,6 +214,8 @@ def ingest_miami_legislation(db: Session, *, limit: int = 20) -> list[Entity]:
         entity.jurisdiction_level = "city"
         entity.jurisdiction_name = JURISDICTION
         entity.external_ids = {**entity.external_ids, "iqm2_legi_file_id": str(legi_file_id)}
+        if record["type"]:
+            entity.attributes = {**(entity.attributes or {}), "item_type": record["type"]}  # see item_kind.py
         db.flush()
 
         source = Source(

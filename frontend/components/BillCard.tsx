@@ -96,6 +96,12 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 special sessions reuse regular-session numbers (the 2026
                 budget is H5001 in both), so name the session on the card.
                 Local bills carry just a year and unique numbers. */}
+            {bill.item_kind && bill.item_kind !== "legislation" && bill.item_type && (
+              <>
+                <span>·</span>
+                <span className="rounded bg-slate-100 px-1.5 text-slate-600">{bill.item_type}</span>
+              </>
+            )}
             {bill.session.includes("Session") && (
               <>
                 <span>·</span>
