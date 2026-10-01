@@ -1,7 +1,7 @@
 """Nightly job: write new Bill Says / Interpretation / Expected Effect
 versions for bills whose inputs changed.
 
-Per bill, up to five blocks. A block is regenerated only when its input
+Per bill, up to six blocks (Who it affects is the sixth). A block is regenerated only when its input
 hash (input text + model + method version) differs from the current
 version's, so a new committee staff analysis re-versions the staff blocks
 and leaves the Sunshine Ledger blocks alone, and vice versa.
@@ -76,6 +76,8 @@ def plan_jobs(db: Session, entity: Entity, model: str) -> list[LayerJob]:
             ("expected_effect", "sunshine_ledger_ai"),
         ):
             candidates.append((layer, origin, bill.full_text))
+        if settings.layers_who_it_affects:
+            candidates.append(("who_it_affects", "sunshine_ledger_ai", bill.full_text))
     analysis = latest_staff_analysis(db, entity.id)
     if analysis is not None:
         candidates.append(("interpretation", "legislative_staff", _staff_input(extract_effect_section(analysis.text), analysis)))
@@ -121,6 +123,8 @@ def run_job(db: Session, entity: Entity, job: LayerJob, client, analysis: StaffA
         result = gen.build_ai_interpretation(bill.bill_number, entity.name, bill.full_text, client)
     elif (job.layer, job.origin) == ("expected_effect", "sunshine_ledger_ai"):
         result = gen.build_ai_expected_effect(bill.bill_number, entity.name, bill.full_text, client)
+    elif (job.layer, job.origin) == ("who_it_affects", "sunshine_ledger_ai"):
+        result = gen.build_who_it_affects(bill.bill_number, entity.name, bill.full_text, client)
     elif (job.layer, job.origin) == ("interpretation", "legislative_staff"):
         result = gen.build_staff_interpretation(extract_effect_section(analysis.text), staff_label(analysis), client)
     else:

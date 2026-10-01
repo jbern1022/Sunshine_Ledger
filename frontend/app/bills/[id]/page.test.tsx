@@ -196,6 +196,29 @@ describe("BillPage", () => {
     expect(screen.queryByRole("heading", { name: "What it does" })).not.toBeInTheDocument();
   });
 
+  it("shows the structured Who it affects block next to the layers, worded by status", async () => {
+    const version = {
+      id: "w1", version: 1, evidence_state: "supported" as const, review_status: "not_reviewed" as const,
+      reviewed_at: null, scope_note: "Bill text", generated_by: "llm:qwen2.5:14b", method_version: "who/1",
+      created_at: "2026-10-01T00:00:00Z", superseded_at: null, sources: [],
+      items: [{ text: "Must file a yearly report.", group: "Landlords", change_kind: "obligation",
+                quote: "A landlord shall file a report.", section_ref: "Section 1", conditions: [], exceptions: [],
+                assumptions: [], affected_groups: ["Landlords"] }],
+    };
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      status: "Vetoed",
+      layers: {
+        bill_says: [], interpretation: [], expected_effect: [],
+        who_it_affects: [{ origin: "sunshine_ledger_ai", current: version, earlier_versions: [] }],
+      },
+    });
+    await renderBillPage();
+    expect(screen.getByRole("heading", { name: "Who it affects" })).toBeInTheDocument();
+    expect(screen.getByText(/Would have applied to/)).toBeInTheDocument();
+    expect(screen.getByText(/Must file a yearly report/)).toBeInTheDocument();
+  });
+
   it("shows the who-it-affects claim when present, distinct from what-it-does", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce({
       ...baseBill,

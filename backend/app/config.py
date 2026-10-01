@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # than defaulted statically so it still tracks an overridden
     # ollama_model.
     ollama_layers_model: str = ""
+    # The nightly generates the Who it affects block only once this is on:
+    # off until a quality report (review_bill_layers --who-only) is signed
+    # off, as with every earlier layer.
+    layers_who_it_affects: bool = False
 
     @model_validator(mode="after")
     def _default_layers_model(self) -> "Settings":

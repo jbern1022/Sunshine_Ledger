@@ -91,7 +91,14 @@ def _render(title: str, result: gen.LayerResult) -> list[str]:
     lines = [f"#### {title}", f"- state: `{result.evidence_state}` · scope: {result.scope_note}"]
     for i in result.items:
         ref = f" ({i['section_ref']})" if i.get("section_ref") else ""
-        lines.append(f"- {i['text']}{ref}")
+        group = f"**{i['group']}** [{i.get('change_kind')}]: " if i.get("group") else ""
+        lines.append(f"- {group}{i['text']}{ref}")
+        if i.get("group") and i.get("quote"):
+            lines.append(f"  - why: \"{i['quote']}\"")
+        for c in i.get("conditions") or []:
+            lines.append(f"  - condition: {c['text']} (\"{c['quote']}\")")
+        for x in i.get("exceptions") or []:
+            lines.append(f"  - exception: {x['text']} (\"{x['quote']}\")")
         for a in i.get("assumptions") or []:
             lines.append(f"  - assumption: {a}")
     for d in result.dropped:
@@ -112,11 +119,12 @@ def main() -> None:
         help="Path to an earlier report; run exactly its bill numbers, in order. "
         "Combine with --sample N to also draw N new random bills, excluding the listed ones.",
     )
+    parser.add_argument("--who-only", action="store_true", help="Generate only the Who it affects block (one model call per bill).")
     args = parser.parse_args()
 
     client = build_client(args)
     db = SessionLocal()
-    kept_quotes = dropped_quotes = kept_effects = dropped_effects = 0
+    kept_quotes = dropped_quotes = kept_effects = dropped_effects = kept_who = dropped_who = 0
     out: list[str] = [f"# Bill layers quality review ({client.model})", ""]
     try:
         bills_from_numbers: list[str] = []
@@ -135,6 +143,13 @@ def main() -> None:
             bill = entity.bill
             out += [f"## {bill.bill_number} — {entity.name}", ""]
             try:
+                who = gen.build_who_it_affects(bill.bill_number, entity.name, bill.full_text or "", client)
+                kept_who += len(who.items)
+                dropped_who += len(who.dropped)
+                out += _render("Who it affects · Sunshine Ledger", who)
+                if args.who_only:
+                    out.append("")
+                    continue
                 says = gen.build_bill_says(bill.bill_number, entity.name, bill.full_text or "", client)
                 kept_quotes += len(says.items)
                 dropped_quotes += len(says.dropped)
@@ -159,7 +174,9 @@ def main() -> None:
             out.append("")
         total_q = kept_quotes + dropped_quotes
         total_e = kept_effects + dropped_effects
+        total_w = kept_who + dropped_who
         out[1:1] = [
+            f"- Who it affects entries kept after guards: {kept_who}/{total_w}" if total_w else "- Who it affects: none returned",
             f"- Bill Says quotes verified: {kept_quotes}/{total_q}" if total_q else "- Bill Says quotes: none returned",
             f"- Sunshine Ledger effects kept after guards: {kept_effects}/{total_e}" if total_e else "- Sunshine Ledger effects: none returned",
             "",

@@ -12,6 +12,8 @@ prompt alone:
 - Staff expected effects must be a real finding -- not a bare "None" /
   "Indeterminate" / "N/A" token left over from a fiscal statement's
   category list.
+- Who it affects entries must rest on a verified quote, state no condition
+  or exception the bill doesn't, and describe direct applicability only.
 
 Design: docs/superpowers/specs/2026-09-23-bill-layers-design.md
 """
@@ -45,6 +47,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/1",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -143,6 +146,29 @@ Restate each fiscal finding as one plain-language statement. For each, give the 
 - List any assumptions staff state. Add nothing that is not in the text above.
 
 Respond with JSON only: {{"items": [{{"category": "tax_fee", "text": "...", "assumptions": ["..."]}}]}}"""
+
+
+WHO_IT_AFFECTS_PROMPT = """You are listing who a bill directly applies to, for a civic transparency website.
+
+Bill: {bill_number} — {title}
+
+The text below is the law as it will read once this bill takes effect (struck language already removed, inserted language already merged in):
+\"\"\"
+{text}
+\"\"\"
+
+List up to 6 entries. Each entry is one group and one thing the bill directly changes for that group. Rules:
+- "group": the specific group the provision names or defines (e.g. "Landlords", "County tax collectors"), not "residents" or "everyone".
+- "change": what changes for that group, in plain language: an obligation, eligibility, protection, cost, service, or prohibition. Keep the bill's modal strength: "shall"/"must" is a requirement, "may" is permission.
+- "change_kind": one of "obligation", "eligibility", "protection", "cost", "service", "prohibition", "other".
+- "quote": the one sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses.
+- "conditions": limits the text states for this entry (geography, dates, thresholds, eligibility requirements), each with the exact sentence that states it. Empty list if none.
+- "exceptions": exclusions the text states for this entry, each with the exact sentence that states it. Empty list if none.
+- Only direct applicability. Do not describe downstream consequences (prices, behavior, supply) -- those are not what the provision changes.
+- Do not invent exceptions, limits, or safeguards the text does not state, even if they seem likely or intended.
+- The same group may appear in more than one entry if the bill affects it in different roles.
+
+Respond with JSON only: {{"items": [{{"group": "...", "change": "...", "change_kind": "obligation", "quote": "exact text", "conditions": [{{"text": "...", "quote": "exact text"}}], "exceptions": [{{"text": "...", "quote": "exact text"}}]}}]}}"""
 
 
 def _parse_items(raw: str) -> list[dict]:
@@ -293,6 +319,72 @@ def build_ai_expected_effect(bill_number: str, title: str, full_text: str, clien
         return LayerResult("insufficient_evidence", note, [], dropped)
     scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
     return LayerResult("supported", scope, kept[:4], dropped)
+
+
+_CHANGE_KINDS = {"obligation", "eligibility", "protection", "cost", "service", "prohibition", "other"}
+
+# Who it affects is direct applicability only. A consequence -- rents rising,
+# fewer permits -- needs its own evidence and belongs in Expected Effect.
+# Plain "may" is not here: "may apply for a grant" is eligibility.
+_DOWNSTREAM = re.compile(
+    r"\b(?:could|might|would|likely|(?:is|are) expected to|may (?:lead|result|cause|increase|decrease|reduce|rise|fall|raise|lower))\b",
+    re.IGNORECASE,
+)
+
+
+def _verified_clauses(raw, amended: str) -> list[dict]:
+    """Conditions or exceptions whose quote is in the bill. An unquoted or
+    unverifiable one is dropped: the page never states a limit or exception
+    the bill doesn't."""
+    if not isinstance(raw, list):
+        return []
+    candidates = [c for c in raw if isinstance(c, dict) and str(c.get("text") or "").strip()]
+    kept, _ = verify_quotes(candidates, amended)
+    return [{"text": str(c["text"]).strip(), "quote": c["quote"]} for c in kept]
+
+
+def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -> LayerResult:
+    """Who the bill directly applies to: group, what changes, the provision
+    that changes it (verified quote), and the conditions and exceptions the
+    text states. Status-dependent wording ("would apply" / "applies") is the
+    page's job, from the bill's current status, so it can't go stale here.
+    Agreed rules: Data Model v1, "Scope and Affected Population"."""
+    text, truncated = _truncate(full_text)
+    amended = law_as_amended(text)
+    raw = _parse_items(client.generate(
+        WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, text=amended), json_mode=True
+    ))
+    kept: list[dict] = []
+    dropped: list[dict] = []
+    for r in raw:
+        group = str(r.get("group") or "").strip()
+        change = str(r.get("change") or "").strip()
+        if not group or not change:
+            continue
+        verified, _ = verify_quotes([r], amended)
+        if not verified or _DOWNSTREAM.search(change) or overstates_modal(change, text):
+            dropped.append(r)
+            continue
+        quote = verified[0]["quote"]
+        kind = str(r.get("change_kind") or "").strip().lower()
+        kept.append({
+            "text": change,
+            "group": group,
+            "change_kind": kind if kind in _CHANGE_KINDS else "other",
+            "quote": quote,
+            "section_ref": section_for_quote(quote, amended),
+            "conditions": _verified_clauses(r.get("conditions"), amended),
+            "exceptions": _verified_clauses(r.get("exceptions"), amended),
+            "assumptions": [],
+            "affected_groups": [group],
+        })
+    if not kept:
+        note = "No group the bill directly applies to could be tied to its text"
+        if truncated:
+            note += " in the first part of a long bill"
+        return LayerResult("insufficient_evidence", note, [], dropped)
+    scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
+    return LayerResult("supported", scope, kept[:6], dropped)
 
 
 def build_staff_interpretation(effect_section: str | None, staff_label: str, client) -> LayerResult:
