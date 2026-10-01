@@ -85,7 +85,8 @@ def sync_bill_amendments(db: Session, *, bill_entity: Entity, amendments: list[d
         number = _TITLE_NUMBER.search(amendment.get("title") or "")
         twin = flsenate_only.get(number.group(1)) if number else None
         if twin is not None:
-            twin.attributes = {**twin.attributes, "amendment_id": amendment_id, "adopted": bool(amendment.get("adopted"))}
+            # The official last action (flsenate.gov) keeps deciding adoption.
+            twin.attributes = {**twin.attributes, "amendment_id": amendment_id, "legiscan_adopted": bool(amendment.get("adopted"))}
             continue
 
         event_date = _parse_date(amendment.get("date")) or date.today()

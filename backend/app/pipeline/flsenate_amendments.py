@@ -10,8 +10,12 @@ The tab is part of the bill page itself (`bills.full_text_url`), so it
 costs one flsenate.gov request per bill (10 s crawl delay) and no LegiScan
 calls. Records are matched to LegiScan's by the amendment number, which
 LegiScan carries in its title ("House Committee Amendment #208403").
-Matched events gain the flsenate fields and keep LegiScan's `adopted` flag;
-unmatched amendments become new AMENDED events with `source: flsenate`.
+Matched events gain the flsenate fields. Where flsenate.gov gives a last
+action, it decides `adopted`: LegiScan's flag disagrees with the official
+record for some amendments (HB 1389's 208403 "Adopted without Objection"
+and the Senate delete-all the House concurred in were both "not adopted"
+in LegiScan). LegiScan's value is kept as `legiscan_adopted`. Unmatched
+amendments become new AMENDED events with `source: flsenate`.
 
     python -m app.pipeline.flsenate_amendments --session "2026 Regular Session" [--limit N] [--max-documents N]
 """
@@ -148,6 +152,11 @@ def merge_amendments(db: Session, bill_entity: Entity, amendments: list[FlAmendm
         event = by_number.get(a.number)
         if event is not None:
             merged = {**event.attributes, **fields}
+            if a.last_action:
+                from_legiscan = event.attributes.get("source") != "flsenate" and "adopted" in event.attributes
+                if from_legiscan and "legiscan_adopted" not in merged:
+                    merged["legiscan_adopted"] = event.attributes["adopted"]
+                merged["adopted"] = a.adopted
             if not merged.get("state_link") and a.pdf_url:
                 merged["state_link"] = a.pdf_url
             if not merged.get("chamber") and a.chamber:

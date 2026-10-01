@@ -70,8 +70,9 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
     tab on flsenate.gov (one request per bill, no LegiScan calls). It adds
     the missing amendments (`source: flsenate`, adopted read from the last
     action), and gives every amendment its number, type, sponsor and last
-    action. LegiScan's own `adopted` flag is kept where both have the
-    amendment.
+    action. The official last action decides `adopted` (LegiScan's flag is
+    kept as `legiscan_adopted`; HB 1389 had two amendments LegiScan called
+    not adopted that the official record shows adopted/concurred).
   - Bill and amendment text are extracted from PDFs/HTML; strike-through
     and underline become `[deleted: …]` / `[added: …]` markers.
 - **Terms:** LegiScan API terms of service; data is licensed CC BY 4.0

@@ -45,7 +45,7 @@ def test_merge_adds_sponsors_to_legiscan_events_and_adds_the_missing_ones(db_ses
     bill = bill_factory(bill_number="H1389")
     legiscan = Event(entity_id=bill.id, event_type="AMENDED", event_date=date(2026, 2, 11),
                      title="House Committee Amendment #208403",
-                     attributes={"amendment_id": 1, "chamber": "House", "adopted": True})
+                     attributes={"amendment_id": 1, "chamber": "House", "adopted": False})
     db_session.add(legiscan)
     db_session.commit()
 
@@ -53,7 +53,9 @@ def test_merge_adds_sponsors_to_legiscan_events_and_adds_the_missing_ones(db_ses
     db_session.commit()
     assert (updated, added) == (1, 4)
     assert legiscan.attributes["sponsor"] == "Redondo"
-    assert legiscan.attributes["adopted"] is True  # LegiScan's flag is kept
+    # The official last action ("Adopted without Objection") decides; LegiScan's
+    # contradicting flag is kept for provenance.
+    assert (legiscan.attributes["adopted"], legiscan.attributes["legiscan_adopted"]) == (True, False)
     assert legiscan.attributes["state_link"].endswith("/Amendment/208403/PDF")
 
     new = db_session.query(Event).filter(Event.entity_id == bill.id, Event.title.like("%#789001")).one()
@@ -84,6 +86,7 @@ def test_legiscan_record_joins_the_flsenate_event_instead_of_duplicating(db_sess
     assert written == 1  # only the amendment flsenate.gov didn't list
     twin = db_session.query(Event).filter(Event.title.like("%#789001")).one()
     assert (twin.attributes["amendment_id"], twin.attributes["sponsor"]) == (99, "Duggan")
+    assert (twin.attributes["adopted"], twin.attributes["legiscan_adopted"]) == (True, True)
     assert db_session.query(Event).filter(Event.entity_id == bill.id, Event.event_type == "AMENDED").count() == 6
 
 
