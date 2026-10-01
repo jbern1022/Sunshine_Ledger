@@ -178,3 +178,18 @@ def test_a_may_provision_labeled_obligation_becomes_a_permission():
     }
     [kept] = build_who_it_affects("HB 1", "Grants", BILL, FakeClient({"items": [item]})).items
     assert kept["change_kind"] == "permission"
+
+
+def test_a_window_that_is_all_title_has_nothing_operative():
+    long_title = "A bill to be entitled An act relating to insurance; " + "amending s. 624.01, F.S.; requiring insurers to file reports; " * 3000
+    bill = long_title + "\nSection 1. Insurers shall file reports.\n"
+    item = {"group": "Insurers", "change": "Must file reports.", "change_kind": "obligation",
+            "quote": "requiring insurers to file reports", "conditions": [], "exceptions": []}
+    r = build_who_it_affects("HB 9", "Insurance", bill, FakeClient({"items": [item]}))
+    assert r.evidence_state == "insufficient_evidence"
+
+
+def test_a_prohibition_worded_as_a_permission_is_dropped():
+    item = _landlord(group="Anyone", change_kind="prohibition", change="May return the deposit within 15 days.")
+    r = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [item]}))
+    assert r.items == []
