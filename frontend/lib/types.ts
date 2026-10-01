@@ -96,6 +96,26 @@ export interface RollCallOut {
 /** One amendment timeline entry. `amendment_text` is null until the
  *  opt-in backfill (see backend/app/pipeline/amendments.py) has fetched
  *  it -- the diff view only renders once it's present. */
+/** ACS/BLS context for one of the bill's badges, at one geography. */
+export interface DemographicMetric {
+  label: string;
+  estimate: number | null;
+  /** Always present for ACS (90% margin of error); null for BLS series. */
+  margin_of_error: number | null;
+  unit: string;
+}
+
+export interface DemographicOverlay {
+  badge_slug: string;
+  badge_label: string;
+  source: "acs" | "bls" | string;
+  /** district: the primary sponsor's district (state bills); county: city items. */
+  geography_type: "district" | "county" | string;
+  geography_id: string;
+  as_of: string;
+  metrics: DemographicMetric[];
+}
+
 export interface AmendmentOut {
   id: string;
   amendment_id: number | null;
@@ -121,6 +141,8 @@ export interface ActionOut {
 
 export interface BillDetail extends BillListItem {
   last_action: string | null;
+  /** ACS/BLS figures for the bill's area, per badge (GET /bills/{id}). */
+  demographic_overlays?: DemographicOverlay[];
   full_text: string | null;
   sponsors: SponsorOut[];
   claims: ClaimOut[];

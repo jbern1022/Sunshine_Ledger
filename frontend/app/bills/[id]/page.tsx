@@ -10,6 +10,7 @@ import BillLayers from "@/components/BillLayers";
 import LegislativeTimeline from "@/components/LegislativeTimeline";
 import TextComparison from "@/components/TextComparison";
 import WhoItAffects from "@/components/WhoItAffects";
+import AreaContext from "@/components/AreaContext";
 import { hasAnyLayer } from "@/lib/layers";
 import { effectiveLabel } from "@/lib/billStatus";
 
@@ -154,6 +155,8 @@ export default async function BillPage({ params }: Props) {
           )}
         </>
       )}
+
+      {isLegislation && <AreaContext overlays={bill.demographic_overlays ?? []} />}
 
       {bill.actions && bill.actions.length > 0 && (
         <LegislativeTimeline
