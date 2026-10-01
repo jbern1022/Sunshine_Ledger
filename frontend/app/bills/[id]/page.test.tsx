@@ -133,6 +133,10 @@ describe("BillPage", () => {
     expect(screen.queryByRole("heading", { name: "Votes" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Amendment history" })).not.toBeInTheDocument();
     expect(screen.queryByText(/takes effect/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Who it affects" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "What it does" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "About this item" })).toBeInTheDocument();
+    expect(screen.getByText(/It may call this a bill; it isn.t one/)).toBeInTheDocument();
   });
 
   it("shows who offered an amendment and its last action when flsenate.gov data is present", async () => {
