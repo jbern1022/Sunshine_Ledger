@@ -104,6 +104,11 @@ export interface AmendmentOut {
   adopted: boolean;
   description: string | null;
   amendment_text: string | null;
+  /** From the bill's flsenate.gov page, once synced. */
+  number?: string | null;
+  label?: string | null;
+  sponsor?: string | null;
+  last_action?: string | null;
 }
 
 /** One step of a state bill's official action history (LegiScan). */

@@ -281,10 +281,12 @@ export default async function BillPage({ params }: Props) {
           <ul className="mt-1 space-y-1 text-sm text-slate-700">
             {bill.amendments.map((a) => (
               <li key={a.id} id={`amendment-${a.id}`} className="scroll-mt-4">
-                Amendment filed {a.date}
+                {a.label ? <>{a.label}</> : "Amendment"} filed {a.date}
                 {a.chamber && <> in {a.chamber}</>}
+                {a.sponsor && <>, offered by {a.sponsor}</>}
                 {a.adopted ? " — adopted" : " — not adopted"}
                 {a.description && <span className="text-slate-500"> — {a.description}</span>}
+                {a.last_action && <span className="text-slate-500"> · last action: {a.last_action}</span>}
                 {a.amendment_text && bill.full_text && (
                   <AmendmentDiff baseText={bill.full_text} amendedText={a.amendment_text} />
                 )}

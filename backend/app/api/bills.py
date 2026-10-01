@@ -585,6 +585,10 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
             adopted=bool(e.attributes.get("adopted")),
             description=e.title,
             amendment_text=e.attributes.get("amendment_text"),
+            number=e.attributes.get("amendment_number"),
+            label=e.attributes.get("label"),
+            sponsor=e.attributes.get("sponsor"),
+            last_action=e.attributes.get("last_action"),
         )
         for e in sorted(
             (e for e in entity.events if e.event_type == "AMENDED"), key=lambda e: e.event_date

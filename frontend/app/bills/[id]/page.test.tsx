@@ -135,6 +135,21 @@ describe("BillPage", () => {
     expect(screen.queryByText(/takes effect/i)).not.toBeInTheDocument();
   });
 
+  it("shows who offered an amendment and its last action when flsenate.gov data is present", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      amendments: [{
+        id: "a1", amendment_id: null, date: "2026-02-24", chamber: "House", adopted: true,
+        description: "House Committee Amendment #789001", amendment_text: null,
+        number: "789001", label: "Amendment to Amendment (406455)", sponsor: "Duggan", last_action: "Adopted",
+      }],
+    });
+    await renderBillPage();
+    expect(screen.getByText(/Amendment to Amendment \(406455\) filed 2026-02-24/)).toBeInTheDocument();
+    expect(screen.getByText(/offered by Duggan/)).toBeInTheDocument();
+    expect(screen.getByText(/last action: Adopted/)).toBeInTheDocument();
+  });
+
   it("renders the core header fields", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce(baseBill);
     await renderBillPage();

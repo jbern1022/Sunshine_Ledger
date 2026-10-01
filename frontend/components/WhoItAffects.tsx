@@ -26,6 +26,7 @@ type Props = {
 
 const KIND_LABEL: Record<string, string> = {
   obligation: "Obligation",
+  permission: "Permission",
   eligibility: "Eligibility",
   protection: "Protection",
   cost: "Cost",

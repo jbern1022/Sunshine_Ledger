@@ -64,8 +64,14 @@ bill layers (`OLLAMA_LAYERS_MODEL`).
     `--ingest-dataset` if one is ever amended or a new one is called.
   - The 2025 sessions (Regular and 1st-3rd Special) aren't ingested.
   - LegiScan lists fewer amendments than the official record for some
-    bills (HB 1389: 3 vs 5 documents), and its `adopted` flag can
-    disagree with the official outcome.
+    bills (HB 1389: 3 vs 5 documents), has no amendment sponsors, and its
+    `adopted` flag can disagree with the official outcome. Since
+    2026-10-01, `flsenate_amendments.py` reads each bill page's Amendments
+    tab on flsenate.gov (one request per bill, no LegiScan calls). It adds
+    the missing amendments (`source: flsenate`, adopted read from the last
+    action), and gives every amendment its number, type, sponsor and last
+    action. LegiScan's own `adopted` flag is kept where both have the
+    amendment.
   - Bill and amendment text are extracted from PDFs/HTML; strike-through
     and underline become `[deleted: …]` / `[added: …]` markers.
 - **Terms:** LegiScan API terms of service; data is licensed CC BY 4.0

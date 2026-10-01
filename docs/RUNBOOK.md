@@ -268,6 +268,16 @@ Design: `docs/superpowers/specs/2026-09-23-bill-layers-design.md`.
 
 ## Running pipeline jobs manually
 
+Florida amendment list and authors from flsenate.gov (one bill page per
+bill at the 10 s crawl delay, ~5.5 h per regular session; resumable, since
+bills already checked are skipped; no LegiScan calls). It shares
+flsenate.gov with the nightly and the `flsenate-backfill.sh` chunks, so
+run one flsenate job at a time and stop before 04:00 UTC:
+
+```bash
+docker exec sunshineledger-backend-1 python -m app.pipeline.flsenate_amendments --session "2026 Regular Session" --max-documents 1900
+```
+
 For one-off/ad-hoc runs (backfills, testing changes) from the Mac against
 the remote docker context, rather than the scheduled job above:
 
