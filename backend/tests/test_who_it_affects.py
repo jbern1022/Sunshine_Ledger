@@ -3,6 +3,7 @@ import json
 from app.pipeline.bill_layers import METHOD_VERSIONS, WHO_IT_AFFECTS_PROMPT, build_who_it_affects
 
 BILL = (
+    "A bill to be entitled An act relating to deposits; requiring landlords to return deposits; providing an effective date.\n"
     "Section 1. Section 83.49, Florida Statutes, is amended to read:\n"
     "(1) A landlord shall return a tenant's security deposit within 15 days after the tenant vacates the dwelling unit.\n"
     "(2) This section does not apply to a landlord who owns fewer than three dwelling units.\n"
@@ -143,3 +144,37 @@ def test_prompt_and_method_version():
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
     assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/1"
+
+
+def test_quotes_from_the_title_paragraph_are_not_the_law():
+    title = _landlord(quote="requiring landlords to return deposits")
+    r = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [title]}))
+    assert r.items == [] and r.dropped == [title]
+
+
+def test_the_effective_date_is_never_a_condition():
+    item = _landlord(conditions=[{"text": "Starts July 1, 2027.", "quote": "This act shall take effect July 1, 2027."}])
+    [kept] = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [item]})).items
+    assert kept["conditions"] == []
+
+
+def test_a_requirement_needs_a_mandatory_quote():
+    # The bill says "may apply"; the entry says "must apply" with the quote's
+    # wording changed enough that the sentence matcher alone might miss it.
+    item = {
+        "group": "Older tenants", "change": "Must file with the county to get a grant.", "change_kind": "obligation",
+        "quote": "A tenant who is 65 years of age or older may apply to the county for a rent assistance grant.",
+        "conditions": [], "exceptions": [],
+    }
+    assert build_who_it_affects("HB 1", "Grants", BILL, FakeClient({"items": [item]})).items == []
+
+
+def test_a_may_provision_labeled_obligation_becomes_a_permission():
+    item = {
+        "group": "Tenants 65 or older", "change": "May apply to the county for a rent assistance grant.",
+        "change_kind": "obligation",
+        "quote": "A tenant who is 65 years of age or older may apply to the county for a rent assistance grant.",
+        "conditions": [], "exceptions": [],
+    }
+    [kept] = build_who_it_affects("HB 1", "Grants", BILL, FakeClient({"items": [item]})).items
+    assert kept["change_kind"] == "permission"

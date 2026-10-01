@@ -126,6 +126,10 @@ def test_get_bill_detail_includes_amendment_timeline_entries(client, db_session,
             "adopted": True,
             "description": "House Committee Amendment #337249",
             "amendment_text": "Remove everything...",
+            "number": None,
+            "label": None,
+            "sponsor": None,
+            "last_action": None,
         }
     ]
 

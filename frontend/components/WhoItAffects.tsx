@@ -2,6 +2,13 @@ import type { LayerBlock } from "@/lib/types";
 import { formatDate, reviewLabel } from "@/lib/layers";
 import { applicability } from "@/lib/billStatus";
 
+/** The bill's sentence, preceded by the plain-language restatement only
+ *  when that says something different (models often copy the sentence). */
+function clause(text: string, quote: string) {
+  const same = text.replace(/\W+/g, " ").trim().toLowerCase() === quote.replace(/\W+/g, " ").trim().toLowerCase();
+  return same ? <q className="italic">{quote}</q> : <>{text} — <q className="italic">{quote}</q></>;
+}
+
 /** Who the bill directly applies to, group by group: what changes, the
  *  provision that changes it, and the conditions and exceptions the bill
  *  states. Rules: Data Model v1, "Scope and Affected Population".
@@ -19,6 +26,7 @@ type Props = {
 
 const KIND_LABEL: Record<string, string> = {
   obligation: "Obligation",
+  permission: "Permission",
   eligibility: "Eligibility",
   protection: "Protection",
   cost: "Cost",
@@ -72,12 +80,12 @@ export default function WhoItAffects({ block, status, effective }: Props) {
                   )}
                   {(item.conditions ?? []).map((c, j) => (
                     <p key={`c${j}`} className="mt-0.5 text-xs text-slate-500">
-                      Condition: {c.text} — <q className="italic">{c.quote}</q>
+                      Condition: {clause(c.text, c.quote)}
                     </p>
                   ))}
                   {(item.exceptions ?? []).map((x, j) => (
                     <p key={`x${j}`} className="mt-0.5 text-xs text-slate-500">
-                      Exception stated in the bill: {x.text} — <q className="italic">{x.quote}</q>
+                      Exception stated in the bill: {clause(x.text, x.quote)}
                     </p>
                   ))}
                 </li>

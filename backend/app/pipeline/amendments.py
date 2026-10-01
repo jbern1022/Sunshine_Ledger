@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import re
 from datetime import date, datetime
 
 from sqlalchemy import select
@@ -42,6 +43,7 @@ from app.pipeline.legiscan import LegiScanClient, report_api_usage
 logger = logging.getLogger(__name__)
 
 CHAMBER_MAP = {"H": "House", "S": "Senate"}
+_TITLE_NUMBER = re.compile(r"#\s*(\d{5,7})\b")
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -63,17 +65,27 @@ def sync_bill_amendments(db: Session, *, bill_entity: Entity, amendments: list[d
 
     Returns the number of new events written.
     """
-    existing_ids = {
-        e.attributes.get("amendment_id")
-        for e in db.execute(
-            select(Event).where(Event.entity_id == bill_entity.id, Event.event_type == "AMENDED")
-        ).scalars()
+    existing = db.execute(
+        select(Event).where(Event.entity_id == bill_entity.id, Event.event_type == "AMENDED")
+    ).scalars().all()
+    existing_ids = {e.attributes.get("amendment_id") for e in existing}
+    # Amendments first found on flsenate.gov (flsenate_amendments.py) have no
+    # LegiScan id; LegiScan's later record for the same number joins them.
+    flsenate_only = {
+        str(e.attributes["amendment_number"]): e
+        for e in existing
+        if e.attributes.get("amendment_number") and not e.attributes.get("amendment_id")
     }
 
     written = 0
     for amendment in amendments:
         amendment_id = amendment.get("amendment_id")
         if amendment_id is None or amendment_id in existing_ids:
+            continue
+        number = _TITLE_NUMBER.search(amendment.get("title") or "")
+        twin = flsenate_only.get(number.group(1)) if number else None
+        if twin is not None:
+            twin.attributes = {**twin.attributes, "amendment_id": amendment_id, "adopted": bool(amendment.get("adopted"))}
             continue
 
         event_date = _parse_date(amendment.get("date")) or date.today()
@@ -166,12 +178,16 @@ def backfill_amendment_texts(db: Session, *, limit: int | None = None, refresh: 
     fetched = failed = 0
     for event in events:
         amendment_id = event.attributes.get("amendment_id")
-        if not amendment_id:
+        state_link = event.attributes.get("state_link")
+        if not amendment_id and not state_link:
             failed += 1
             continue
 
         try:
-            text = fetch_amendment_text(client, int(amendment_id), state_link=event.attributes.get("state_link"))
+            # flsenate-only amendments have no LegiScan id to fall back on.
+            text = fetch_amendment_text(
+                client, int(amendment_id) if amendment_id else 0, state_link=state_link, fallback=bool(amendment_id)
+            )
             if not text:
                 failed += 1
                 continue

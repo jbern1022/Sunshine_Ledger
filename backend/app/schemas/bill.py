@@ -40,6 +40,13 @@ class AmendmentOut(BaseModel):
     # Full amendment text, when the opt-in backfill has fetched it (see
     # backfill_amendment_texts) -- None until then. Powers the diff view.
     amendment_text: str | None
+    # From the bill's flsenate.gov page (flsenate_amendments.py), when synced:
+    # the amendment number, "Strike All Amendment"-style label, who filed
+    # it, and its last committee/floor action.
+    number: str | None = None
+    label: str | None = None
+    sponsor: str | None = None
+    last_action: str | None = None
 
 
 class SponsorOut(BaseModel):

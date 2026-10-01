@@ -39,6 +39,8 @@ from app.pipeline.bill_layers_text import (
 )
 from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 
+_BILL_SECTION_HEADING = re.compile(r"(?m)^\s*Section\s+\d+\.(?!\d)", re.IGNORECASE)
+
 # Bump a value when its prompt or guard changes in a way that should
 # regenerate stored versions. Part of each block's input hash.
 METHOD_VERSIONS: dict[tuple[str, str], str] = {
@@ -158,11 +160,11 @@ The text below is the law as it will read once this bill takes effect (struck la
 \"\"\"
 
 List up to 6 entries. Each entry is one group and one thing the bill directly changes for that group. Rules:
-- "group": the specific group the provision names or defines (e.g. "Landlords", "County tax collectors"), not "residents" or "everyone".
+- "group": the specific group the provision names or defines (e.g. "Landlords", "County tax collectors"). If the provision applies to any person (as most criminal offenses do), write "Anyone" -- that broad coverage is what the text says.
 - "change": what changes for that group, in plain language: an obligation, eligibility, protection, cost, service, or prohibition. Keep the bill's modal strength: "shall"/"must" is a requirement, "may" is permission.
-- "change_kind": one of "obligation", "eligibility", "protection", "cost", "service", "prohibition", "other".
-- "quote": the one sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses.
-- "conditions": limits the text states for this entry (geography, dates, thresholds, eligibility requirements), each with the exact sentence that states it. Empty list if none.
+- "change_kind": one of "obligation", "permission", "eligibility", "protection", "cost", "service", "prohibition", "other". A "may" provision is a permission, not an obligation.
+- "quote": the one sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses. Quote the law itself (from "Section 1." on), never the bill's title or summary paragraph.
+- "conditions": limits the text states for this entry (geography, deadlines, thresholds, eligibility requirements), each with the exact sentence that states it. Not the bill's effective date -- that is shown separately. Empty list if none.
 - "exceptions": exclusions the text states for this entry, each with the exact sentence that states it. Empty list if none.
 - Only direct applicability. Do not describe downstream consequences (prices, behavior, supply) -- those are not what the provision changes.
 - Do not invent exceptions, limits, or safeguards the text does not state, even if they seem likely or intended.
@@ -321,7 +323,29 @@ def build_ai_expected_effect(bill_number: str, title: str, full_text: str, clien
     return LayerResult("supported", scope, kept[:4], dropped)
 
 
-_CHANGE_KINDS = {"obligation", "eligibility", "protection", "cost", "service", "prohibition", "other"}
+_CHANGE_KINDS = {"obligation", "permission", "eligibility", "protection", "cost", "service", "prohibition", "other"}
+
+# The page shows the effective date on its own (effective_date.py); as a
+# "condition" it only repeats it, so it is never one.
+_EFFECTIVE_DATE_CLAUSE = re.compile(
+    r"\b(?:this|the) (?:act|ordinance|resolution)\b[^.]{0,120}?\b(?:takes?|becomes?|shall become) (?:effect|effective)\b",
+    re.IGNORECASE,
+)
+# A requirement in the entry must rest on a mandatory quote. Found
+# 2026-10-01: H1279 "a county may not impose any requirement ... other than
+# requiring proof" was restated as "must require proof".
+_REQUIRES = re.compile(r"\b(?:must(?! not)|shall(?! not)|(?:is|are) required to)\b", re.IGNORECASE)
+_MANDATORY = re.compile(r"\b(?:shall|must|(?:is|are) required)\b", re.IGNORECASE)
+_PERMITS = re.compile(r"\bmay\b(?!\s+not\b)", re.IGNORECASE)
+
+
+def _operative(amended: str) -> str:
+    """The law itself, from the first "Section N." heading on. A Florida
+    bill opens with a title paragraph paraphrasing every change ("amending
+    s. 641.26, F.S.; revising requirements ..."); quoting that is quoting a
+    summary, not the provision. Text with no section headings is used whole."""
+    first = _BILL_SECTION_HEADING.search(amended)
+    return amended[first.start():] if first else amended
 
 # Who it affects is direct applicability only. A consequence -- rents rising,
 # fewer permits -- needs its own evidence and belongs in Expected Effect.
@@ -340,7 +364,11 @@ def _verified_clauses(raw, amended: str) -> list[dict]:
         return []
     candidates = [c for c in raw if isinstance(c, dict) and str(c.get("text") or "").strip()]
     kept, _ = verify_quotes(candidates, amended)
-    return [{"text": str(c["text"]).strip(), "quote": c["quote"]} for c in kept]
+    return [
+        {"text": str(c["text"]).strip(), "quote": c["quote"]}
+        for c in kept
+        if not _EFFECTIVE_DATE_CLAUSE.search(c["quote"])
+    ]
 
 
 def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -> LayerResult:
@@ -354,6 +382,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     raw = _parse_items(client.generate(
         WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, text=amended), json_mode=True
     ))
+    operative = _operative(amended)
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:
@@ -361,20 +390,29 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
         change = str(r.get("change") or "").strip()
         if not group or not change:
             continue
-        verified, _ = verify_quotes([r], amended)
-        if not verified or _DOWNSTREAM.search(change) or overstates_modal(change, text):
+        verified, _ = verify_quotes([r], operative)
+        if (
+            not verified
+            or _EFFECTIVE_DATE_CLAUSE.search(verified[0]["quote"])
+            or _DOWNSTREAM.search(change)
+            or overstates_modal(change, text)
+            or (_REQUIRES.search(change) and not _MANDATORY.search(verified[0]["quote"]))
+        ):
             dropped.append(r)
             continue
         quote = verified[0]["quote"]
         kind = str(r.get("change_kind") or "").strip().lower()
+        kind = kind if kind in _CHANGE_KINDS else "other"
+        if kind == "obligation" and not _REQUIRES.search(change) and _PERMITS.search(change):
+            kind = "permission"
         kept.append({
             "text": change,
             "group": group,
-            "change_kind": kind if kind in _CHANGE_KINDS else "other",
+            "change_kind": kind,
             "quote": quote,
             "section_ref": section_for_quote(quote, amended),
-            "conditions": _verified_clauses(r.get("conditions"), amended),
-            "exceptions": _verified_clauses(r.get("exceptions"), amended),
+            "conditions": _verified_clauses(r.get("conditions"), operative),
+            "exceptions": _verified_clauses(r.get("exceptions"), operative),
             "assumptions": [],
             "affected_groups": [group],
         })
