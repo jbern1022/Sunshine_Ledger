@@ -68,7 +68,7 @@ export default function MethodologyPage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="text-base font-semibold text-ledger-900">Bill Says, Interpretation, Expected Effect</h2>
+        <h2 className="text-base font-semibold text-ledger-900">Bill Says, Interpretation, Expected Effect, Who it affects</h2>
         <p className="mt-2 text-sm text-slate-700">
           Bill pages separate three kinds of statement so you always know which one you are reading.
         </p>
@@ -90,6 +90,17 @@ export default function MethodologyPage() {
             &ldquo;none&rdquo; or &ldquo;indeterminate&rdquo;. Sunshine Ledger only describes effects that a
             specific section of the bill creates; each must cite that section and use words like &ldquo;may&rdquo;
             or &ldquo;could&rdquo;, or it is not published.
+          </li>
+          <li>
+            <span className="font-medium">Who it affects</span> — who the bill directly applies to, one group at a
+            time: what changes for them (an obligation, eligibility, protection, cost, service, or prohibition), the
+            sentence of the bill that makes the change, and any conditions or exceptions the bill states. Each of those
+            sentences is checked word for word against the bill text; an exception the bill doesn&apos;t state is never
+            listed, and a missing one isn&apos;t filled in because it seems likely. Possible knock-on effects, like
+            prices, belong under Expected Effect instead. The wording follows the bill&apos;s status and its own
+            effective date: &ldquo;would apply&rdquo; while it is pending, &ldquo;will apply beginning&rdquo; once
+            enacted but not yet in effect, &ldquo;applies&rdquo; once in effect, and &ldquo;would have
+            applied&rdquo; if it failed. Belonging to a group doesn&apos;t mean every condition applies to you.
           </li>
         </ul>
         <p className="mt-2 text-sm text-slate-700">
