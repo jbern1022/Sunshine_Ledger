@@ -304,12 +304,23 @@ export interface StatusCount {
 export type LayerKey = "bill_says" | "interpretation" | "expected_effect";
 export type Origin = "bill_text" | "legislative_staff" | "sunshine_ledger_ai";
 
+export interface QuotedClause {
+  text: string;
+  /** The bill's own sentence stating it, checked word for word. */
+  quote: string;
+}
+
 export interface LayerItem {
   text: string;
   section_ref: string | null;
   quote: string | null;
   assumptions: string[];
   affected_groups: string[];
+  /** Who it affects only. */
+  group?: string | null;
+  change_kind?: string | null;
+  conditions?: QuotedClause[];
+  exceptions?: QuotedClause[];
 }
 
 export interface LayerVersion {
@@ -333,7 +344,10 @@ export interface LayerBlock {
   earlier_versions: LayerVersion[];
 }
 
-export type BillLayers = Record<LayerKey, LayerBlock[]>;
+export type BillLayers = Record<LayerKey, LayerBlock[]> & {
+  /** Group-level applicability, rendered by WhoItAffects, not BillLayers. */
+  who_it_affects?: LayerBlock[];
+};
 
 /** One data source's freshness and coverage (GET /sources/status). */
 export interface SourceStatus {

@@ -18,7 +18,7 @@ def _row(db, entity, layer, origin, version=1, superseded=False, text="t"):
 def test_bill_without_layers_has_empty_layers(client, bill_factory):
     entity = bill_factory()
     body = client.get(f"/bills/{entity.id}").json()
-    assert body["layers"] == {"bill_says": [], "interpretation": [], "expected_effect": []}
+    assert body["layers"] == {"bill_says": [], "interpretation": [], "expected_effect": [], "who_it_affects": []}
     assert body["has_staff_analysis"] is False
 
 
@@ -75,3 +75,21 @@ def test_has_staff_analysis_false_for_empty_text_only(client, db_session, bill_f
                                  analysis_date=date(2026, 3, 2), source_url="https://x/c.pdf", text=None))
     db_session.commit()
     assert client.get(f"/bills/{entity.id}").json()["has_staff_analysis"] is False
+
+
+def test_who_it_affects_block_carries_group_conditions_and_exceptions(client, db_session, bill_factory):
+    entity = bill_factory()
+    db_session.add(BillLayer(
+        bill_entity_id=entity.id, layer="who_it_affects", origin="sunshine_ledger_ai", version=1,
+        evidence_state="supported", scope_note="Bill text",
+        items=[{"text": "Must return deposits within 15 days.", "group": "Landlords", "change_kind": "obligation",
+                "quote": "A landlord shall return ...", "section_ref": "Section 1",
+                "conditions": [], "exceptions": [{"text": "Fewer than 3 units", "quote": "does not apply ..."}],
+                "assumptions": [], "affected_groups": ["Landlords"]}],
+        generated_by="llm:test", method_version="who_it_affects/sunshine_ledger_ai/1", input_hash="w1",
+    ))
+    db_session.commit()
+    [block] = client.get(f"/bills/{entity.id}").json()["layers"]["who_it_affects"]
+    item = block["current"]["items"][0]
+    assert (item["group"], item["change_kind"]) == ("Landlords", "obligation")
+    assert item["exceptions"] == [{"text": "Fewer than 3 units", "quote": "does not apply ..."}]

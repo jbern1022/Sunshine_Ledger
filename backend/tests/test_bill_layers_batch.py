@@ -19,12 +19,20 @@ None.
 """
 
 
+WHO = {"items": [{
+    "group": "State employees", "change": "May be paid by direct deposit.", "change_kind": "other",
+    "quote": "Salary payments may be made by direct deposit.", "conditions": [], "exceptions": [],
+}]}
+
+
 class RoutingClient:
     """Returns a valid payload for whichever prompt it receives."""
 
     model = "fake:1"
 
     def generate(self, prompt, *, json_mode=False):
+        if "who a bill directly applies to" in prompt:
+            return json.dumps(WHO)
         if "EXACTLY as written" in prompt:
             return json.dumps({"items": [{"section_ref": "Section 2", "quote": "This act shall take effect July 1, 2027."}]})
         if "fiscal impact section" in prompt:
@@ -166,3 +174,16 @@ def test_exit_code_is_nonzero_only_when_everything_failed():
     assert exit_code(written=0, failed=2) == 1
     assert exit_code(written=3, failed=1) == 0
     assert exit_code(written=0, failed=0) == 0
+
+
+def test_who_it_affects_is_planned_only_when_enabled(db_session, bill_factory, monkeypatch):
+    entity = bill_factory()
+    _with_text(db_session, entity)
+    assert ("who_it_affects", "sunshine_ledger_ai") not in {(j.layer, j.origin) for j in plan_jobs(db_session, entity, "fake:1")}
+
+    monkeypatch.setattr(settings, "layers_who_it_affects", True)
+    assert process_bills(db_session, RoutingClient()) == (4, 0)
+    who = db_session.query(BillLayer).filter_by(layer="who_it_affects").one()
+    assert who.evidence_state == "supported"
+    assert who.items[0]["group"] == "State employees"
+    assert who.items[0]["section_ref"] == "Section 1"

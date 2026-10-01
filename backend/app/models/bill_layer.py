@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 from app.models.mixins import TimestampMixin, UUIDPrimaryKeyMixin
 
-LAYERS = ("bill_says", "interpretation", "expected_effect")
+LAYERS = ("bill_says", "interpretation", "expected_effect", "who_it_affects")
 ORIGINS = ("bill_text", "legislative_staff", "sunshine_ledger_ai")
 ALLOWED_PAIRS = frozenset(
     {
@@ -19,6 +19,7 @@ ALLOWED_PAIRS = frozenset(
         ("interpretation", "sunshine_ledger_ai"),
         ("expected_effect", "legislative_staff"),
         ("expected_effect", "sunshine_ledger_ai"),
+        ("who_it_affects", "sunshine_ledger_ai"),
     }
 )
 EVIDENCE_STATES = ("supported", "insufficient_evidence")
@@ -64,7 +65,8 @@ class BillLayer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     evidence_state: Mapped[str] = mapped_column(String(30), nullable=False)
     scope_note: Mapped[str] = mapped_column(Text, nullable=False)
-    # [{text, section_ref, quote, assumptions: [], affected_groups: []}]
+    # [{text, section_ref, quote, assumptions: [], affected_groups: []}];
+    # who_it_affects items add group, change_kind, conditions, exceptions.
     items: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
     generated_by: Mapped[str] = mapped_column(String(100), nullable=False)
     method_version: Mapped[str] = mapped_column(String(80), nullable=False)

@@ -9,6 +9,7 @@ import MarkedText from "@/components/MarkedText";
 import BillLayers from "@/components/BillLayers";
 import LegislativeTimeline from "@/components/LegislativeTimeline";
 import TextComparison from "@/components/TextComparison";
+import WhoItAffects from "@/components/WhoItAffects";
 import { hasAnyLayer } from "@/lib/layers";
 import { effectiveLabel } from "@/lib/billStatus";
 
@@ -66,6 +67,8 @@ export default async function BillPage({ params }: Props) {
   // (app/pipeline/item_kind.py). Those get none of the bill-only sections.
   const isLegislation = (bill.item_kind ?? "legislation") === "legislation";
   const whoItAffects = bill.claims.find((c) => c.claim_type === "who_it_affects")?.claim_text;
+  // The structured, quote-backed block replaces the prose summary when present.
+  const whoBlock = isLegislation ? bill.layers?.who_it_affects?.[0] : undefined;
   const sources = Array.from(
     new Map(bill.claims.flatMap((c) => c.sources).map((s) => [s.id, s])).values(),
   );
@@ -123,7 +126,10 @@ export default async function BillPage({ params }: Props) {
       </header>
 
       {hasAnyLayer(bill.layers) ? (
-        <BillLayers layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} />
+        <>
+          <BillLayers layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} />
+          {whoBlock && <WhoItAffects block={whoBlock} status={bill.status} effective={bill.effective} />}
+        </>
       ) : (
         <>
           {bill.what_it_does && (
@@ -133,7 +139,9 @@ export default async function BillPage({ params }: Props) {
             </section>
           )}
 
-          {whoItAffects && (
+          {whoBlock ? (
+            <WhoItAffects block={whoBlock} status={bill.status} effective={bill.effective} />
+          ) : whoItAffects && (
             <section className="mt-4">
               <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
               <p className="mt-1 text-sm leading-relaxed text-slate-700">{whoItAffects}</p>

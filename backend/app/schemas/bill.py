@@ -123,6 +123,12 @@ class LayerItemOut(BaseModel):
     quote: str | None = None
     assumptions: list[str] = []
     affected_groups: list[str] = []
+    # who_it_affects only: the group, the kind of change, and the conditions
+    # and exceptions the bill states, each [{text, quote}].
+    group: str | None = None
+    change_kind: str | None = None
+    conditions: list[dict[str, str]] = []
+    exceptions: list[dict[str, str]] = []
 
 
 class LayerVersionOut(BaseModel):
@@ -154,6 +160,7 @@ class BillLayersOut(BaseModel):
     bill_says: list[LayerBlockOut] = []
     interpretation: list[LayerBlockOut] = []
     expected_effect: list[LayerBlockOut] = []
+    who_it_affects: list[LayerBlockOut] = []
 
 
 class ActionOut(BaseModel):
