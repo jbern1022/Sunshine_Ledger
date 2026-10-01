@@ -134,14 +134,19 @@ export default async function BillPage({ params }: Props) {
         <>
           {bill.what_it_does && (
             <section className="mt-5">
-              <h2 className="text-sm font-semibold text-ledger-900">What it does</h2>
+              {/* The summary prompt was written for legislation ("This bill
+                  ..."); for an agenda record, say what it is and label it. */}
+              <h2 className="text-sm font-semibold text-ledger-900">{isLegislation ? "What it does" : "About this item"}</h2>
+              {!isLegislation && (
+                <p className="text-xs text-slate-500">AI summary of the agenda listing. It may call this a bill; it isn&apos;t one.</p>
+              )}
               <p className="mt-1 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
             </section>
           )}
 
           {whoBlock ? (
             <WhoItAffects block={whoBlock} status={bill.status} effective={bill.effective} />
-          ) : whoItAffects && (
+          ) : isLegislation && whoItAffects && (
             <section className="mt-4">
               <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
               <p className="mt-1 text-sm leading-relaxed text-slate-700">{whoItAffects}</p>
