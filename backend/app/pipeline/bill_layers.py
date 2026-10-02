@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from app.pipeline.bill_layers_text import (
     applicability_exclusions,
+    change_regions,
     bill_section_numbers,
     fiscal_option_kind,
     is_conditional,
@@ -35,6 +36,7 @@ from app.pipeline.bill_layers_text import (
     overstates_modal,
     quote_position,
     restates_bill,
+    restates_existing_law,
     section_for_quote,
     section_number,
     statute_at,
@@ -480,7 +482,9 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     text states. Status-dependent wording ("would apply" / "applies") is the
     page's job, from the bill's current status, so it can't go stale here.
     Agreed rules: Data Model v1, "Scope and Affected Population"."""
-    law = law_as_amended(_law_text(full_text))
+    law, regions = change_regions(_law_text(full_text))
+    if law != law_as_amended(_law_text(full_text)):
+        regions = []  # never label from a text the model didn't see
     windows = _windows(law)
     read = min(len(windows), MAX_WHO_WINDOWS)
     per_window: list[list[dict]] = []
@@ -491,6 +495,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
             item["section_ref"] = _section_ref(item["quote"], window, law, offset)
             at = quote_position(item["quote"], window)
             item["statute_ref"] = statute_at(law, None if at is None else offset + at)
+            item["restates_existing_law"] = restates_existing_law(law, regions, item["quote"])
         per_window.append(kept)
         dropped += rejected
     kept, dupes = _dedupe_quotes(_round_robin(per_window))

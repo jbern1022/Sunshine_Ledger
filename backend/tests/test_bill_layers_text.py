@@ -701,3 +701,47 @@ def test_no_statute_when_the_quote_is_not_found():
     from app.pipeline.bill_layers_text import statute_at
 
     assert statute_at("Section 1. Text.", None) is None
+
+
+# R5 (HB 1389 validation): an entry can rest on law the bill leaves as is.
+def test_change_regions_match_law_as_amended():
+    from app.pipeline.bill_layers_text import change_regions, law_as_amended
+
+    raw = ("Section 1. Section 1.01, Florida Statutes, is amended to read:\n"
+           "(1) Fees may be waived[added: ;][deleted: , and] in any case.\n"
+           "(2) The clerk shall keep [deleted: paper] records [added: online].\n")
+    plain, regions = change_regions(raw)
+    assert plain == law_as_amended(raw)
+    assert [plain[a:b] for a, b in regions] == [";", "", "", "online"]
+
+
+def test_a_quote_on_unchanged_text_restates_existing_law():
+    from app.pipeline.bill_layers_text import change_regions, restates_existing_law
+
+    raw = ("Section 1. Section 1.01, Florida Statutes, is amended to read:\n"
+           "(1) A clerk shall keep records of every filing.\n"
+           "(2) The clerk shall publish [added: each record online within 10 days].\n"
+           "Section 2. Section 1.02, Florida Statutes, is created to read:\n"
+           "1.02 Fees.—A clerk may charge a fee for copies.\n")
+    plain, regions = change_regions(raw)
+    assert restates_existing_law(plain, regions, "A clerk shall keep records of every filing.") is True
+    assert restates_existing_law(plain, regions, "The clerk shall publish each record online within 10 days.") is False
+    # A created section is new law throughout, marked or not.
+    assert restates_existing_law(plain, regions, "A clerk may charge a fee for copies.") is False
+
+
+def test_a_deletion_inside_the_quote_is_a_change():
+    from app.pipeline.bill_layers_text import change_regions, restates_existing_law
+
+    raw = ("Section 1. Section 1.01, Florida Statutes, is amended to read:\n"
+           "(1) Industrial use includes junk yards, [deleted: meat packing facilities,] electrical generating plants.\n")
+    plain, regions = change_regions(raw)
+    assert restates_existing_law(plain, regions, "Industrial use includes junk yards, electrical generating plants.") is False
+
+
+def test_text_with_no_markers_is_never_called_existing_law():
+    from app.pipeline.bill_layers_text import change_regions, restates_existing_law
+
+    raw = "Section 1. Section 1.01, Florida Statutes, is amended to read:\n(1) A clerk shall keep records.\n"
+    plain, regions = change_regions(raw)
+    assert restates_existing_law(plain, regions, "A clerk shall keep records.") is False

@@ -358,6 +358,60 @@ def applicability_exclusions(law: str) -> list[dict]:
     return found
 
 
+# R5 (HB 1389 validation): an entry can rest on law the bill leaves as is.
+# Private-use sentinels ride through law_as_amended: inserted text between
+# _IN and _OUT, a deletion point at _DEL.
+_IN, _OUT, _DEL = "\ue000", "\ue001", "\ue002"
+
+
+def change_regions(raw: str) -> tuple[str, list[tuple[int, int]]]:
+    """law_as_amended(raw), plus where in it the bill changed something:
+    (start, end) of each inserted span, and (p, p) where text was deleted."""
+    marked = re.sub(r" ?\[deleted:", lambda m: _DEL + m.group(0), raw)
+    marked = re.sub(r"\[added:\s*([^\]]*)\]", lambda m: f"[added: {_IN}{m.group(1)}{_OUT}]", marked)
+    marked = re.sub(r"\[added:\s*([^\]]*)$", lambda m: f"[added: {_IN}{m.group(1)}", marked)
+    marked = law_as_amended(marked)
+    plain: list[str] = []
+    regions: list[tuple[int, int]] = []
+    start = None
+    for ch in marked:
+        if ch == _IN:
+            start = len(plain)
+        elif ch == _OUT and start is not None:
+            regions.append((start, len(plain)))
+            start = None
+        elif ch == _DEL:
+            regions.append((len(plain), len(plain)))
+        else:
+            plain.append(ch)
+    if start is not None:
+        regions.append((start, len(plain)))
+    return "".join(plain), regions
+
+
+def restates_existing_law(law: str, regions: list[tuple[int, int]], quote: str) -> bool:
+    """True when `quote` sits in a section that amends a statute, that
+    section shows changes elsewhere, and none of them touch the quote. A
+    created section, or a bill with no change markers, is never "existing"."""
+    q = normalize_ws(quote)
+    m = re.search(r"\s+".join(re.escape(word) for word in q.split()), law) if q else None
+    if not m or not regions:
+        return False
+    headings = list(_BILL_SECTION.finditer(law))
+    before = [h for h in headings if h.start() <= m.start()]
+    if not before:
+        return False
+    sec_start = before[-1].start()
+    after = [h.start() for h in headings if h.start() > m.start()]
+    sec_end = after[0] if after else len(law)
+    statute = _AMENDED_STATUTE.search(law, sec_start, m.start())
+    if not statute or not re.search(r"\bamended\s+to\s+read:", statute.group(0), re.IGNORECASE):
+        return False
+    if not any(sec_start <= a <= sec_end for a, _ in regions):
+        return False
+    return not any(a <= m.end() and b >= m.start() for a, b in regions)
+
+
 def is_conditional(statement: str) -> bool:
     return bool(_CONDITIONAL.search(statement))
 

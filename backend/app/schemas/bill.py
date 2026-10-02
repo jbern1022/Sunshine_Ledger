@@ -137,6 +137,8 @@ class LayerItemOut(BaseModel):
     change_kind: str | None = None
     # The statute the quoted provision amends, e.g. "s. 125.01055(7)(a)1."
     statute_ref: str | None = None
+    # True when the quoted provision is law the bill leaves unchanged.
+    restates_existing_law: bool | None = None
     conditions: list[dict[str, str]] = []
     exceptions: list[dict[str, str]] = []
 

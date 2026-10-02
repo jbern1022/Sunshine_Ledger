@@ -418,6 +418,7 @@ export interface LayerItem {
   text: string;
   section_ref: string | null;
   statute_ref?: string | null;
+  restates_existing_law?: boolean | null;
   quote: string | null;
   assumptions: string[];
   affected_groups: string[];

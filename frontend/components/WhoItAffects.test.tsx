@@ -103,4 +103,11 @@ describe("WhoItAffects", () => {
     render(<WhoItAffects billEntityId="b1" block={b} status="Introduced" effective={null} />);
     expect(screen.getByText(/\(Section 1, s\. 83\.49\(1\)\)/)).toBeInTheDocument();
   });
+
+  it("labels an entry that rests on law the bill leaves unchanged", () => {
+    const b = block();
+    b.current.items[0].restates_existing_law = true;
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getAllByText("Existing law, not changed by this bill")).toHaveLength(1);
+  });
 });

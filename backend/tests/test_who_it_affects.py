@@ -434,3 +434,18 @@ def test_an_exclusion_the_model_missed_is_added():
     assert [x["quote"] for x in item["exceptions"]] == [
         "This section does not apply to a landlord who owns fewer than three dwelling units.",
     ]
+
+
+def test_an_entry_on_unchanged_law_is_labeled():
+    # HB 1389's (7)(d)2 height cap near single-family homes is existing law.
+    cap = ("the county may restrict the height of the proposed development to 150 percent of the tallest building "
+           "on any property adjacent to the proposed development")
+    entry = {"group": "Counties", "change": "May cap height near single-family neighborhoods.",
+             "change_kind": "permission", "quote": cap, "conditions": [], "exceptions": []}
+    setbacks = ("A county may not restrict height below the height authorized under this paragraph through other "
+                "dimensional means, such as establishing setbacks or stepbacks by height")
+    new = {"group": "Counties", "change": "May not use setbacks to cut the allowed height.",
+           "change_kind": "prohibition", "quote": setbacks, "conditions": [], "exceptions": []}
+    client = SequenceClient({"items": [entry, new]})
+    items = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    assert [i["restates_existing_law"] for i in items] == [True, False]

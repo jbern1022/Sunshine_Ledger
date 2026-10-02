@@ -81,6 +81,11 @@ export default function WhoItAffects({ billEntityId, block, status, effective, a
                         {KIND_LABEL[item.change_kind] ?? KIND_LABEL.other}
                       </span>
                     )}
+                    {item.restates_existing_law && (
+                      <span className="ml-1.5 rounded border border-slate-200 px-1.5 text-xs text-slate-500">
+                        Existing law, not changed by this bill
+                      </span>
+                    )}
                   </p>
                   {item.quote && (
                     <p className="mt-0.5 text-xs text-slate-500">
