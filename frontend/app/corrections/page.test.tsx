@@ -18,6 +18,7 @@ describe("CorrectionsPage", () => {
     await renderPage();
     expect(screen.getByText("No material or critical corrections have been published yet.")).toBeInTheDocument();
     expect(getCorrections).toHaveBeenCalledWith({ change_type: undefined, severity: "material" });
+    expect(screen.getByRole("link", { name: "Follow by RSS" })).toHaveAttribute("href", "/corrections/feed.xml");
   });
 
   it("doesn't claim there are none when the API is down", async () => {

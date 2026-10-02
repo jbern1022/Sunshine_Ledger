@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Corrections — Sunshine Ledger",
   description:
     "Every material or critical correction, update, clarification and retraction Sunshine Ledger has made, newest first, with the earlier version and the reason.",
+  alternates: { types: { "application/rss+xml": [{ url: "/corrections/feed.xml", title: "Sunshine Ledger — corrections" }] } },
 };
 
 const CHANGE_TYPES = Object.keys(CHANGE_TYPE_NAMES) as ChangeType[];
@@ -54,6 +55,8 @@ export default async function CorrectionsPage({ searchParams }: Props) {
         entry keeps the earlier version and says why it changed. Corrections to AI-generated analysis are listed like
         any other. Minor fixes, such as typos and broken links, are listed only on the page they affect.{" "}
         <Link href="/methodology#corrections" className="text-sunshine-700 underline">How corrections work</Link>
+        {" · "}
+        <a href="/corrections/feed.xml" className="text-sunshine-700 underline">Follow by RSS</a>
       </p>
 
       <nav aria-label="Filter corrections" className="mt-4 space-y-2 text-xs">

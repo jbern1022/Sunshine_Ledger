@@ -1,6 +1,5 @@
+import { escapeXml, SITE } from "@/lib/rss";
 import { getRecentBillsForFeed } from "@/lib/server-api";
-
-const SITE = "https://sunshineledger.josephbernal.com";
 
 /** RSS feed of recently-active bills.
  *
@@ -14,15 +13,6 @@ const SITE = "https://sunshineledger.josephbernal.com";
  *  and states that the summaries are AI-written so that caveat travels with
  *  the content instead of being left behind on the site.
  */
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
 
 export const revalidate = 3600;
 
