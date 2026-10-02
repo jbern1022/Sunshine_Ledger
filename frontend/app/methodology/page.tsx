@@ -224,7 +224,8 @@ export default function MethodologyPage() {
         </ul>
         <p className="mt-2 text-sm text-slate-700">
           Material and critical changes across the site are listed on the{" "}
-          <Link href="/corrections" className="text-sunshine-700 underline">corrections log</Link>.
+          <Link href="/corrections" className="text-sunshine-700 underline">corrections log</Link>, which you can
+          also follow by <a href="/corrections/feed.xml" className="text-sunshine-700 underline">RSS</a>.
         </p>
       </section>
 
