@@ -1,4 +1,4 @@
-import type { LayerBlock } from "@/lib/types";
+import type { LayerBlock, LayerItem } from "@/lib/types";
 import { billTextLabel, formatDate, reviewLabel } from "@/lib/layers";
 import { applicability } from "@/lib/billStatus";
 import { FlagThis } from "@/components/ChallengeForm";
@@ -40,9 +40,53 @@ const KIND_LABEL: Record<string, string> = {
   other: "Other change",
 };
 
+// The rest of a long list folds behind "Show N more" (R9): nothing is cut.
+const SHOWN = 6;
+
 export default function WhoItAffects({ billEntityId, block, status, effective, accountability }: Props) {
   const version = block.current;
   const { verb, note } = applicability(status, effective);
+  const entry = (item: LayerItem, i: number) => (
+    <li key={i}>
+      <p>
+        <span className="text-slate-500">{verb} </span>
+        <span className="font-medium text-ledger-900">{item.group}</span>: {item.text}
+        {item.change_kind && (
+          <span className="ml-1.5 rounded bg-slate-100 px-1.5 text-xs text-slate-600">
+            {KIND_LABEL[item.change_kind] ?? KIND_LABEL.other}
+          </span>
+        )}
+        {item.restates_existing_law && (
+          <span className="ml-1.5 rounded border border-slate-200 px-1.5 text-xs text-slate-500">
+            Existing law, not changed by this bill
+          </span>
+        )}
+      </p>
+      {item.quote && (
+        <p className="mt-0.5 text-xs text-slate-500">
+          Why: <q className="italic">{item.quote}</q>
+          {(item.section_ref || item.statute_ref) && <> ({[item.section_ref, item.statute_ref].filter(Boolean).join(", ")})</>}
+        </p>
+      )}
+      {(item.also_in ?? []).map((a, j) => (
+        <p key={`a${j}`} className="mt-0.5 text-xs text-slate-500">
+          Same rule: <q className="italic">{a.quote}</q>
+          {(a.section_ref || a.statute_ref) && <> ({[a.section_ref, a.statute_ref].filter(Boolean).join(", ")})</>}
+        </p>
+      ))}
+      {(item.conditions ?? []).map((c, j) => (
+        <p key={`c${j}`} className="mt-0.5 text-xs text-slate-500">
+          Condition: {clause(c.text, c.quote)}
+        </p>
+      ))}
+      {(item.exceptions ?? []).map((x, j) => (
+        <p key={`x${j}`} className="mt-0.5 text-xs text-slate-500">
+          Exception stated in the bill: {clause(x.text, x.quote)}
+        </p>
+      ))}
+    </li>
+  );
+
   return (
     <section aria-labelledby="who-it-affects" className="mt-5">
       <h2 id="who-it-affects" className="text-sm font-semibold text-ledger-900">Who it affects</h2>
@@ -71,41 +115,18 @@ export default function WhoItAffects({ billEntityId, block, status, effective, a
           <>
             {note && <p className="mt-1 text-xs text-slate-500">{note === "if enacted" ? "Only if the bill is enacted." : note}</p>}
             <ul className="mt-1 space-y-3 text-sm leading-relaxed text-slate-700">
-              {version.items.map((item, i) => (
-                <li key={i}>
-                  <p>
-                    <span className="text-slate-500">{verb} </span>
-                    <span className="font-medium text-ledger-900">{item.group}</span>: {item.text}
-                    {item.change_kind && (
-                      <span className="ml-1.5 rounded bg-slate-100 px-1.5 text-xs text-slate-600">
-                        {KIND_LABEL[item.change_kind] ?? KIND_LABEL.other}
-                      </span>
-                    )}
-                    {item.restates_existing_law && (
-                      <span className="ml-1.5 rounded border border-slate-200 px-1.5 text-xs text-slate-500">
-                        Existing law, not changed by this bill
-                      </span>
-                    )}
-                  </p>
-                  {item.quote && (
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      Why: <q className="italic">{item.quote}</q>
-                      {(item.section_ref || item.statute_ref) && <> ({[item.section_ref, item.statute_ref].filter(Boolean).join(", ")})</>}
-                    </p>
-                  )}
-                  {(item.conditions ?? []).map((c, j) => (
-                    <p key={`c${j}`} className="mt-0.5 text-xs text-slate-500">
-                      Condition: {clause(c.text, c.quote)}
-                    </p>
-                  ))}
-                  {(item.exceptions ?? []).map((x, j) => (
-                    <p key={`x${j}`} className="mt-0.5 text-xs text-slate-500">
-                      Exception stated in the bill: {clause(x.text, x.quote)}
-                    </p>
-                  ))}
-                </li>
-              ))}
+              {version.items.slice(0, SHOWN).map((item, i) => entry(item, i))}
             </ul>
+            {version.items.length > SHOWN && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-slate-600 underline">
+                  Show {version.items.length - SHOWN} more
+                </summary>
+                <ul className="mt-2 space-y-3 text-sm leading-relaxed text-slate-700">
+                  {version.items.slice(SHOWN).map((item, i) => entry(item, SHOWN + i))}
+                </ul>
+              </details>
+            )}
             <p className="mt-2 text-[11px] text-slate-500">
               Each reason is checked word for word against the bill text. Conditions and exceptions are listed only
               where the bill states them; its definitions may narrow who is covered. Belonging to a group doesn&apos;t

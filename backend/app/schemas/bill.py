@@ -139,6 +139,9 @@ class LayerItemOut(BaseModel):
     statute_ref: str | None = None
     # True when the quoted provision is law the bill leaves unchanged.
     restates_existing_law: bool | None = None
+    # The same rule in a parallel statute (ch. 125 / ch. 166), each
+    # {quote, section_ref, statute_ref}.
+    also_in: list[dict[str, str | None]] = []
     conditions: list[dict[str, str]] = []
     exceptions: list[dict[str, str]] = []
 

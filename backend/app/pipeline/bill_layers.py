@@ -364,6 +364,8 @@ _PERMITS = re.compile(r"\bmay\b(?!\s+not\b)", re.IGNORECASE)
 # very long bill is read up to this many windows, and the block says which
 # sections that covered.
 MAX_WHO_WINDOWS = 4
+# Entries kept per bill; the page shows the first 6 and folds the rest.
+MAX_WHO_ENTRIES = 12
 _SECTION_NUMBER = re.compile(r"Section\s+(\d+)\.", re.IGNORECASE)
 
 
@@ -501,6 +503,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     kept, dupes = _dedupe_quotes(_round_robin(per_window))
     dropped += dupes
     _attach_exclusions(kept, applicability_exclusions(law))
+    kept = _merge_parallel(kept)
     partial = read < len(windows)
     if not kept:
         note = "No group the bill directly applies to could be tied to its text"
@@ -508,7 +511,45 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
             note += f" in {_sections_read(law, windows, read)}"
         return LayerResult("insufficient_evidence", note, [], dropped)
     scope = _sections_read(law, windows, read) if partial else "Bill text"
-    return LayerResult("supported", scope, kept[:6], dropped)
+    if len(kept) > MAX_WHO_ENTRIES:
+        scope += f" · first {MAX_WHO_ENTRIES} of {len(kept)} entries"
+    return LayerResult("supported", scope, kept[:MAX_WHO_ENTRIES], dropped)
+
+
+# Florida's county (ch. 125) and municipal (ch. 166) statutes often carry the
+# same rule word for word; one entry names both (R9, HB 1389 validation).
+_LOCAL_GOVERNMENT = re.compile(r"\b(?:count(?:y|ies)|municipalit(?:y|ies))(?:'s)?\b", re.IGNORECASE)
+
+
+def _merge_parallel(entries: list[dict]) -> list[dict]:
+    """Fold an entry into an earlier one whose quote is the same once
+    "county"/"municipality" are set aside: one entry, both groups, the
+    second citation kept under also_in, conditions and exceptions merged."""
+    merged: list[dict] = []
+    by_key: dict[str, dict] = {}
+    for entry in entries:
+        entry.setdefault("also_in", [])
+        quote = normalize_ws(entry["quote"]).lower()
+        key = _LOCAL_GOVERNMENT.sub("<local>", quote)
+        first = by_key.get(key)
+        if key == quote or first is None or first["also_in"] or first["group"] == entry["group"]:
+            by_key.setdefault(key, entry)
+            merged.append(entry)
+            continue
+        first["also_in"].append({k: entry.get(k) for k in ("quote", "section_ref", "statute_ref")})
+        first["affected_groups"] = first["affected_groups"] + [entry["group"]]
+        pair = sorted(g.lower() for g in first["affected_groups"])
+        first["group"] = (
+            "Counties and municipalities" if pair == ["counties", "municipalities"]
+            else f"{first['group']} and {entry['group'][:1].lower()}{entry['group'][1:]}"
+        )
+        for field_name in ("conditions", "exceptions"):
+            seen = {normalize_ws(x["quote"]).lower() for x in first[field_name]}
+            for x in entry[field_name]:
+                if normalize_ws(x["quote"]).lower() not in seen:
+                    first[field_name].append(x)
+        first["restates_existing_law"] = bool(first.get("restates_existing_law") and entry.get("restates_existing_law"))
+    return merged
 
 
 def _attach_exclusions(entries: list[dict], exclusions: list[dict]) -> None:

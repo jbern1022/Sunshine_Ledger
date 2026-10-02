@@ -110,4 +110,22 @@ describe("WhoItAffects", () => {
     render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
     expect(screen.getAllByText("Existing law, not changed by this bill")).toHaveLength(1);
   });
+
+  it("shows the same rule's parallel citation", () => {
+    const b = block();
+    b.current.items[0].also_in = [{ quote: "A municipality shall return deposits.", section_ref: "Section 2", statute_ref: "s. 166.1(1)" }];
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getByText(/Same rule:/)).toBeInTheDocument();
+    expect(screen.getByText(/\(Section 2, s\. 166\.1\(1\)\)/)).toBeInTheDocument();
+  });
+
+  it("folds entries past the sixth behind 'Show N more'", () => {
+    const b = block();
+    const one = b.current.items[0];
+    b.current.items = Array.from({ length: 8 }, (_, i) => ({ ...one, group: `Group ${i + 1}` }));
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getByText("Show 2 more")).toBeInTheDocument();
+    // Folded, not cut: still in the page.
+    expect(screen.getByText("Group 8")).toBeInTheDocument();
+  });
 });

@@ -265,8 +265,8 @@ def test_later_sections_are_not_crowded_out_by_the_first():
     first = [_entry(f"Group {i}", f"({i}) The department shall keep record number 1-{i} on file.") for i in range(6)]
     client = SequenceClient({"items": first}, {"items": [_entry("Municipalities", CITIES)]}, {"items": []})
     r = build_who_it_affects("HB 2", "Records", LONG_BILL, client)
-    assert len(r.items) == 6
-    assert "Municipalities" in [i["group"] for i in r.items]
+    assert len(r.items) == 7
+    assert [i["group"] for i in r.items][:2] == ["Group 0", "Municipalities"]
 
 
 def test_a_section_larger_than_one_window_is_split_on_line_breaks():
@@ -449,3 +449,51 @@ def test_an_entry_on_unchanged_law_is_labeled():
     client = SequenceClient({"items": [entry, new]})
     items = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
     assert [i["restates_existing_law"] for i in items] == [True, False]
+
+
+# R9 (HB 1389 validation): ss. 125.x (counties) and 166.x (municipalities)
+# repeat the same rule; two entries per rule spent the cap twice, and the
+# cap hid every group past the sixth.
+def _parallel(local: str, section_hint: str) -> dict:
+    quote = (f"A {local} may not restrict height below the height authorized under this paragraph through other "
+             "dimensional means, such as establishing setbacks or stepbacks by height")
+    group = "Counties" if local == "county" else "Municipalities"
+    return {"group": group, "change": "May not use setbacks to cut the allowed height.",
+            "change_kind": "prohibition", "quote": quote, "conditions": [], "exceptions": []}
+
+
+def test_parallel_county_and_municipal_entries_merge():
+    client = SequenceClient({"items": [_parallel("county", "1")]}, {"items": [_parallel("municipality", "2")]})
+    [item] = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    assert item["group"] == "Counties and municipalities"
+    assert item["affected_groups"] == ["Counties", "Municipalities"]
+    assert (item["section_ref"], item["statute_ref"]) == ("Section 1", "s. 125.01055(7)(d)1.")
+    [also] = item["also_in"]
+    assert (also["section_ref"], also["statute_ref"]) == ("Section 2", "s. 166.04151(7)(d)1.")
+    assert also["quote"].startswith("A municipality may not restrict height")
+    # The (7)(o) lists read the same in both statutes: listed once.
+    subsection = [x for x in item["exceptions"] if x["quote"].startswith("This subsection does not apply to")]
+    assert len(subsection) == 1
+
+
+def test_rules_that_differ_beyond_the_local_government_stay_separate():
+    county = ("Notwithstanding any other law, local ordinance, or regulation to the contrary, a county may not "
+              "require a proposed multifamily development to obtain a zoning or land use change")
+    city = ("Notwithstanding any other law, local ordinance, or regulation to the contrary, a municipality may not "
+            "require a proposed multifamily development to obtain a zoning or land use change, special exception")
+    a = {"group": "Counties", "change": "May not require rezoning.", "change_kind": "prohibition",
+         "quote": county, "conditions": [], "exceptions": []}
+    b = {"group": "Municipalities", "change": "May not require rezoning.", "change_kind": "prohibition",
+         "quote": city, "conditions": [], "exceptions": []}
+    client = SequenceClient({"items": [a]}, {"items": [b]})
+    items = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    assert [i["group"] for i in items] == ["Counties", "Municipalities"]
+
+
+def test_up_to_twelve_entries_are_kept_and_more_are_counted():
+    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, 15))
+    bill = "Section 1. Reports.\n" + lines
+    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, 15)]
+    r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
+    assert len(r.items) == 12
+    assert r.scope_note == "Bill text · first 12 of 14 entries"
