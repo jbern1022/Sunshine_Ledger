@@ -72,7 +72,10 @@ def test_never_keeps_an_exception_the_bill_does_not_state():
     }])
     r = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [invented]}))
     [item] = r.items
-    assert item["exceptions"] == []
+    # Only the bill's own exclusion (R4), never the invented one.
+    assert [x["quote"] for x in item["exceptions"]] == [
+        "This section does not apply to a landlord who owns fewer than three dwelling units.",
+    ]
 
 
 def test_conditions_are_kept_only_when_quoted_from_the_bill():
@@ -382,3 +385,52 @@ def test_entries_cite_the_statute_they_amend():
     client = SequenceClient({"items": []}, {"items": [entry]}, {"items": []})
     [item] = build_who_it_affects("H1389", "Affordable Housing", text, client).items
     assert (item["section_ref"], item["statute_ref"]) == ("Section 2", "s. 166.04151(7)(d)1.")
+
+
+# R4 (HB 1389 validation): neither entry listed the (7)(o) exclusions or the
+# s. 333.03(5) airport carve-out, which govern every rule in (7).
+def _hb1389_text():
+    from pathlib import Path
+
+    return (Path(__file__).parent / "fixtures" / "bill_text" / "hb1389_2026_enrolled.txt").read_text()
+
+
+COUNTY_MANDATE = "A county must authorize multifamily and mixed-use residential as allowable uses in any area zoned for commercial, industrial, or mixed use;"
+
+
+def test_exclusions_reach_the_entries_they_govern():
+    entry = {"group": "Counties", "change": "Must allow multifamily housing in commercial areas.",
+             "change_kind": "obligation", "quote": COUNTY_MANDATE, "conditions": [], "exceptions": []}
+    client = SequenceClient({"items": [entry]})
+    [item] = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    quotes = [" ".join(x["quote"].split()) for x in item["exceptions"]]
+    assert len(quotes) == 2
+    subsection, airports = quotes
+    assert subsection.startswith("This subsection does not apply to:")
+    assert "The Wekiva Study Area" in subsection and "recorded conservation easement" in subsection
+    assert "Section 2." not in subsection  # stops at the end of the list
+    assert airports.startswith("Sections 125.01055(7) and 166.04151(7) do not apply to any of the following, unless")
+    assert "maximum height restrictions" in airports
+
+
+def test_an_exclusion_for_another_statute_is_not_attached():
+    discrimination = "It is unlawful to discriminate in land use decisions or in the permitting of development"
+    entry = {"group": "Local governments", "change": "May not discriminate in land use decisions.",
+             "change_kind": "prohibition", "quote": discrimination, "conditions": [], "exceptions": []}
+    client = SequenceClient({"items": []}, {"items": []}, {"items": [entry]})
+    [item] = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    assert item["exceptions"] == []
+
+
+def test_an_exclusion_the_model_listed_is_not_repeated():
+    [item] = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [_landlord()]})).items
+    assert [x["quote"] for x in item["exceptions"]] == [
+        "This section does not apply to a landlord who owns fewer than three dwelling units.",
+    ]
+
+
+def test_an_exclusion_the_model_missed_is_added():
+    [item] = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [_landlord(exceptions=[])]})).items
+    assert [x["quote"] for x in item["exceptions"]] == [
+        "This section does not apply to a landlord who owns fewer than three dwelling units.",
+    ]

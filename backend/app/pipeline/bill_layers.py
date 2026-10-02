@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.pipeline.bill_layers_text import (
+    applicability_exclusions,
     bill_section_numbers,
     fiscal_option_kind,
     is_conditional,
@@ -39,6 +40,7 @@ from app.pipeline.bill_layers_text import (
     statute_at,
     strip_page_artifacts,
     verify_quotes,
+    within,
 )
 from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 
@@ -493,6 +495,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
         dropped += rejected
     kept, dupes = _dedupe_quotes(_round_robin(per_window))
     dropped += dupes
+    _attach_exclusions(kept, applicability_exclusions(law))
     partial = read < len(windows)
     if not kept:
         note = "No group the bill directly applies to could be tied to its text"
@@ -501,6 +504,21 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
         return LayerResult("insufficient_evidence", note, [], dropped)
     scope = _sections_read(law, windows, read) if partial else "Bill text"
     return LayerResult("supported", scope, kept[:6], dropped)
+
+
+def _attach_exclusions(entries: list[dict], exclusions: list[dict]) -> None:
+    """Add each "does not apply to" provision to the entries it governs,
+    unless the entry already lists it (R4, HB 1389 validation)."""
+    for entry in entries:
+        ref = entry.get("statute_ref") or entry.get("section_ref")
+        for exclusion in exclusions:
+            if not any(within(ref, scope) for scope in exclusion["scopes"]):
+                continue
+            quote = normalize_ws(exclusion["quote"]).lower()
+            listed = [normalize_ws(x["quote"]).lower() for x in entry["exceptions"]]
+            if any(q in quote or quote in q for q in listed):
+                continue
+            entry["exceptions"].append({"text": normalize_ws(exclusion["quote"]), "quote": exclusion["quote"]})
 
 
 def _section_ref(quote: str, window: str, law: str, offset: int) -> str | None:
