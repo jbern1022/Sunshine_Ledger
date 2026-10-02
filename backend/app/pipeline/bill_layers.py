@@ -30,6 +30,7 @@ from app.pipeline.bill_layers_text import (
     is_conditional,
     is_substantive_finding,
     law_as_amended,
+    normalize_ws,
     overstates_modal,
     restates_bill,
     section_for_quote,
@@ -428,19 +429,45 @@ _DOWNSTREAM = re.compile(
 )
 
 
-def _verified_clauses(raw, amended: str) -> list[dict]:
-    """Conditions or exceptions whose quote is in the bill. An unquoted or
-    unverifiable one is dropped: the page never states a limit or exception
-    the bill doesn't."""
+def _verified_clauses(raw, amended: str) -> tuple[list[dict], list[dict]]:
+    """Conditions or exceptions whose quote is in the bill, and the ones
+    dropped. An unquoted or unverifiable one is dropped: the page never
+    states a limit or exception the bill doesn't."""
     if not isinstance(raw, list):
-        return []
+        return [], []
     candidates = [c for c in raw if isinstance(c, dict) and str(c.get("text") or "").strip()]
-    kept, _ = verify_quotes(candidates, amended)
+    kept, dropped = verify_quotes(candidates, amended)
     return [
         {"text": str(c["text"]).strip(), "quote": c["quote"]}
         for c in kept
         if not _EFFECTIVE_DATE_CLAUSE.search(c["quote"])
-    ]
+    ], dropped
+
+
+# A condition the entry's own quote states (R3, HB 1389 validation): "...
+# regardless of the underlying zoning, if at least 40 percent of the
+# residential units ... are affordable" came back with conditions: [].
+_CONDITION_MARKER = re.compile(
+    r"\b(?:only if|only when|if|unless|provided that|so long as|on condition that)\b", re.IGNORECASE
+)
+
+
+def _quoted_condition(quote: str, conditions: list[dict]) -> dict | None:
+    """The clause from the quote's first condition marker to the next
+    semicolon or the end, unless a listed condition already covers it. A
+    quote that opens with the marker ("If the proposed development is
+    adjacent to ...") is conditional as a whole and already shown; where its
+    condition ends can't be told from commas, so nothing is added."""
+    m = _CONDITION_MARKER.search(quote)
+    if not m or not quote[:m.start()].strip():
+        return None
+    clause = re.split(r";\s", quote[m.start():], maxsplit=1)[0].rstrip(" .,")
+    norm = normalize_ws(clause).lower()
+    for c in conditions:
+        listed = normalize_ws(c["quote"]).lower()
+        if listed in norm or norm in listed:
+            return None
+    return {"text": clause[0].upper() + clause[1:], "quote": clause}
 
 
 def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -> LayerResult:
@@ -511,6 +538,13 @@ def _who_entries(bill_number: str, title: str, window: str, client) -> tuple[lis
             dropped.append(r)
             continue
         quote = verified[0]["quote"]
+        conditions, bad_conditions = _verified_clauses(r.get("conditions"), window)
+        exceptions, bad_exceptions = _verified_clauses(r.get("exceptions"), window)
+        dropped += [{"dropped": "condition", "group": group, **c} for c in bad_conditions]
+        dropped += [{"dropped": "exception", "group": group, **c} for c in bad_exceptions]
+        stated = _quoted_condition(quote, conditions)
+        if stated:
+            conditions.append(stated)
         kind = str(r.get("change_kind") or "").strip().lower()
         kind = kind if kind in _CHANGE_KINDS else "other"
         if kind == "obligation" and not _REQUIRES.search(change) and _PERMITS.search(change):
@@ -521,8 +555,8 @@ def _who_entries(bill_number: str, title: str, window: str, client) -> tuple[lis
             "change_kind": kind,
             "quote": quote,
             "section_ref": None,
-            "conditions": _verified_clauses(r.get("conditions"), window),
-            "exceptions": _verified_clauses(r.get("exceptions"), window),
+            "conditions": conditions,
+            "exceptions": exceptions,
             "assumptions": [],
             "affected_groups": [group],
         })

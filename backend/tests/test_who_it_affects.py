@@ -302,3 +302,69 @@ def test_hb1389_is_read_in_full():
     # Sections 1 and 2 (counties, municipalities) are each ~9-10k chars.
     assert "Section 1." in client.prompts[0] and "Section 2." in client.prompts[1]
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
+
+
+# R3 (HB 1389 validation): entry 1 quoted "... if at least 40 percent of the
+# residential units ... are affordable" and listed no condition. The model
+# returned conditions: [] for every item; the condition was in its own quote.
+ZONING = (
+    "Section 1. A county must authorize multifamily residential as an allowable use in any area zoned for "
+    "commercial use; and on property owned by a school district, regardless of the underlying zoning, if at "
+    "least 40 percent of the residential units are rental units that, for a period of at least 30 years, are "
+    "affordable as defined in s. 420.0004.\n"
+    "Section 2. An airport-area development may proceed unless the application is denied by the airport; "
+    "the county shall record the decision.\n"
+    "Section 3. This act shall take effect July 1, 2026.\n"
+)
+COUNTY_QUOTE = ZONING.split("\n")[0].removeprefix("Section 1. ")
+
+
+def _county(**over):
+    item = {"group": "Counties", "change": "Must allow multifamily housing in commercial areas.",
+            "change_kind": "obligation", "quote": COUNTY_QUOTE, "conditions": [], "exceptions": []}
+    item.update(over)
+    return item
+
+
+def test_a_condition_stated_in_the_entrys_own_quote_is_listed():
+    [item] = build_who_it_affects("HB 5", "Housing", ZONING, FakeClient({"items": [_county()]})).items
+    [cond] = item["conditions"]
+    assert cond["quote"].startswith("if at least 40 percent of the residential units")
+    assert cond["quote"].endswith("affordable as defined in s. 420.0004")
+    assert cond["text"].startswith("If at least 40 percent")
+
+
+def test_a_condition_the_model_already_listed_is_not_repeated():
+    given = {"text": "At least 40% of units affordable for 30 years.",
+             "quote": "at least 40 percent of the residential units are rental units"}
+    [item] = build_who_it_affects("HB 5", "Housing", ZONING, FakeClient({"items": [_county(conditions=[given])]})).items
+    assert [c["text"] for c in item["conditions"]] == [given["text"]]
+
+
+def test_an_unless_clause_stops_at_the_semicolon():
+    entry = {"group": "Developers", "change": "May build near an airport.", "change_kind": "permission",
+             "quote": "An airport-area development may proceed unless the application is denied by the airport; "
+                      "the county shall record the decision.",
+             "conditions": [], "exceptions": []}
+    [item] = build_who_it_affects("HB 5", "Housing", ZONING, FakeClient({"items": [entry]})).items
+    assert [c["quote"] for c in item["conditions"]] == ["unless the application is denied by the airport"]
+
+
+def test_a_quote_with_no_condition_gets_none():
+    [item] = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [_landlord()]})).items
+    assert item["conditions"] == []
+
+
+def test_dropped_conditions_and_exceptions_are_reported():
+    invented = {"text": "Only in Miami.", "quote": "This applies only in Miami-Dade County."}
+    r = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [_landlord(conditions=[invented])]}))
+    assert {"dropped": "condition", "group": "Landlords", **invented} in r.dropped
+
+
+def test_a_quote_that_opens_with_if_is_not_repeated_as_its_own_condition():
+    bill = "Section 1. If the tenant vacates early, the landlord may keep one month of rent.\n"
+    entry = {"group": "Landlords", "change": "May keep one month of rent if the tenant leaves early.",
+             "change_kind": "permission", "quote": "If the tenant vacates early, the landlord may keep one month of rent.",
+             "conditions": [], "exceptions": []}
+    [item] = build_who_it_affects("HB 6", "Leases", bill, FakeClient({"items": [entry]})).items
+    assert item["conditions"] == []
