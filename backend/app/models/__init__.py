@@ -6,6 +6,7 @@ from app.models.spatial_context import SpatialContext
 from app.models.bill import Bill
 from app.models.claim import Claim, ClaimSource
 from app.models.flag import Flag
+from app.models.correction import CorrectionRecord, Response
 from app.models.tag import BillTag, SubjectMapping, Tag
 from app.models.demographic_overlay import DemographicOverlay
 from app.models.staff_analysis import StaffAnalysis
@@ -24,6 +25,8 @@ __all__ = [
     "Claim",
     "ClaimSource",
     "Flag",
+    "CorrectionRecord",
+    "Response",
     "Tag",
     "SubjectMapping",
     "BillTag",

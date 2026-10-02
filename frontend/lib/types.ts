@@ -212,10 +212,21 @@ export interface NewsItemOut {
   published_date: string | null;
 }
 
+export type ChallengeCategory = "factually_wrong" | "misleading" | "wrong_source" | "outdated" | "wrong_entity" | "other";
+export type ChallengeObjectType = "bill" | "claim" | "bill_layer" | "amendment" | "vote" | "page_copy";
+
+/** A challenge ("Flag this"): see the correction-process spec. */
 export interface FlagCreate {
   bill_entity_id: string;
   claim_id?: string | null;
+  object_type?: ChallengeObjectType;
+  object_id?: string | null;
+  object_version?: number | null;
+  category?: ChallengeCategory;
   reason_text: string;
+  evidence_url?: string | null;
+  evidence_text?: string | null;
+  is_named_party?: boolean;
   reporter_email?: string | null;
 }
 

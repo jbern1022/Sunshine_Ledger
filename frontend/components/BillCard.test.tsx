@@ -92,17 +92,24 @@ describe("BillCard", () => {
     render(<BillCard bill={baseBill} />);
 
     await user.click(screen.getByRole("button", { name: /flag this/i }));
-    await user.type(screen.getByLabelText(/what looks wrong/i), "The summary is inaccurate");
+    await user.selectOptions(screen.getByLabelText(/what kind of problem/i), "misleading");
+    await user.type(screen.getByLabelText(/what is wrong/i), "The summary is inaccurate");
+    await user.type(screen.getByLabelText(/evidence link/i), "https://www.flsenate.gov/x.pdf");
+    await user.click(screen.getByLabelText(/named in this record/i));
     await user.click(screen.getByRole("button", { name: /submit report/i }));
 
     await waitFor(() =>
       expect(api.submitFlag).toHaveBeenCalledWith({
         bill_entity_id: "bill-1",
+        category: "misleading",
         reason_text: "The summary is inaccurate",
+        evidence_url: "https://www.flsenate.gov/x.pdf",
+        evidence_text: null,
+        is_named_party: true,
         reporter_email: null,
       }),
     );
-    expect(await screen.findByText(/sent for manual review/i)).toBeInTheDocument();
+    expect(await screen.findByText(/a person will review this/i)).toBeInTheDocument();
   });
 
   it("renders topic badges when the bill has tags", () => {
@@ -148,7 +155,7 @@ describe("BillCard", () => {
     render(<BillCard bill={baseBill} />);
 
     await user.click(screen.getByRole("button", { name: /flag this/i }));
-    await user.type(screen.getByLabelText(/what looks wrong/i), "Something is wrong here");
+    await user.type(screen.getByLabelText(/what is wrong/i), "Something is wrong here");
     await user.click(screen.getByRole("button", { name: /submit report/i }));
 
     expect(await screen.findByText(/couldn.t submit/i)).toBeInTheDocument();

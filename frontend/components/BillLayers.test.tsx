@@ -25,21 +25,21 @@ describe("BillLayers", () => {
       ...empty,
       interpretation: [{ origin: "sunshine_ledger_ai", current: version({ items: [{ text: "Interp only", section_ref: "Section 1", quote: null, assumptions: [], affected_groups: [] }] }), earlier_versions: [] }],
     };
-    render(<BillLayers layers={layers} hasStaffAnalysis={false} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={layers} hasStaffAnalysis={false} fallbackSummary={null} />);
     expect(within(section(/Interpretation/)).getByText("Interp only")).toBeInTheDocument();
     expect(within(section(/Expected Effect/)).queryByText("Interp only")).toBeNull();
     expect(within(section(/Bill Says/)).queryByText("Interp only")).toBeNull();
   });
 
   it("shows the exact empty states", () => {
-    render(<BillLayers layers={empty} hasStaffAnalysis={false} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={empty} hasStaffAnalysis={false} fallbackSummary={null} />);
     const interp = section(/Interpretation/);
     expect(within(interp).getByText("No staff analysis published.")).toBeInTheDocument();
     expect(within(interp).getByText("Not yet evaluated.")).toBeInTheDocument();
   });
 
   it("says not yet evaluated for a staff block when an analysis exists", () => {
-    render(<BillLayers layers={empty} hasStaffAnalysis={true} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={empty} hasStaffAnalysis={true} fallbackSummary={null} />);
     expect(within(section(/Interpretation/)).getAllByText("Not yet evaluated.")).toHaveLength(2);
   });
 
@@ -52,7 +52,7 @@ describe("BillLayers", () => {
       ],
       expected_effect: [],
     };
-    render(<BillLayers layers={layers} hasStaffAnalysis={true} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={layers} hasStaffAnalysis={true} fallbackSummary={null} />);
     expect(within(section(/Bill Says/)).getByText("Quotes checked word for word against the bill text")).toBeInTheDocument();
     const interp = section(/Interpretation/);
     expect(within(interp).getByText(/Legislative staff analysis · Rules, 2026-03-01 · condensed by AI/)).toBeInTheDocument();
@@ -66,13 +66,13 @@ describe("BillLayers", () => {
       ...empty,
       expected_effect: [{ origin: "sunshine_ledger_ai", current: version({ evidence_state: "insufficient_evidence", items: [], scope_note: "No effects traceable to a specific bill section" }), earlier_versions: [] }],
     };
-    render(<BillLayers layers={layers} hasStaffAnalysis={false} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={layers} hasStaffAnalysis={false} fallbackSummary={null} />);
     expect(within(section(/Expected Effect/)).getByText(/Insufficient evidence/)).toBeInTheDocument();
     expect(within(section(/Expected Effect/)).getByText(/No effects traceable to a specific bill section/)).toBeInTheDocument();
   });
 
   it("includes the Expected Effect disclaimer", () => {
-    render(<BillLayers layers={empty} hasStaffAnalysis={false} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={empty} hasStaffAnalysis={false} fallbackSummary={null} />);
     expect(screen.getByText("What may happen. Forecasts, not established facts, and not legal or financial advice.")).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe("BillLayers", () => {
         earlier_versions: [version({ id: "v0", version: 1, superseded_at: "2026-09-20T00:00:00Z", items: [{ text: "Older reading", section_ref: null, quote: null, assumptions: [], affected_groups: [] }] })],
       }],
     };
-    render(<BillLayers layers={layers} hasStaffAnalysis={false} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={layers} hasStaffAnalysis={false} fallbackSummary={null} />);
     expect(screen.getByText("1 earlier version")).toBeInTheDocument();
     expect(screen.getByText("Older reading")).toBeInTheDocument();
   });
@@ -102,13 +102,13 @@ describe("BillLayers", () => {
         earlier_versions: [],
       }],
     };
-    render(<BillLayers layers={layers} hasStaffAnalysis={true} fallbackSummary={null} />);
+    render(<BillLayers billEntityId="b1" layers={layers} hasStaffAnalysis={true} fallbackSummary={null} />);
     expect(screen.getByRole("link", { name: "staff analysis (PDF)" })).toHaveAttribute("href", "https://flsenate.gov/a.pdf");
     expect(screen.getByText(/retrieved Sep 23, 2026/)).toBeInTheDocument();
   });
 
   it("falls back to the labeled summary when there is no Bill Says", () => {
-    render(<BillLayers layers={empty} hasStaffAnalysis={false} fallbackSummary="Plain summary." />);
+    render(<BillLayers billEntityId="b1" layers={empty} hasStaffAnalysis={false} fallbackSummary="Plain summary." />);
     const says = section(/Bill Says/);
     expect(within(says).getByText("AI summary of the official description")).toBeInTheDocument();
     expect(within(says).getByText("Plain summary.")).toBeInTheDocument();

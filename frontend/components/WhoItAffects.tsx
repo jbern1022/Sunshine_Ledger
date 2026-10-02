@@ -1,6 +1,7 @@
 import type { LayerBlock } from "@/lib/types";
 import { formatDate, reviewLabel } from "@/lib/layers";
 import { applicability } from "@/lib/billStatus";
+import { FlagThis } from "@/components/ChallengeForm";
 
 /** The bill's sentence, preceded by the plain-language restatement only
  *  when that says something different (models often copy the sentence). */
@@ -19,6 +20,7 @@ function clause(text: string, quote: string) {
  *  overall verdict. Server-rendered, no interactivity. */
 
 type Props = {
+  billEntityId: string;
   block: LayerBlock;
   status: string | null | undefined;
   effective: { when: string; has_exceptions: boolean } | null | undefined;
@@ -35,7 +37,7 @@ const KIND_LABEL: Record<string, string> = {
   other: "Other change",
 };
 
-export default function WhoItAffects({ block, status, effective }: Props) {
+export default function WhoItAffects({ billEntityId, block, status, effective }: Props) {
   const version = block.current;
   const { verb, note } = applicability(status, effective);
   return (
@@ -107,6 +109,11 @@ export default function WhoItAffects({ block, status, effective }: Props) {
           {block.earlier_versions.length > 0 &&
             ` · ${block.earlier_versions.length} earlier version${block.earlier_versions.length === 1 ? "" : "s"} kept`}
         </p>
+        <FlagThis
+          billEntityId={billEntityId}
+          target={{ object_type: "bill_layer", object_id: version.id, object_version: version.version }}
+          label="Flag this block"
+        />
       </div>
     </section>
   );

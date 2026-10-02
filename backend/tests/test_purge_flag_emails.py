@@ -6,7 +6,7 @@ from app.pipeline.purge_flag_emails import RETENTION_DAYS, purge_reporter_emails
 NOW = datetime(2026, 9, 23, 12, 0, tzinfo=timezone.utc)
 
 
-def _flag(db_session, entity, *, status="reviewed", resolved_days_ago=None, email="reporter@example.com"):
+def _flag(db_session, entity, *, status="decided", resolved_days_ago=None, email="reporter@example.com"):
     flag = Flag(
         bill_entity_id=entity.id,
         reason_text="This looks wrong",
@@ -29,7 +29,7 @@ def test_purges_email_resolved_past_retention(db_session, bill_factory):
     assert flag.reporter_email is None
     # The report itself is kept -- only the email goes.
     assert flag.reason_text == "This looks wrong"
-    assert flag.status == "reviewed"
+    assert flag.status == "decided"
 
 
 def test_keeps_email_within_retention(db_session, bill_factory):

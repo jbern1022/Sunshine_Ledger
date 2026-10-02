@@ -1,10 +1,12 @@
 import type { BillLayers as Layers, LayerBlock, LayerKey, LayerVersion, Origin } from "@/lib/types";
+import { FlagThis } from "@/components/ChallengeForm";
 import { LAYER_META, LAYER_ORDER, ORIGINS_FOR_LAYER, formatDate, originBadge, reviewLabel } from "@/lib/layers";
 
 /** The three separately labeled layers on a bill page. Pure display --
  *  server-rendered, no interactivity beyond native <details>. */
 
 type Props = {
+  billEntityId: string;
   layers: Layers;
   hasStaffAnalysis: boolean;
   /** Existing "what it does" summary, shown under Bill Says only as a
@@ -52,8 +54,8 @@ function VersionBody({ layer, version }: { layer: LayerKey; version: LayerVersio
   );
 }
 
-function Block({ layer, origin, block, hasStaffAnalysis }: {
-  layer: LayerKey; origin: Origin; block: LayerBlock | undefined; hasStaffAnalysis: boolean;
+function Block({ billEntityId, layer, origin, block, hasStaffAnalysis }: {
+  billEntityId: string; layer: LayerKey; origin: Origin; block: LayerBlock | undefined; hasStaffAnalysis: boolean;
 }) {
   const version = block?.current ?? null;
   const review = version ? reviewLabel(origin, version) : null;
@@ -102,6 +104,11 @@ function Block({ layer, origin, block, hasStaffAnalysis }: {
             {version.generated_by.replace(/^llm:/, "Model: ")} · method {version.method_version} · updated{" "}
             {formatDate(version.created_at)}
           </p>
+          <FlagThis
+            billEntityId={billEntityId}
+            target={{ object_type: "bill_layer", object_id: version.id, object_version: version.version }}
+            label="Flag this block"
+          />
           {block && block.earlier_versions.length > 0 && (
             <details className="mt-1 text-xs text-slate-500">
               <summary className="cursor-pointer underline">
@@ -125,7 +132,7 @@ function Block({ layer, origin, block, hasStaffAnalysis }: {
   );
 }
 
-export default function BillLayers({ layers, hasStaffAnalysis, fallbackSummary }: Props) {
+export default function BillLayers({ billEntityId, layers, hasStaffAnalysis, fallbackSummary }: Props) {
   return (
     <>
       {LAYER_ORDER.map((layer) => {
@@ -141,6 +148,7 @@ export default function BillLayers({ layers, hasStaffAnalysis, fallbackSummary }
             {ORIGINS_FOR_LAYER[layer].map((origin) => (
               <Block
                 key={origin}
+                billEntityId={billEntityId}
                 layer={layer}
                 origin={origin}
                 block={layers[layer].find((b) => b.origin === origin)}

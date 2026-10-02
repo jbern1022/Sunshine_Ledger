@@ -47,25 +47,7 @@ def test_admin_flags_lists_pending(client, bill_factory):
     assert body[0]["bill_number"] == "HB 123"
 
 
-def test_admin_flag_status_update(client, bill_factory):
-    entity = bill_factory()
-    create_resp = client.post("/flags", json={"bill_entity_id": str(entity.id), "reason_text": "Needs review"})
-    flag_id = create_resp.json()["id"]
-
-    resp = client.patch(
-        f"/flags/admin/{flag_id}",
-        json={"status": "reviewed"},
-        auth=("testadmin", "testpass"),
-    )
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "reviewed"
-
-    # No longer shows up under the default pending-only filter.
-    pending = client.get("/flags/admin", auth=("testadmin", "testpass")).json()
-    assert pending == []
-
-
-def test_resolving_flag_starts_email_retention_clock(client, bill_factory, db_session):
+def test_dismissing_starts_email_retention_clock_and_leaves_the_queue(client, bill_factory, db_session):
     entity = bill_factory()
     flag_id = client.post(
         "/flags",
@@ -74,17 +56,8 @@ def test_resolving_flag_starts_email_retention_clock(client, bill_factory, db_se
     flag = db_session.get(Flag, uuid.UUID(flag_id))
     assert flag.resolved_at is None
 
-    client.patch(f"/flags/admin/{flag_id}", json={"status": "dismissed"}, auth=("testadmin", "testpass"))
+    resp = client.post(f"/flags/admin/{flag_id}/triage", json={"dismiss": True, "note": "spam"}, auth=("testadmin", "testpass"))
+    assert resp.status_code == 200 and resp.json()["status"] == "dismissed"
     db_session.refresh(flag)
-    first_resolved = flag.resolved_at
-    assert first_resolved is not None
-
-    # Switching between resolved statuses doesn't restart the clock.
-    client.patch(f"/flags/admin/{flag_id}", json={"status": "reviewed"}, auth=("testadmin", "testpass"))
-    db_session.refresh(flag)
-    assert flag.resolved_at == first_resolved
-
-    # Reopening stops it -- a pending flag's email is still needed.
-    client.patch(f"/flags/admin/{flag_id}", json={"status": "pending"}, auth=("testadmin", "testpass"))
-    db_session.refresh(flag)
-    assert flag.resolved_at is None
+    assert flag.resolved_at is not None
+    assert client.get("/flags/admin", auth=("testadmin", "testpass")).json() == []

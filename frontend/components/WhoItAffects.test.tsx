@@ -33,7 +33,7 @@ function block(overrides: Partial<LayerVersion> = {}): LayerBlock {
 
 describe("WhoItAffects", () => {
   it("words a pending bill conditionally and shows who, what, why, conditions and exceptions", () => {
-    render(<WhoItAffects block={block()} status="Introduced" effective={{ when: "July 1, 2027", has_exceptions: false }} />);
+    render(<WhoItAffects billEntityId="b1" block={block()} status="Introduced" effective={{ when: "July 1, 2027", has_exceptions: false }} />);
     expect(screen.getByRole("heading", { name: "Who it affects" })).toBeInTheDocument();
     expect(screen.getAllByText(/Would apply to/)).toHaveLength(2);
     expect(screen.getByText("Only if the bill is enacted.")).toBeInTheDocument();
@@ -49,18 +49,19 @@ describe("WhoItAffects", () => {
   it("shows an exception once when its text just repeats the bill's sentence", () => {
     const b = block();
     b.current.items[0].exceptions = [{ text: "(a) Law enforcement agencies.", quote: "(a) Law enforcement agencies." }];
-    render(<WhoItAffects block={b} status="Introduced" effective={null} />);
+    render(<WhoItAffects billEntityId="b1" block={b} status="Introduced" effective={null} />);
     expect(screen.getAllByText(/Law enforcement agencies/)).toHaveLength(1);
   });
 
   it("uses the bill's fate for the verb", () => {
-    render(<WhoItAffects block={block()} status="Vetoed" effective={{ when: "July 1, 2027", has_exceptions: false }} />);
+    render(<WhoItAffects billEntityId="b1" block={block()} status="Vetoed" effective={{ when: "July 1, 2027", has_exceptions: false }} />);
     expect(screen.getAllByText(/Would have applied to/)).toHaveLength(2);
   });
 
   it("shows insufficient evidence honestly", () => {
     render(
       <WhoItAffects
+        billEntityId="b1"
         block={block({ evidence_state: "insufficient_evidence", items: [], scope_note: "No group the bill directly applies to could be tied to its text" })}
         status="Introduced"
         effective={null}
