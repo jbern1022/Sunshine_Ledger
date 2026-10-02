@@ -12,6 +12,7 @@ class SourceOut(BaseModel):
     id: uuid.UUID
     url: str
     publisher: str | None
+    document_reference: str | None = None
     source_type: str
     retrieved_at: datetime
 

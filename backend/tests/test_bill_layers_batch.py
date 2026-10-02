@@ -187,3 +187,30 @@ def test_who_it_affects_is_planned_only_when_enabled(db_session, bill_factory, m
     assert who.evidence_state == "supported"
     assert who.items[0]["group"] == "State employees"
     assert who.items[0]["section_ref"] == "Section 1"
+
+
+# R7 (HB 1389 validation): the bill-text source said "FL via legiscan" with
+# no version, though the text is the Legislature's enrolled PDF.
+def test_bill_text_source_names_the_version_and_official_document(db_session, bill_factory):
+    entity = bill_factory()
+    entity.external_ids = {"text_version": {
+        "type": "Enrolled", "date": "2026-03-16", "url": "https://www.flsenate.gov/Session/Bill/2026/123/BillText/er/PDF",
+    }}
+    _with_text(db_session, entity)
+    process_bills(db_session, RoutingClient())
+    says = db_session.query(BillLayer).filter_by(layer="bill_says").one()
+    [source] = [link.source for link in says.source_links]
+    assert source.url == "https://www.flsenate.gov/Session/Bill/2026/123/BillText/er/PDF"
+    assert source.document_reference == "HB 123, Enrolled text, 2026-03-16"
+    assert source.publisher == "Florida Legislature"
+    assert source.metadata_json["text_version"] == {"type": "Enrolled", "date": "2026-03-16"}
+
+
+def test_bill_text_source_without_a_known_version_keeps_the_bill_link(db_session, bill_factory):
+    entity = bill_factory()
+    _with_text(db_session, entity)
+    process_bills(db_session, RoutingClient())
+    says = db_session.query(BillLayer).filter_by(layer="bill_says").one()
+    [source] = [link.source for link in says.source_links]
+    assert source.url == "https://example.com/bill"
+    assert source.document_reference == "HB 123"

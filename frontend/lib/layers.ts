@@ -1,7 +1,7 @@
 // The one place layer and origin keys become display text. Components never
 // derive a heading or badge from block position or content -- only from
 // these keys -- so a block can't be rendered under the wrong label.
-import type { BillLayers, LayerKey, LayerVersion, Origin } from "@/lib/types";
+import type { BillLayers, LayerKey, LayerVersion, Origin, SourceOut } from "@/lib/types";
 
 export const LAYER_ORDER: LayerKey[] = ["bill_says", "interpretation", "expected_effect"];
 
@@ -22,6 +22,14 @@ export const ORIGINS_FOR_LAYER: Record<LayerKey, Origin[]> = {
 
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/** "Enrolled text, Mar 16, 2026" from a bill-text source's document
+ *  reference ("HB 123, Enrolled text, 2026-03-16"); "bill text" when the
+ *  version isn't known. */
+export function billTextLabel(source: SourceOut): string {
+  const m = source.document_reference?.match(/, (.+?) text(?:, (\d{4}-\d{2}-\d{2}))?$/);
+  return m ? `${m[1]} text${m[2] ? `, ${formatDate(m[2])}` : ""}` : "bill text";
 }
 
 export function originBadge(origin: Origin, version: LayerVersion | null): string {

@@ -2,6 +2,7 @@ export interface SourceOut {
   id: string;
   url: string;
   publisher: string | null;
+  document_reference?: string | null;
   source_type: string;
   retrieved_at: string;
 }

@@ -1,5 +1,5 @@
 import type { LayerBlock } from "@/lib/types";
-import { formatDate, reviewLabel } from "@/lib/layers";
+import { billTextLabel, formatDate, reviewLabel } from "@/lib/layers";
 import { applicability } from "@/lib/billStatus";
 import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes } from "@/components/Accountability";
@@ -112,6 +112,23 @@ export default function WhoItAffects({ billEntityId, block, status, effective, a
               </p>
             )}
           </>
+        )}
+        {version.sources.length > 0 && (
+          <p className="mt-2 text-[11px] text-slate-500">
+            Source:{" "}
+            {version.sources.map((s, i) => (
+              <span key={s.id}>
+                {i > 0 && "; "}
+                {s.url ? (
+                  <a href={s.url} className="underline hover:text-slate-700">
+                    {billTextLabel(s)}
+                  </a>
+                ) : (
+                  billTextLabel(s)
+                )}
+              </span>
+            ))}
+          </p>
         )}
         <p className="mt-1 text-[11px] text-slate-500">
           {version.generated_by.replace(/^llm:/, "Model: ")} · method {version.method_version} · updated{" "}

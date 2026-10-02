@@ -85,4 +85,15 @@ describe("WhoItAffects", () => {
     render(<WhoItAffects billEntityId="b1" block={block()} status="Introduced" effective={null} />);
     expect(screen.queryByText(/Drawn from/)).not.toBeInTheDocument();
   });
+
+  it("names the bill text version it was drawn from", () => {
+    const sources = [{
+      id: "s1", url: "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF", publisher: "Florida Legislature",
+      document_reference: "H1389, Enrolled text, 2026-03-16", source_type: "legiscan_bill_text", retrieved_at: "2026-10-02T04:54:20Z",
+    }];
+    render(<WhoItAffects billEntityId="b1" block={block({ sources })} status="Passed" effective={null} />);
+    expect(screen.getByRole("link", { name: "Enrolled text, Mar 16, 2026" })).toHaveAttribute(
+      "href", "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF",
+    );
+  });
 });

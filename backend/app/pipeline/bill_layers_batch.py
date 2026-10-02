@@ -105,13 +105,24 @@ def _sources_for(entity: Entity, job: LayerJob, analysis: StaffAnalysis | None) 
             metadata_json={"analysis_date": analysis.analysis_date.isoformat() if analysis.analysis_date else None,
                            "used_for": f"bill_layer:{job.layer}"},
         )]
+    # Name the document the text came from: its version and the official
+    # copy (R7, HB 1389 validation). A Florida bill's text is the
+    # Legislature's own PDF whether flsenate.gov or LegiScan served it.
+    version = (entity.external_ids or {}).get("text_version") or {}
+    reference = bill.bill_number
+    if version.get("type"):
+        reference += f", {version['type']} text" + (f", {version['date']}" if version.get("date") else "")
+    official = bill.source_system == "legiscan" and entity.jurisdiction_name == "FL"
+    metadata = {"used_for": f"bill_layer:{job.layer}"}
+    if version:
+        metadata["text_version"] = {"type": version.get("type"), "date": version.get("date")}
     return [Source(
-        url=bill.full_text_url or "",
-        document_reference=bill.bill_number,
-        publisher=f"{entity.jurisdiction_name or ''} via {bill.source_system}".strip(),
+        url=version.get("url") or bill.full_text_url or "",
+        document_reference=reference,
+        publisher="Florida Legislature" if official else f"{entity.jurisdiction_name or ''} via {bill.source_system}".strip(),
         source_type=f"{bill.source_system}_bill_text",
         retrieved_at=now,
-        metadata_json={"used_for": f"bill_layer:{job.layer}"},
+        metadata_json=metadata,
     )]
 
 
