@@ -1,5 +1,7 @@
 import type { BillLayers as Layers, LayerBlock, LayerKey, LayerVersion, Origin } from "@/lib/types";
 import { FlagThis } from "@/components/ChallengeForm";
+import { AccountabilityNotes } from "@/components/Accountability";
+import { forTarget, type Accountability } from "@/lib/accountability";
 import { LAYER_META, LAYER_ORDER, ORIGINS_FOR_LAYER, formatDate, originBadge, reviewLabel } from "@/lib/layers";
 
 /** The three separately labeled layers on a bill page. Pure display --
@@ -12,6 +14,8 @@ type Props = {
   /** Existing "what it does" summary, shown under Bill Says only as a
    *  labeled fallback -- never presented as the bill's own words. */
   fallbackSummary: string | null;
+  /** Disputes, corrections and responses on this bill, labelled per block. */
+  accountability?: Accountability;
 };
 
 const BADGE_STYLE: Record<Origin, string> = {
@@ -54,10 +58,12 @@ function VersionBody({ layer, version }: { layer: LayerKey; version: LayerVersio
   );
 }
 
-function Block({ billEntityId, layer, origin, block, hasStaffAnalysis }: {
+function Block({ billEntityId, layer, origin, block, hasStaffAnalysis, accountability }: {
   billEntityId: string; layer: LayerKey; origin: Origin; block: LayerBlock | undefined; hasStaffAnalysis: boolean;
+  accountability?: Accountability;
 }) {
   const version = block?.current ?? null;
+  const versionIds = block ? [block.current?.id, ...block.earlier_versions.map((v) => v.id)].filter((id): id is string => !!id) : [];
   const review = version ? reviewLabel(origin, version) : null;
   return (
     <div className="mt-3 rounded border border-slate-200 p-3">
@@ -69,6 +75,9 @@ function Block({ billEntityId, layer, origin, block, hasStaffAnalysis }: {
           </span>
         )}
       </h3>
+      {accountability && versionIds.length > 0 && (
+        <AccountabilityNotes items={forTarget(accountability, "bill_layer", versionIds)} />
+      )}
       {!version ? (
         <p className="mt-1 text-sm text-slate-600">
           {origin === "legislative_staff" && !hasStaffAnalysis ? "No staff analysis published." : "Not yet evaluated."}
@@ -132,7 +141,7 @@ function Block({ billEntityId, layer, origin, block, hasStaffAnalysis }: {
   );
 }
 
-export default function BillLayers({ billEntityId, layers, hasStaffAnalysis, fallbackSummary }: Props) {
+export default function BillLayers({ billEntityId, layers, hasStaffAnalysis, fallbackSummary, accountability }: Props) {
   return (
     <>
       {LAYER_ORDER.map((layer) => {
@@ -153,6 +162,7 @@ export default function BillLayers({ billEntityId, layers, hasStaffAnalysis, fal
                 origin={origin}
                 block={layers[layer].find((b) => b.origin === origin)}
                 hasStaffAnalysis={hasStaffAnalysis}
+                accountability={accountability}
               />
             ))}
             {showFallback && (

@@ -9,26 +9,42 @@ from sqlalchemy.orm import Session
 from app.api.flags import _check_target, record_correction
 from app.auth import require_admin
 from app.db import get_db
-from app.models import CorrectionRecord, Entity, Flag, Response
-from app.schemas.flag import CorrectionCreate, CorrectionOut, DisputeOut, ResponseCreate, ResponseOut
+from app.models import Bill, CorrectionRecord, Entity, Flag, Response
+from app.schemas.flag import CorrectionCreate, CorrectionLogOut, CorrectionOut, DisputeOut, ResponseCreate, ResponseOut
 
 router = APIRouter(tags=["corrections"])
 
 
-@router.get("/corrections", response_model=list[CorrectionOut])
+@router.get("/corrections", response_model=list[CorrectionLogOut])
 def list_corrections(
-    severity: str = Query("material", pattern="^(material|all)$"),
+    severity: str = Query("material", pattern="^(material|critical|all)$"),
+    change_type: str | None = Query(None, pattern="^(update|correction|clarification|retraction|source_correction)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
-) -> list[CorrectionRecord]:
+) -> list[CorrectionLogOut]:
     """The site-wide corrections log, newest first. Material and Critical by
-    default; `severity=all` includes Minor fixes too (each bill page lists
-    all of its own)."""
-    stmt = select(CorrectionRecord).order_by(CorrectionRecord.decided_at.desc()).offset(offset).limit(limit)
+    default (`severity=critical` narrows to Critical); `severity=all`
+    includes Minor fixes too (each bill page lists all of its own).
+    `change_type` narrows to one kind of change."""
+    stmt = (
+        select(CorrectionRecord, Bill.bill_number, Entity.name)
+        .join(Entity, Entity.id == CorrectionRecord.bill_entity_id)
+        .outerjoin(Bill, Bill.entity_id == CorrectionRecord.bill_entity_id)
+        .order_by(CorrectionRecord.decided_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
     if severity == "material":
         stmt = stmt.where(CorrectionRecord.severity.in_(("material", "critical")))
-    return list(db.execute(stmt).scalars())
+    elif severity == "critical":
+        stmt = stmt.where(CorrectionRecord.severity == "critical")
+    if change_type:
+        stmt = stmt.where(CorrectionRecord.change_type == change_type)
+    return [
+        CorrectionLogOut.model_validate(record).model_copy(update={"bill_number": number, "bill_name": name})
+        for record, number, name in db.execute(stmt)
+    ]
 
 
 @router.post("/corrections/admin", response_model=CorrectionOut, status_code=201)

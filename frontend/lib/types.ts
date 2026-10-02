@@ -157,6 +157,71 @@ export interface BillDetail extends BillListItem {
   effective?: { when: string; has_exceptions: boolean } | null;
   /** Filed vs current text, when both are stored (see TextComparison). */
   text_versions?: TextVersions | null;
+  /** Statements under challenge: labelled on the page, never hidden. */
+  disputes?: DisputeOut[];
+  /** Every correction on this bill, oldest first, all severities. */
+  corrections?: CorrectionOut[];
+  /** Verified right-of-reply responses, superseded ones included. */
+  responses?: ResponseOut[];
+}
+
+export type ChangeType = "update" | "correction" | "clarification" | "retraction" | "source_correction";
+export type Severity = "minor" | "material" | "critical";
+
+export interface DisputeOut {
+  flag_id: string;
+  object_type: string;
+  object_id: string | null;
+  category: string;
+  severity: Severity | null;
+  disputed_since: string;
+}
+
+export interface EvidenceLink {
+  url: string;
+  role?: "supporting" | "challenging" | "contradicting";
+  note?: string | null;
+}
+
+export interface CorrectionOut {
+  id: string;
+  bill_entity_id: string;
+  object_type: string;
+  object_id: string | null;
+  prior_version: number | null;
+  current_version: number | null;
+  prior_text: string | null;
+  current_text: string | null;
+  change_type: ChangeType;
+  severity: Severity;
+  trigger: "challenge" | "internal_review" | "source_change" | "methodology_change";
+  explanation: string;
+  evidence_links: EvidenceLink[];
+  origin: string | null;
+  was_reviewed: boolean | null;
+  methodology_version: string | null;
+  decided_at: string;
+  decided_by_label: string;
+}
+
+/** A /corrections log entry. */
+export interface CorrectionLogEntry extends CorrectionOut {
+  bill_number: string | null;
+  bill_name: string | null;
+}
+
+export interface ResponseOut {
+  id: string;
+  bill_entity_id: string;
+  object_type: string;
+  object_id: string | null;
+  responder_name: string;
+  responder_role: string | null;
+  text: string;
+  full_text_url: string | null;
+  verified_via: string;
+  received_at: string;
+  superseded_by_id: string | null;
 }
 
 export interface TextVersion {

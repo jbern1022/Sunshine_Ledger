@@ -174,3 +174,31 @@ def test_a_decided_challenge_cannot_be_decided_again(client, db_session, bill_fa
     client.post(f"/flags/admin/{flag_id}/decide", auth=ADMIN, json={"decision": "no_change", "explanation": "Checked; accurate."})
     again = client.post(f"/flags/admin/{flag_id}/decide", auth=ADMIN, json={"decision": "no_change", "explanation": "Checked; accurate."})
     assert again.status_code == 409
+
+
+def _admin_correction(client, entity, **fields):
+    body = {
+        "bill_entity_id": str(entity.id), "object_type": "page_copy", "trigger": "internal_review",
+        "change_type": "correction", "severity": "material", "explanation": "Wrong committee named.", **fields,
+    }
+    resp = client.post("/corrections/admin", auth=ADMIN, json=body)
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+def test_log_entries_name_the_bill(client, bill_factory):
+    entity = bill_factory(bill_number="H1389", name="Affordable Housing")
+    _admin_correction(client, entity)
+    [entry] = client.get("/corrections").json()
+    assert (entry["bill_number"], entry["bill_name"]) == ("H1389", "Affordable Housing")
+
+
+def test_log_filters_by_change_type_and_severity(client, bill_factory):
+    entity = bill_factory()
+    _admin_correction(client, entity, change_type="clarification")
+    _admin_correction(client, entity, change_type="correction", severity="critical")
+    _admin_correction(client, entity, change_type="correction", severity="minor")
+    assert len(client.get("/corrections").json()) == 2
+    assert [e["change_type"] for e in client.get("/corrections", params={"change_type": "clarification"}).json()] == ["clarification"]
+    assert [e["severity"] for e in client.get("/corrections", params={"severity": "critical"}).json()] == ["critical"]
+    assert client.get("/corrections", params={"change_type": "bogus"}).status_code == 422

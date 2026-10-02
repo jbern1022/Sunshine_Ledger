@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="mx-auto max-w-5xl px-4 py-8 text-xs text-slate-500">
           Bernal Labs · Sunshine Ledger MVP. Bill data from LegiScan (Florida), Legistar (Jacksonville), and
           Granicus iQM2 (Miami). Every claim links to a source. Informational only, not legal advice.{" "}
-          <Link href="/methodology" className="underline hover:text-slate-600">How this works</Link> &middot; <a href="/feed.xml" className="underline hover:text-slate-600">RSS</a> &middot; <Link href="/privacy" className="underline hover:text-slate-600">Privacy &amp; Terms</Link> &middot; <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-600">Security</a>
+          <Link href="/methodology" className="underline hover:text-slate-600">How this works</Link> &middot; <Link href="/corrections" className="underline hover:text-slate-600">Corrections</Link> &middot; <a href="/feed.xml" className="underline hover:text-slate-600">RSS</a> &middot; <Link href="/privacy" className="underline hover:text-slate-600">Privacy &amp; Terms</Link> &middot; <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-600">Security</a>
         </footer>
       </body>
     </html>

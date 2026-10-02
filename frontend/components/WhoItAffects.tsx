@@ -2,6 +2,8 @@ import type { LayerBlock } from "@/lib/types";
 import { formatDate, reviewLabel } from "@/lib/layers";
 import { applicability } from "@/lib/billStatus";
 import { FlagThis } from "@/components/ChallengeForm";
+import { AccountabilityNotes } from "@/components/Accountability";
+import { forTarget, type Accountability } from "@/lib/accountability";
 
 /** The bill's sentence, preceded by the plain-language restatement only
  *  when that says something different (models often copy the sentence). */
@@ -24,6 +26,7 @@ type Props = {
   block: LayerBlock;
   status: string | null | undefined;
   effective: { when: string; has_exceptions: boolean } | null | undefined;
+  accountability?: Accountability;
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -37,7 +40,7 @@ const KIND_LABEL: Record<string, string> = {
   other: "Other change",
 };
 
-export default function WhoItAffects({ billEntityId, block, status, effective }: Props) {
+export default function WhoItAffects({ billEntityId, block, status, effective, accountability }: Props) {
   const version = block.current;
   const { verb, note } = applicability(status, effective);
   return (
@@ -55,6 +58,11 @@ export default function WhoItAffects({ billEntityId, block, status, effective }:
             </span>
           )}
         </h3>
+        {accountability && (
+          <AccountabilityNotes
+            items={forTarget(accountability, "bill_layer", [version.id, ...block.earlier_versions.map((v) => v.id)])}
+          />
+        )}
         {version.evidence_state === "insufficient_evidence" ? (
           <p className="mt-1 text-sm text-slate-600">
             <span className="font-medium">Insufficient evidence</span> — {version.scope_note}

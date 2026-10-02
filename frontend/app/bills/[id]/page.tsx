@@ -12,6 +12,8 @@ import TextComparison from "@/components/TextComparison";
 import WhoItAffects from "@/components/WhoItAffects";
 import AreaContext from "@/components/AreaContext";
 import { FlagThis } from "@/components/ChallengeForm";
+import { AccountabilityNotes, CorrectionsSection } from "@/components/Accountability";
+import { forTarget } from "@/lib/accountability";
 import { hasAnyLayer } from "@/lib/layers";
 import { effectiveLabel } from "@/lib/billStatus";
 
@@ -125,12 +127,13 @@ export default async function BillPage({ params }: Props) {
             </p>
           )}
         </div>
+        <AccountabilityNotes items={forTarget(bill, "bill", [])} withResponses={false} />
       </header>
 
       {hasAnyLayer(bill.layers) ? (
         <>
-          <BillLayers billEntityId={bill.entity_id} layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} />
-          {whoBlock && <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} />}
+          <BillLayers billEntityId={bill.entity_id} layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} accountability={bill} />
+          {whoBlock && <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} accountability={bill} />}
         </>
       ) : (
         <>
@@ -147,7 +150,7 @@ export default async function BillPage({ params }: Props) {
           )}
 
           {whoBlock ? (
-            <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} />
+            <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} accountability={bill} />
           ) : isLegislation && whoItAffects && (
             <section className="mt-4">
               <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
@@ -237,6 +240,7 @@ export default async function BillPage({ params }: Props) {
                   {v.nv ? `, ${v.nv} not voting` : ""}
                   {v.absent ? `, ${v.absent} absent` : ""}
                 </p>
+                <AccountabilityNotes items={forTarget(bill, "vote", [v.id])} />
                 {v.votes.length > 0 && (
                   <details className="mt-1">
                     <summary className="cursor-pointer text-xs text-sunshine-700 underline">
@@ -296,6 +300,7 @@ export default async function BillPage({ params }: Props) {
                 {a.adopted ? " — adopted" : " — not adopted"}
                 {a.description && <span className="text-slate-500"> — {a.description}</span>}
                 {a.last_action && <span className="text-slate-500"> · last action: {a.last_action}</span>}
+                <AccountabilityNotes items={forTarget(bill, "amendment", [a.id])} />
                 {a.amendment_text && bill.full_text && (
                   <AmendmentDiff baseText={bill.full_text} amendedText={a.amendment_text} />
                 )}
@@ -304,6 +309,8 @@ export default async function BillPage({ params }: Props) {
           </ul>
         </section>
       )}
+
+      <CorrectionsSection bill={bill} />
 
       <section className="mt-4">
         <FlagThis billEntityId={bill.entity_id} label="Report a problem with this bill" />

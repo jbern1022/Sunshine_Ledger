@@ -12,4 +12,11 @@ describe("MethodologyPage", () => {
     expect(screen.getByText(/A new version starts unreviewed/)).toBeInTheDocument();
     expect(screen.getByText(/Not yet evaluated/)).toBeInTheDocument();
   });
+
+  it("explains the correction labels and links the log", () => {
+    render(<MethodologyPage />);
+    expect(screen.getByText(/Disputed — under review:/)).toBeInTheDocument();
+    expect(screen.getByText(/filing a complaint can.t/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "corrections log" })).toHaveAttribute("href", "/corrections");
+  });
 });

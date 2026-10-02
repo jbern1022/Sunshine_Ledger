@@ -148,6 +148,13 @@ class CorrectionOut(BaseModel):
     decided_by_label: str = "Sunshine Ledger editor"
 
 
+class CorrectionLogOut(CorrectionOut):
+    """A /corrections log entry: the record plus which bill it's on."""
+
+    bill_number: str | None = None
+    bill_name: str | None = None
+
+
 class DisputeOut(BaseModel):
     """A statement currently under challenge: the page labels it, never hides it."""
 

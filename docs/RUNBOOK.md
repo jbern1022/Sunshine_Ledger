@@ -548,9 +548,16 @@ curl $AUTH -H "Content-Type: application/json" -d '{"bill_entity_id": "<bill>", 
   "verified_via": "confirmed via the email on the Division of Elections candidate filing"}' "$API/responses/admin"
 ```
 
-Public: `GET /corrections` (Material + Critical; `?severity=all` adds
-Minor), and each `GET /bills/{id}` carries `disputes`, `corrections` and
-`responses`. Decided and dismissed flags start the 90-day reporter-email
+Public: `GET /corrections` (Material + Critical; `?severity=critical`
+narrows, `?severity=all` adds Minor; `?change_type=` filters; entries carry
+`bill_number`/`bill_name`), and each `GET /bills/{id}` carries `disputes`,
+`corrections` and `responses`. On the site: labels on the affected block,
+vote or amendment ("Disputed — under review", "Corrected [date]" plus the
+earlier-version note for Material/Critical), the bill's "Corrections,
+disputes and responses" section (`#corrections`, all severities), the
+`/corrections` log, and the methodology "Found something wrong?" section.
+For a block, set `object_id` to the bill_layer version id (any version of
+the block matches). Decided and dismissed flags start the 90-day reporter-email
 retention clock (`purge_flag_emails`).
 
 ## Monitoring

@@ -1,4 +1,4 @@
-import type { BillDetail, BillListResponse, PersonDetail, PersonListResponse, SourceStatus } from "./types";
+import type { BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, PersonListResponse, SourceStatus } from "./types";
 
 /** Server-side API base.
  *
@@ -106,6 +106,24 @@ export async function getRecentBillsForFeed(limit = 50): Promise<BillListRespons
 export async function getSourceStatus(): Promise<SourceStatus[] | null> {
   try {
     const res = await fetch(`${SERVER_API_URL}/sources/status`, { next: { revalidate: 600 } });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** The public corrections log (Material and Critical; filters optional).
+ *  Null when the API can't be reached, so the page can say so instead of
+ *  claiming there are no corrections. */
+export async function getCorrections(filters: { change_type?: string; severity?: string } = {}): Promise<
+  CorrectionLogEntry[] | null
+> {
+  const qs = new URLSearchParams({ limit: "200" });
+  if (filters.change_type) qs.set("change_type", filters.change_type);
+  if (filters.severity) qs.set("severity", filters.severity);
+  try {
+    const res = await fetch(`${SERVER_API_URL}/corrections?${qs}`, { next: { revalidate: 600 } });
     if (!res.ok) return null;
     return res.json();
   } catch {

@@ -168,11 +168,63 @@ export default function MethodologyPage() {
         </ul>
       </section>
 
-      <section className="mt-6">
+      <section id="corrections" className="mt-6 scroll-mt-4">
         <h2 className="text-base font-semibold text-ledger-900">Found something wrong?</h2>
         <p className="mt-2 text-sm text-slate-700">
-          Every bill has a &ldquo;Flag this&rdquo; option. Reports go to manual review — they never
-          edit the site automatically. Corrections are made against the original source.
+          Every bill page has &ldquo;Report a problem with this bill&rdquo;, and every analysis block has &ldquo;Flag
+          this block&rdquo;. Say what&apos;s wrong and, if you can, add a link or a quote that shows it; evidence helps
+          but isn&apos;t required. A report goes to a person for review. It never changes the site by itself, and many
+          reports about the same statement count as one case, not as proof.
+        </p>
+        <h3 className="mt-3 text-sm font-semibold text-ledger-900">What you may see on a page</h3>
+        <ul className="mt-1 space-y-1.5 text-sm text-slate-700">
+          <li>
+            <span className="font-medium">Disputed — under review:</span> a reviewer found a credible challenge to a
+            material or critical statement. The statement stays up with this label until a decision is published.
+            Sunshine Ledger doesn&apos;t hide statements while they&apos;re reviewed, so filing a complaint can&apos;t
+            make something disappear.
+          </li>
+          <li>
+            <span className="font-medium">Corrected, Updated, Clarified, Retracted [date]:</span> what changed and when.
+            A correction means Sunshine Ledger got it wrong; an update means new information arrived; a clarification
+            fixes wording that could mislead; a retraction means the statement is no longer supported. Material and
+            critical changes also say what the earlier version said and why it changed.
+          </li>
+          <li>
+            <span className="font-medium">Source corrected:</span> the source changed its own record, for example a
+            new version of a staff analysis. That isn&apos;t a Sunshine Ledger error and isn&apos;t described as one.
+          </li>
+          <li>
+            <span className="font-medium">Response from [name]:</span> a reply from a person or organization named on
+            the page, shown as they wrote it, with how their identity was checked (through contact details on their
+            official filings). A response isn&apos;t evidence by itself and doesn&apos;t change a finding.
+          </li>
+        </ul>
+        <h3 className="mt-3 text-sm font-semibold text-ledger-900">How reviews are handled</h3>
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
+          <li>Possible harm comes first, not the number of reports.</li>
+          <li>
+            Targets, not guarantees: critical issues (wrong identity, false attribution, an unsupported accusation)
+            are triaged within 2 days and decided within 7; material issues within 7 and 30 days; minor fixes as time
+            allows. Sunshine Ledger is run by one person. Each case records its dates, so missed targets are counted, not hidden.
+          </li>
+          <li>
+            Every reviewed report gets a recorded decision and reason, including &ldquo;no change&rdquo;. A case
+            reopens if material new evidence arrives, and the earlier decision is kept.
+          </li>
+          <li>
+            Corrections to AI-generated analysis count as Sunshine Ledger corrections and are listed like any other.
+            Regenerating analysis after a method change isn&apos;t a correction; it&apos;s logged as a methodology
+            change.
+          </li>
+          <li>
+            Nothing is corrected quietly. The earlier version, the corrected version and the evidence stay reachable
+            from the page.
+          </li>
+        </ul>
+        <p className="mt-2 text-sm text-slate-700">
+          Material and critical changes across the site are listed on the{" "}
+          <Link href="/corrections" className="text-sunshine-700 underline">corrections log</Link>.
         </p>
       </section>
 
