@@ -292,6 +292,25 @@ def within(ref: str | None, scope: str) -> bool:
     return ref.startswith(scope) and scope.startswith("s. ") and (scope[-1] in ")." or ref[len(scope)] == "(")
 
 
+def section_at(law: str, pos: int) -> str | None:
+    """"Section N" for the bill section in force at `pos`."""
+    headings = _BILL_SECTION.findall(law[: pos + 1])
+    return f"Section {headings[-1]}" if headings else None
+
+
+def unit_scope(law: str, pos: int, unit: str) -> list[str]:
+    """What "this section/subsection/paragraph/subparagraph" at `pos`
+    governs: a statute citation cut to that level ("s. 125.01055(7)"), or
+    the bill section when it amends no statute."""
+    parts = _statute_parts(law, pos)
+    if parts:
+        statute, levels = parts
+        depth = _UNIT_DEPTH[unit.lower()]
+        return ["s. " + statute + "".join(label for label in levels[:depth] if label)]
+    section = section_at(law, pos)
+    return [section] if section else []
+
+
 # R4 (HB 1389 validation): "This subsection does not apply to: 1. Airport-
 # impacted areas ... 7. Any portion of a property encumbered by a recorded
 # conservation easement" limits every rule in subsection (7).
@@ -345,14 +364,7 @@ def applicability_exclusions(law: str) -> list[dict]:
         if m.group("cites"):
             scopes = ["s. " + c for c in re.findall(r"\d+\.\d+[\w()]*", m.group("cites"))]
         else:
-            parts = _statute_parts(law, m.start())
-            depth = _UNIT_DEPTH[m.group("unit").lower()]
-            if parts:
-                statute, levels = parts
-                scopes = ["s. " + statute + "".join(label for label in levels[:depth] if label)]
-            else:
-                section = section_for_quote(law[m.start():m.end()], law[: m.end()])
-                scopes = [section] if section else []
+            scopes = unit_scope(law, m.start(), m.group("unit"))
         if scopes:
             found.append({"scopes": scopes, "quote": law[m.start():_exclusion_end(law, m)].strip()})
     return found

@@ -497,3 +497,32 @@ def test_up_to_twelve_entries_are_kept_and_more_are_counted():
     r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
     assert len(r.items) == 12
     assert r.scope_note == "Bill text · first 12 of 14 entries"
+
+
+class QuoteRoutingClient:
+    """Answers each window with the entries whose quote that window contains."""
+    model = "fake:1"
+
+    def __init__(self, *entries):
+        self.entries = entries
+        self.prompts = []
+
+    def generate(self, prompt, *, json_mode=False):
+        self.prompts.append(prompt)
+        flat = " ".join(prompt.split())
+        return json.dumps({"items": [e for e in self.entries if " ".join(e["quote"].split()) in flat]})
+
+
+def test_provision_dates_reach_the_entries_they_govern():
+    assemblage = ("A multifamily or mixed-use residential development proposed under this section shall not exclude "
+                  "an assemblage of parcels under common ownership or control")
+    a = {"group": "Developers", "change": "Must be allowed to include nearby parcels under common ownership.",
+         "change_kind": "eligibility", "quote": assemblage, "conditions": [], "exceptions": []}
+    notice = "may notify the county or municipality by July 1, 2026, of its intent to proceed"
+    b = {"group": "Pending applicants", "change": "May choose to proceed under the old rules.",
+         "change_kind": "permission", "quote": notice, "conditions": [], "exceptions": []}
+    client = QuoteRoutingClient(a, b)
+    items = {i["group"]: i for i in build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items}
+    assert {"text": "Expires July 1, 2030", "quote": "This subparagraph expires July 1, 2030."} in items["Developers"]["conditions"]
+    # The deadline is in the entry's own quote: not repeated as a condition.
+    assert items["Pending applicants"]["conditions"] == []

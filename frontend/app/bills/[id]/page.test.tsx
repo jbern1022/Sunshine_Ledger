@@ -87,6 +87,23 @@ describe("BillPage", () => {
     expect(screen.getByText(/some sections have their own dates/)).toBeInTheDocument();
   });
 
+  it("lists provisions that carry their own dates", async () => {
+    vi.mocked(serverApi.getBill).mockResolvedValueOnce({
+      ...baseBill,
+      status: "Passed",
+      effective: { when: "July 1, 2026", has_exceptions: false },
+      provision_dates: [{
+        kind: "expires", when: "July 1, 2030", date: "2030-07-01", section: "Section 1",
+        scopes: ["s. 125.01055(7)(a)2."], quote: "This subparagraph expires July 1, 2030.",
+      }],
+    });
+    await renderBillPage();
+    expect(screen.getByText(/some sections have their own dates/)).toBeInTheDocument();
+    expect(screen.getByText("1 provision has its own date")).toBeInTheDocument();
+    expect(screen.getByText("Expires July 1, 2030")).toBeInTheDocument();
+    expect(screen.getByText(/Section 1; s\. 125\.01055\(7\)\(a\)2\./)).toBeInTheDocument();
+  });
+
   it("says a dead bill would have taken effect", async () => {
     vi.mocked(serverApi.getBill).mockResolvedValueOnce({
       ...baseBill,

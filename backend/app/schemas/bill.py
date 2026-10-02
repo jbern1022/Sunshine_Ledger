@@ -221,6 +221,19 @@ class EffectiveOut(BaseModel):
     has_exceptions: bool
 
 
+class ProvisionDateOut(BaseModel):
+    """A date that applies to particular provisions rather than the act: a
+    retroactive section, a first tax roll, a sunset, a deadline, a section
+    with its own effective date. Read from the bill's own text."""
+
+    kind: str  # retroactive | tax_roll | expires | takes_effect | deadline
+    when: str
+    date: str | None  # ISO; None for a tax roll year
+    section: str | None
+    scopes: list[str]
+    quote: str
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -238,6 +251,7 @@ class BillDetail(BillListItem):
     has_staff_analysis: bool
     text_versions: TextVersionsOut | None = None
     effective: EffectiveOut | None = None
+    provision_dates: list[ProvisionDateOut] = []
     # The correction process: statements under challenge (labelled on the
     # page, never hidden), every correction with its before/after and
     # evidence, and verified right-of-reply responses.

@@ -25,7 +25,7 @@ from app.models import (
     Tag,
 )
 from app.api.corrections import bill_accountability
-from app.pipeline.effective_date import effective_clause
+from app.pipeline.effective_date import effective_clause, provision_dates
 from app.pipeline.item_kind import item_kind
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.schemas.bill import (
@@ -37,6 +37,7 @@ from app.schemas.bill import (
     BillListResponse,
     BillTagUpdate,
     EffectiveOut,
+    ProvisionDateOut,
     ClaimOut,
     DemographicMetricOut,
     DemographicOverlayOut,
@@ -628,6 +629,7 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
             if (clause := effective_clause(bill.full_text))
             else None
         ),
+        provision_dates=[ProvisionDateOut(**d) for d in provision_dates(bill.full_text)],
         has_staff_analysis=db.execute(
             select(StaffAnalysis.id).where(
                 StaffAnalysis.entity_id == entity_id,

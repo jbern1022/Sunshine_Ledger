@@ -44,6 +44,7 @@ from app.pipeline.bill_layers_text import (
     verify_quotes,
     within,
 )
+from app.pipeline.effective_date import provision_dates
 from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
 
 _BILL_SECTION_HEADING = re.compile(r"(?m)^\s*Section\s+\d+\.(?!\d)", re.IGNORECASE)
@@ -503,6 +504,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     kept, dupes = _dedupe_quotes(_round_robin(per_window))
     dropped += dupes
     _attach_exclusions(kept, applicability_exclusions(law))
+    _attach_dates(kept, provision_dates(_law_text(full_text)))
     kept = _merge_parallel(kept)
     partial = read < len(windows)
     if not kept:
@@ -565,6 +567,30 @@ def _attach_exclusions(entries: list[dict], exclusions: list[dict]) -> None:
             if any(q in quote or quote in q for q in listed):
                 continue
             entry["exceptions"].append({"text": normalize_ws(exclusion["quote"]), "quote": exclusion["quote"]})
+
+
+_DATE_LABEL = {
+    "retroactive": "Applies retroactively to {when}",
+    "tax_roll": "First applies to {when}",
+    "expires": "Expires {when}",
+    "takes_effect": "Takes effect {when}",
+    "deadline": "Deadline: {when}",
+}
+
+
+def _attach_dates(entries: list[dict], dates: list[dict]) -> None:
+    """A provision's own date (R8, HB 1389 validation) becomes a condition
+    of the entries it governs, unless the entry's quote already states it."""
+    for entry in entries:
+        ref = entry.get("statute_ref") or entry.get("section_ref")
+        for d in dates:
+            if not any(within(ref, scope) or ref == scope for scope in d["scopes"]):
+                continue
+            quote = normalize_ws(d["quote"]).lower()
+            own = [normalize_ws(entry["quote"]).lower()] + [normalize_ws(c["quote"]).lower() for c in entry["conditions"]]
+            if any(q in quote or quote in q for q in own):
+                continue
+            entry["conditions"].append({"text": _DATE_LABEL[d["kind"]].format(when=d["when"]), "quote": d["quote"]})
 
 
 def _section_ref(quote: str, window: str, law: str, offset: int) -> str | None:
