@@ -1,6 +1,6 @@
 import json
 
-from app.pipeline.bill_layers import METHOD_VERSIONS, WHO_IT_AFFECTS_PROMPT, build_who_it_affects
+from app.pipeline.bill_layers import MAX_WHO_WINDOWS, METHOD_VERSIONS, WHO_IT_AFFECTS_PROMPT, build_who_it_affects
 
 BILL = (
     "A bill to be entitled An act relating to deposits; requiring landlords to return deposits; providing an effective date.\n"
@@ -143,7 +143,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/1"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/2"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -193,3 +193,112 @@ def test_a_prohibition_worded_as_a_permission_is_dropped():
     item = _landlord(group="Anyone", change_kind="prohibition", change="May return the deposit within 15 days.")
     r = build_who_it_affects("HB 1", "Deposits", BILL, FakeClient({"items": [item]}))
     assert r.items == []
+
+
+# R1 (HB 1389 validation, 2026-10-02): the model saw only the first 12,000
+# chars -- Section 1 of 13 -- so every group in Sections 2-12 was missing.
+# Who it affects now reads the whole bill, one window of sections at a time.
+class SequenceClient:
+    """Answers each call with the next payload; records every prompt."""
+    model = "fake:1"
+
+    def __init__(self, *payloads):
+        self.payloads = list(payloads)
+        self.prompts = []
+
+    def generate(self, prompt, *, json_mode=False):
+        assert json_mode
+        self.prompts.append(prompt)
+        return json.dumps(self.payloads.pop(0) if self.payloads else {"items": []})
+
+
+def _section(n: int, sentence: str, size: int = 7_000) -> str:
+    filler = "".join(f"({i}) The department shall keep record number {n}-{i} on file.\n" for i in range(size // 55))
+    return f"Section {n}. {sentence}\n{filler}"
+
+
+def _entry(group: str, quote: str, kind: str = "obligation") -> dict:
+    change = "Must " + quote.split(" shall ", 1)[1].rstrip(".") if " shall " in quote else quote
+    return {"group": group, "change": change, "change_kind": kind, "quote": quote, "conditions": [], "exceptions": []}
+
+
+TITLE = "A bill to be entitled An act relating to records; amending s. 1.01, F.S.; providing an effective date.\n"
+COUNTIES = "Each county shall publish its land records online."
+CITIES = "Each municipality shall publish its zoning maps online."
+SCHOOLS = "Each school district shall publish its property list online."
+LONG_BILL = (
+    TITLE
+    + _section(1, COUNTIES)
+    + _section(2, CITIES)
+    + _section(3, SCHOOLS)
+    + "Section 4. This act shall take effect July 1, 2027.\n"
+)
+
+
+def test_reads_every_section_of_a_long_bill():
+    client = SequenceClient(
+        {"items": [_entry("Counties", COUNTIES)]},
+        {"items": [_entry("Municipalities", CITIES)]},
+        {"items": [_entry("School districts", SCHOOLS)]},
+    )
+    r = build_who_it_affects("HB 2", "Records", LONG_BILL, client)
+    assert len(client.prompts) == 3
+    assert [(i["group"], i["section_ref"]) for i in r.items] == [
+        ("Counties", "Section 1"), ("Municipalities", "Section 2"), ("School districts", "Section 3"),
+    ]
+    assert r.scope_note == "Bill text"
+    # Each window is the law, never the title.
+    assert all("A bill to be entitled" not in p for p in client.prompts)
+
+
+def test_a_quote_must_be_in_the_window_the_model_saw():
+    # The model answering for Section 1's window can't cite Section 3.
+    client = SequenceClient({"items": [_entry("School districts", SCHOOLS)]})
+    r = build_who_it_affects("HB 2", "Records", LONG_BILL, client)
+    assert r.items == [] and len(r.dropped) == 1
+
+
+def test_later_sections_are_not_crowded_out_by_the_first():
+    first = [_entry(f"Group {i}", f"({i}) The department shall keep record number 1-{i} on file.") for i in range(6)]
+    client = SequenceClient({"items": first}, {"items": [_entry("Municipalities", CITIES)]}, {"items": []})
+    r = build_who_it_affects("HB 2", "Records", LONG_BILL, client)
+    assert len(r.items) == 6
+    assert "Municipalities" in [i["group"] for i in r.items]
+
+
+def test_a_section_larger_than_one_window_is_split_on_line_breaks():
+    big = _section(1, COUNTIES, size=30_000)
+    tail = "(999) Each county shall report its totals to the department.\n"
+    bill = TITLE + big + tail + "Section 2. This act shall take effect July 1, 2027.\n"
+    client = SequenceClient({"items": []}, {"items": []}, {"items": [_entry("Counties", tail.strip())]})
+    r = build_who_it_affects("HB 3", "Records", bill, client)
+    assert len(client.prompts) == 3
+    [item] = r.items
+    # The section is found from the whole bill, not the window the quote came from.
+    assert item["section_ref"] == "Section 1"
+
+
+def test_a_very_long_bill_says_which_sections_were_read():
+    sections = "".join(_section(n, f"Agency {n} shall publish its records online.", size=11_000) for n in range(1, 8))
+    bill = TITLE + sections + "Section 8. This act shall take effect July 1, 2027.\n"
+    client = SequenceClient({"items": [_entry("Agency 1", "Agency 1 shall publish its records online.")]})
+    r = build_who_it_affects("HB 4", "Records", bill, client)
+    assert len(client.prompts) == 4
+    assert r.scope_note == "Sections 1-4 of 8"
+
+
+def test_hb1389_is_read_in_full():
+    # The bill that found the gap: stored enrolled text, 13 sections, ~32k chars.
+    from pathlib import Path
+
+    text = (Path(__file__).parent / "fixtures" / "bill_text" / "hb1389_2026_enrolled.txt").read_text()
+    client = SequenceClient()
+    r = build_who_it_affects("H1389", "Affordable Housing", text, client)
+    seen = "".join(client.prompts)
+    assert len(client.prompts) <= MAX_WHO_WINDOWS
+    assert "An act relating to affordable housing" not in seen
+    for n in range(1, 14):
+        assert f"Section {n}." in seen
+    # Sections 1 and 2 (counties, municipalities) are each ~9-10k chars.
+    assert "Section 1." in client.prompts[0] and "Section 2." in client.prompts[1]
+    assert r.scope_note == "No group the bill directly applies to could be tied to its text"

@@ -106,8 +106,10 @@ export default function WhoItAffects({ billEntityId, block, status, effective, a
               where the bill states them; its definitions may narrow who is covered. Belonging to a group doesn&apos;t
               mean every condition applies to you.
             </p>
-            {version.scope_note === "Drawn from the first part of a long bill" && (
-              <p className="mt-1 text-[11px] text-slate-500">Drawn from the first part of a long bill</p>
+            {version.scope_note !== "Bill text" && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                {version.scope_note.startsWith("Sections ") ? `Drawn from ${version.scope_note}` : version.scope_note}
+              </p>
             )}
           </>
         )}

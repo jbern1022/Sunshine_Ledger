@@ -49,7 +49,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/1",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/2",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -213,10 +213,22 @@ def _item(raw: dict, *, quote: str | None = None, assumptions_required: bool = F
     }
 
 
-def _truncate(full_text: str) -> tuple[str, bool]:
+def _law_text(full_text: str) -> str:
+    """The bill from its first "Section N." heading on. A Florida bill opens
+    with a title paragraph paraphrasing every change ("amending s. 641.26,
+    F.S.; revising requirements ..."): quoting it is quoting a summary, and
+    it can fill most of the window (HB 1389: 2,540 of 12,000 chars; H1141:
+    all of it). The bill's name reaches the prompt separately. Text with no
+    section headings (a resolution, an agenda item) is used whole."""
     # Page headers and margin line numbers go first: they split sentences
     # (so verbatim quotes fail) and waste the model's character budget.
     text = strip_page_artifacts(full_text)
+    first = _BILL_SECTION_HEADING.search(text)
+    return text[first.start():].lstrip() if first else text
+
+
+def _truncate(full_text: str) -> tuple[str, bool]:
+    text = _law_text(full_text)
     return text[:MAX_BILL_TEXT_CHARS], len(text) > MAX_BILL_TEXT_CHARS
 
 
@@ -339,20 +351,71 @@ _MANDATORY = re.compile(r"\b(?:shall|must|(?:is|are) required)\b", re.IGNORECASE
 _PERMITS = re.compile(r"\bmay\b(?!\s+not\b)", re.IGNORECASE)
 
 
-def _operative(amended: str, full_text: str) -> str:
-    """The law itself, from the first "Section N." heading on. A Florida
-    bill opens with a title paragraph paraphrasing every change ("amending
-    s. 641.26, F.S.; revising requirements ..."); quoting that is quoting a
-    summary, not the provision. Text with no section headings is used whole,
-    unless the full bill has them: then the window shown to the model is all
-    title (H1141, 2026-10-01) and nothing operative is visible."""
-    first = _BILL_SECTION_HEADING.search(amended)
-    if first:
-        return amended[first.start():]
-    return "" if _BILL_SECTION_HEADING.search(law_as_amended(full_text)) else amended
+# Who it affects reads the whole bill, a window of whole sections at a time
+# (HB 1389 validation, 2026-10-02: one 12,000-char window showed the model
+# Section 1 of 13). Each window is one model call on the nightly GPU, so a
+# very long bill is read up to this many windows, and the block says which
+# sections that covered.
+MAX_WHO_WINDOWS = 4
+_SECTION_NUMBER = re.compile(r"Section\s+(\d+)\.", re.IGNORECASE)
 
 
-# Title-paragraph phrasing, should one slip past _operative (no headings).
+def _windows(law: str, limit: int = MAX_BILL_TEXT_CHARS) -> list[tuple[int, str]]:
+    """(offset, text) windows of at most `limit` chars, packing consecutive
+    "Section N." sections; a section longer than that is split at line
+    breaks (and a single line longer still, at `limit`)."""
+    starts = [m.start() for m in _BILL_SECTION_HEADING.finditer(law)]
+    if not starts or starts[0] != 0:
+        starts.insert(0, 0)
+    units: list[tuple[int, str]] = []
+    for a, b in zip(starts, starts[1:] + [len(law)]):
+        if b - a <= limit:
+            units.append((a, law[a:b]))
+            continue
+        pos = a
+        for line in law[a:b].splitlines(keepends=True):
+            for i in range(0, len(line), limit):
+                units.append((pos + i, line[i:i + limit]))
+            pos += len(line)
+    windows: list[tuple[int, str]] = []
+    for offset, text in units:
+        if windows and len(windows[-1][1]) + len(text) <= limit:
+            windows[-1] = (windows[-1][0], windows[-1][1] + text)
+        else:
+            windows.append((offset, text))
+    return [w for w in windows if w[1].strip()]
+
+
+def _section_at(law: str, offset: int) -> str | None:
+    """The number of the section in force at `offset` in `law`: the last
+    heading at or before it."""
+    last = None
+    for m in _BILL_SECTION_HEADING.finditer(law):
+        if m.start() > offset:
+            break
+        last = m
+    return _SECTION_NUMBER.search(law, last.start()).group(1) if last else None
+
+
+def _sections_read(law: str, windows: list[tuple[int, str]], read: int) -> str:
+    """'Sections 1-4 of 8' for the first `read` windows of `law`."""
+    first = _section_at(law, windows[0][0])
+    last = _section_at(law, windows[read - 1][0] + len(windows[read - 1][1]) - 1)
+    total = _section_at(law, len(law))
+    if not (first and last and total):
+        return "the first part of a long bill"
+    return f"Sections {first}-{last} of {total}"
+
+
+def _round_robin(groups: list[list[dict]]) -> list[dict]:
+    """Interleave per-window entries so the cap can't fill from Section 1 alone."""
+    merged: list[dict] = []
+    for i in range(max((len(g) for g in groups), default=0)):
+        merged.extend(g[i] for g in groups if i < len(g))
+    return merged
+
+
+# Title-paragraph phrasing, should one slip past _law_text (no headings).
 _TITLE_STYLE = re.compile(r"\bamending s(?:s)?\.\s*[\d.]+,\s*F\.S\.;|^(?:requiring|prohibiting|authorizing|revising|providing|creating|removing|specifying)\b", re.IGNORECASE)
 _NEGATION = re.compile(r"\b(?:not|no|never|unlawful|prohibit\w*|may not|shall not)\b", re.IGNORECASE)
 
@@ -386,12 +449,46 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     text states. Status-dependent wording ("would apply" / "applies") is the
     page's job, from the bill's current status, so it can't go stale here.
     Agreed rules: Data Model v1, "Scope and Affected Population"."""
-    text, truncated = _truncate(full_text)
-    amended = law_as_amended(text)
+    law = law_as_amended(_law_text(full_text))
+    windows = _windows(law)
+    read = min(len(windows), MAX_WHO_WINDOWS)
+    per_window: list[list[dict]] = []
+    dropped: list[dict] = []
+    for offset, window in windows[:read]:
+        kept, rejected = _who_entries(bill_number, title, window, client)
+        for item in kept:
+            item["section_ref"] = _section_ref(item["quote"], window, law, offset)
+        per_window.append(kept)
+        dropped += rejected
+    kept, dupes = _dedupe_quotes(_round_robin(per_window))
+    dropped += dupes
+    partial = read < len(windows)
+    if not kept:
+        note = "No group the bill directly applies to could be tied to its text"
+        if partial:
+            note += f" in {_sections_read(law, windows, read)}"
+        return LayerResult("insufficient_evidence", note, [], dropped)
+    scope = _sections_read(law, windows, read) if partial else "Bill text"
+    return LayerResult("supported", scope, kept[:6], dropped)
+
+
+def _section_ref(quote: str, window: str, law: str, offset: int) -> str | None:
+    """The section a quote sits in, located in the window it came from (the
+    same sentence can recur in another section); a window that opens
+    mid-section takes the heading in force where it starts."""
+    ref = section_for_quote(quote, window)
+    if ref:
+        return ref
+    number = _section_at(law, offset)
+    return f"Section {number}" if number else None
+
+
+def _who_entries(bill_number: str, title: str, window: str, client) -> tuple[list[dict], list[dict]]:
+    """One model call on one window of the law; every guard runs against that
+    window, so an entry can only cite text the model was shown."""
     raw = _parse_items(client.generate(
-        WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, text=amended), json_mode=True
+        WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, text=window), json_mode=True
     ))
-    operative = _operative(amended, full_text)
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:
@@ -399,12 +496,12 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
         change = str(r.get("change") or "").strip()
         if not group or not change:
             continue
-        verified, _ = verify_quotes([r], operative)
+        verified, _ = verify_quotes([r], window)
         if (
             not verified
             or _EFFECTIVE_DATE_CLAUSE.search(verified[0]["quote"])
             or _DOWNSTREAM.search(change)
-            or overstates_modal(change, text)
+            or overstates_modal(change, window)
             or (_REQUIRES.search(change) and not _MANDATORY.search(verified[0]["quote"]))
             or _TITLE_STYLE.search(verified[0]["quote"])
             # A "prohibition" worded as a bare permission is a misreading
@@ -423,19 +520,13 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
             "group": group,
             "change_kind": kind,
             "quote": quote,
-            "section_ref": section_for_quote(quote, amended),
-            "conditions": _verified_clauses(r.get("conditions"), operative),
-            "exceptions": _verified_clauses(r.get("exceptions"), operative),
+            "section_ref": None,
+            "conditions": _verified_clauses(r.get("conditions"), window),
+            "exceptions": _verified_clauses(r.get("exceptions"), window),
             "assumptions": [],
             "affected_groups": [group],
         })
-    if not kept:
-        note = "No group the bill directly applies to could be tied to its text"
-        if truncated:
-            note += " in the first part of a long bill"
-        return LayerResult("insufficient_evidence", note, [], dropped)
-    scope = "Drawn from the first part of a long bill" if truncated else "Bill text"
-    return LayerResult("supported", scope, kept[:6], dropped)
+    return kept, dropped
 
 
 def build_staff_interpretation(effect_section: str | None, staff_label: str, client) -> LayerResult:

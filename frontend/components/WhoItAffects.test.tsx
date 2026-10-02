@@ -70,4 +70,19 @@ describe("WhoItAffects", () => {
     expect(screen.getByText(/No group the bill directly applies to/)).toBeInTheDocument();
     expect(screen.queryByText(/Would apply to/)).toBeNull();
   });
+
+  it("says which sections a very long bill was read from", () => {
+    render(<WhoItAffects billEntityId="b1" block={block({ scope_note: "Sections 1-4 of 20" })} status="Introduced" effective={null} />);
+    expect(screen.getByText("Drawn from Sections 1-4 of 20")).toBeInTheDocument();
+  });
+
+  it("still shows the older long-bill note", () => {
+    render(<WhoItAffects billEntityId="b1" block={block({ scope_note: "Drawn from the first part of a long bill" })} status="Introduced" effective={null} />);
+    expect(screen.getByText("Drawn from the first part of a long bill")).toBeInTheDocument();
+  });
+
+  it("adds no scope note when the whole bill was read", () => {
+    render(<WhoItAffects billEntityId="b1" block={block()} status="Introduced" effective={null} />);
+    expect(screen.queryByText(/Drawn from/)).not.toBeInTheDocument();
+  });
 });
