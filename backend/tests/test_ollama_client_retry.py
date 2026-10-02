@@ -139,3 +139,21 @@ def test_generate_does_not_retry_on_http_status_error(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         client.generate("prompt")
     assert calls["n"] == 1
+
+
+# The bill layers run at temperature 0 (F2, 2026-10-02): at Ollama's default,
+# two HB 1389 runs kept 4 and 14 Who it affects entries from the same text.
+def test_temperature_is_sent_only_when_set(monkeypatch):
+    bodies = []
+
+    def post(url, json=None):
+        bodies.append(json)
+        return _FakeResponse(200, {"response": "ok"})
+
+    default, fixed = OllamaClient(), OllamaClient(temperature=0)
+    monkeypatch.setattr(default._client, "post", post)
+    monkeypatch.setattr(fixed._client, "post", post)
+    default.generate("p")
+    fixed.generate("p", json_mode=True)
+    assert "options" not in bodies[0]
+    assert bodies[1]["options"] == {"temperature": 0}

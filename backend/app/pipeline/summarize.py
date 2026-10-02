@@ -153,10 +153,18 @@ _sleep = time.sleep
 
 class OllamaClient:
     def __init__(
-        self, host: str | None = None, model: str | None = None, *, timeout: float = 120.0
+        self,
+        host: str | None = None,
+        model: str | None = None,
+        *,
+        timeout: float = 120.0,
+        temperature: float | None = None,
     ) -> None:
         self.host = (host or settings.ollama_host).rstrip("/")
         self.model = model or settings.ollama_model
+        # None keeps the model's default sampling (the summaries). The bill
+        # layers pass 0: the same text should give the same published block.
+        self.temperature = temperature
         self._client = httpx.Client(timeout=timeout)
 
     def generate(self, prompt: str, *, json_mode: bool = False) -> str:
@@ -166,6 +174,8 @@ class OllamaClient:
         body = {"model": self.model, "prompt": prompt, "stream": False}
         if json_mode:
             body["format"] = "json"
+        if self.temperature is not None:
+            body["options"] = {"temperature": self.temperature}
         # Retry once, after a short pause, on a connection-level failure
         # (refused, dropped, reset) -- the 2026-09-23 quality report hit
         # three of these when Ollama restarted mid-run. Not retried:
