@@ -96,4 +96,11 @@ describe("WhoItAffects", () => {
       "href", "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF",
     );
   });
+
+  it("cites the statute next to the bill section", () => {
+    const b = block();
+    b.current.items[0].statute_ref = "s. 83.49(1)";
+    render(<WhoItAffects billEntityId="b1" block={b} status="Introduced" effective={null} />);
+    expect(screen.getByText(/\(Section 1, s\. 83\.49\(1\)\)/)).toBeInTheDocument();
+  });
 });

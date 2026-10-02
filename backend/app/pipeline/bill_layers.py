@@ -32,9 +32,11 @@ from app.pipeline.bill_layers_text import (
     law_as_amended,
     normalize_ws,
     overstates_modal,
+    quote_position,
     restates_bill,
     section_for_quote,
     section_number,
+    statute_at,
     strip_page_artifacts,
     verify_quotes,
 )
@@ -485,6 +487,8 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
         kept, rejected = _who_entries(bill_number, title, window, client)
         for item in kept:
             item["section_ref"] = _section_ref(item["quote"], window, law, offset)
+            at = quote_position(item["quote"], window)
+            item["statute_ref"] = statute_at(law, None if at is None else offset + at)
         per_window.append(kept)
         dropped += rejected
     kept, dupes = _dedupe_quotes(_round_robin(per_window))
@@ -555,6 +559,7 @@ def _who_entries(bill_number: str, title: str, window: str, client) -> tuple[lis
             "change_kind": kind,
             "quote": quote,
             "section_ref": None,
+            "statute_ref": None,
             "conditions": conditions,
             "exceptions": exceptions,
             "assumptions": [],

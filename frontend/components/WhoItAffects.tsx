@@ -85,7 +85,7 @@ export default function WhoItAffects({ billEntityId, block, status, effective, a
                   {item.quote && (
                     <p className="mt-0.5 text-xs text-slate-500">
                       Why: <q className="italic">{item.quote}</q>
-                      {item.section_ref && <> ({item.section_ref})</>}
+                      {(item.section_ref || item.statute_ref) && <> ({[item.section_ref, item.statute_ref].filter(Boolean).join(", ")})</>}
                     </p>
                   )}
                   {(item.conditions ?? []).map((c, j) => (

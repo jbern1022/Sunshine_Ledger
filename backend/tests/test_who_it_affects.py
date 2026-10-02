@@ -368,3 +368,17 @@ def test_a_quote_that_opens_with_if_is_not_repeated_as_its_own_condition():
              "conditions": [], "exceptions": []}
     [item] = build_who_it_affects("HB 6", "Leases", bill, FakeClient({"items": [entry]})).items
     assert item["conditions"] == []
+
+
+def test_entries_cite_the_statute_they_amend():
+    from pathlib import Path
+
+    text = (Path(__file__).parent / "fixtures" / "bill_text" / "hb1389_2026_enrolled.txt").read_text()
+    setbacks = ("A municipality may not restrict height below the height authorized under this paragraph through "
+                "other dimensional means, such as establishing setbacks or stepbacks by height, or require setbacks "
+                "or stepbacks that are more restrictive than the minimum permitted in the proposed development.")
+    entry = {"group": "Municipalities", "change": "May not use setbacks to cut the allowed height.",
+             "change_kind": "prohibition", "quote": setbacks, "conditions": [], "exceptions": []}
+    client = SequenceClient({"items": []}, {"items": [entry]}, {"items": []})
+    [item] = build_who_it_affects("H1389", "Affordable Housing", text, client).items
+    assert (item["section_ref"], item["statute_ref"]) == ("Section 2", "s. 166.04151(7)(d)1.")

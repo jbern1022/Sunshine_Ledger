@@ -211,23 +211,66 @@ def section_number(ref: str | None) -> str | None:
     return m.group(1) if m else None
 
 
-def section_for_quote(quote: str, text: str) -> str | None:
-    """The last bill section heading ("Section N.") before `quote` in `text`.
-
-    The quote is located in `text` tolerating whitespace differences (as it
-    was during verification), but the search runs against the original
-    (non-normalized) text so the line-anchored `_BILL_SECTION` heading
-    pattern still means what it says.
-    """
+def quote_position(quote: str, text: str) -> int | None:
+    """Where `quote` starts in `text`, tolerating whitespace differences (as
+    verification does). The search runs against the original text, so
+    offsets and line-anchored patterns still mean what they say."""
     q = normalize_ws(quote)
     if not q:
         return None
-    quote_pattern = re.compile(r"\s+".join(re.escape(word) for word in q.split()))
-    m = quote_pattern.search(text)
-    if not m:
+    m = re.search(r"\s+".join(re.escape(word) for word in q.split()), text)
+    return m.start() if m else None
+
+
+def section_for_quote(quote: str, text: str) -> str | None:
+    """The last bill section heading ("Section N.") before `quote` in `text`."""
+    pos = quote_position(quote, text)
+    if pos is None:
         return None
-    headings = _BILL_SECTION.findall(text[: m.start()])
+    headings = _BILL_SECTION.findall(text[:pos])
     return f"Section {headings[-1]}" if headings else None
+
+
+# R6 (HB 1389 validation): a Florida bill section that amends a statute
+# opens "Section 1. Paragraphs (a) ... of subsection (7) of section
+# 125.01055, Florida Statutes, are amended to read:"; the reader's
+# reference is s. 125.01055(7)(a)1., not "Section 1".
+_AMENDED_STATUTE = re.compile(
+    r"\b(?:section|s\.)\s+(\d+\.\d+),\s+Florida\s+Statutes,?[^:]*?\b(?:amended|created|reenacted)\s+to\s+read:",
+    re.IGNORECASE,
+)
+# Subsection (7), paragraph (a), subparagraph 1., sub-subparagraph a. at the
+# start of a line. "s. 170.201" is a citation, not sub-subparagraph "s.".
+_LABELS = re.compile(r"(?m)^\s*(\(\d+\))?(\([a-z]{1,2}\))?(\d+\.(?=\s))?([a-z]\.(?=\s(?!\d)))?")
+
+
+def statute_at(law: str, pos: int | None) -> str | None:
+    """The statutory citation in force at `pos` in `law`: the statute the
+    enclosing bill section amends, plus the subdivision labels seen since.
+    None for a free-standing section (no "Florida Statutes ... to read:")."""
+    if pos is None:
+        return None
+    headings = [m for m in _BILL_SECTION.finditer(law) if m.start() <= pos]
+    if not headings:
+        return None
+    start = headings[-1].start()
+    statute = _AMENDED_STATUTE.search(law, start, pos)
+    if not statute or "\n" not in law[statute.end():pos]:
+        return None
+    levels: list[str | None] = [None, None, None, None]
+    body_start = law.index("\n", statute.end()) + 1
+    line_start = body_start
+    while line_start <= pos:
+        m = _LABELS.match(law, line_start)
+        for depth, label in enumerate(m.groups() if m else ()):
+            if label:
+                levels[depth] = label
+                levels[depth + 1:] = [None] * (3 - depth)
+        nxt = law.find("\n", line_start)
+        if nxt == -1:
+            break
+        line_start = nxt + 1
+    return "s. " + statute.group(1) + "".join(label for label in levels if label)
 
 
 def is_conditional(statement: str) -> bool:
