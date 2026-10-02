@@ -2,6 +2,7 @@ export interface SourceOut {
   id: string;
   url: string;
   publisher: string | null;
+  document_reference?: string | null;
   source_type: string;
   retrieved_at: string;
 }
@@ -155,6 +156,7 @@ export interface BillDetail extends BillListItem {
   has_staff_analysis: boolean;
   /** When the bill says it takes effect, from its own text. */
   effective?: { when: string; has_exceptions: boolean } | null;
+  provision_dates?: ProvisionDate[];
   /** Filed vs current text, when both are stored (see TextComparison). */
   text_versions?: TextVersions | null;
   /** Statements under challenge: labelled on the page, never hidden. */
@@ -416,6 +418,9 @@ export interface QuotedClause {
 export interface LayerItem {
   text: string;
   section_ref: string | null;
+  statute_ref?: string | null;
+  restates_existing_law?: boolean | null;
+  also_in?: { quote: string; section_ref: string | null; statute_ref: string | null }[];
   quote: string | null;
   assumptions: string[];
   affected_groups: string[];
@@ -463,4 +468,14 @@ export interface SourceStatus {
   stale: boolean;
   bill_count: number | null;
   bills_with_text: number | null;
+}
+
+/** A date that applies to particular provisions, not the whole act. */
+export interface ProvisionDate {
+  kind: "retroactive" | "tax_roll" | "expires" | "takes_effect" | "deadline" | string;
+  when: string;
+  date: string | null;
+  section: string | null;
+  scopes: string[];
+  quote: string;
 }

@@ -652,3 +652,96 @@ def test_verify_quotes_rejects_statute_catchline():
         text,
     )
     assert len(dropped) == 1
+
+
+# R6 (HB 1389 validation): "Section 1" is the bill's numbering; the reference
+# a reader can look up is the statute it amends.
+def _hb1389_law():
+    from pathlib import Path
+
+    from app.pipeline.bill_layers_text import law_as_amended
+
+    return law_as_amended((Path(__file__).parent / "fixtures" / "bill_text" / "hb1389_2026_enrolled.txt").read_text())
+
+
+def _statute(quote, law):
+    from app.pipeline.bill_layers_text import quote_position, statute_at
+
+    return statute_at(law, quote_position(quote, law))
+
+
+def test_statute_reference_follows_subsection_paragraph_and_subparagraph():
+    law = _hb1389_law()
+    assert _statute("A county must authorize multifamily and mixed-use residential as allowable uses", law) == "s. 125.01055(7)(a)1."
+    assert _statute("A county may not restrict height below the height authorized under this paragraph", law) == "s. 125.01055(7)(d)1."
+    assert _statute("the county may restrict the height of the proposed development to 150 percent", law) == "s. 125.01055(7)(d)2."
+    assert _statute("Farms and farm operations as those terms are defined in s. 823.14(3) and uses associated therewith, including the packaging and sale of products raised on the premises, are not industrial use.", law) == "s. 125.01055(7)(n)2."
+    assert _statute("Any area of critical state concern, as designated in ss. 380.055", law) == "s. 125.01055(7)(o)6."
+
+
+def test_statute_reference_in_the_parallel_municipal_section():
+    law = _hb1389_law()
+    assert _statute("A municipality may not restrict height below the height authorized under this paragraph", law) == "s. 166.04151(7)(d)1."
+
+
+def test_whole_section_amendments_and_unnumbered_lines():
+    law = _hb1389_law()
+    assert _statute("It is unlawful to discriminate in land use decisions", law) == "s. 760.26"
+    assert _statute("multifamily project that was issued a building permit on or after July 1, 2026", law) == "s. 196.1978(3)(o)8."
+    assert _statute("\"Person\" includes one or more individuals", law) == "s. 760.22(8)"
+
+
+def test_no_statute_for_a_free_standing_section():
+    law = _hb1389_law()
+    assert _statute("are intended to be remedial and clarifying in nature", law) is None
+    assert _statute("OPPAGA shall also evaluate the potential of tiny homes", law) is None
+
+
+def test_no_statute_when_the_quote_is_not_found():
+    from app.pipeline.bill_layers_text import statute_at
+
+    assert statute_at("Section 1. Text.", None) is None
+
+
+# R5 (HB 1389 validation): an entry can rest on law the bill leaves as is.
+def test_change_regions_match_law_as_amended():
+    from app.pipeline.bill_layers_text import change_regions, law_as_amended
+
+    raw = ("Section 1. Section 1.01, Florida Statutes, is amended to read:\n"
+           "(1) Fees may be waived[added: ;][deleted: , and] in any case.\n"
+           "(2) The clerk shall keep [deleted: paper] records [added: online].\n")
+    plain, regions = change_regions(raw)
+    assert plain == law_as_amended(raw)
+    assert [plain[a:b] for a, b in regions] == [";", "", "", "online"]
+
+
+def test_a_quote_on_unchanged_text_restates_existing_law():
+    from app.pipeline.bill_layers_text import change_regions, restates_existing_law
+
+    raw = ("Section 1. Section 1.01, Florida Statutes, is amended to read:\n"
+           "(1) A clerk shall keep records of every filing.\n"
+           "(2) The clerk shall publish [added: each record online within 10 days].\n"
+           "Section 2. Section 1.02, Florida Statutes, is created to read:\n"
+           "1.02 Fees.—A clerk may charge a fee for copies.\n")
+    plain, regions = change_regions(raw)
+    assert restates_existing_law(plain, regions, "A clerk shall keep records of every filing.") is True
+    assert restates_existing_law(plain, regions, "The clerk shall publish each record online within 10 days.") is False
+    # A created section is new law throughout, marked or not.
+    assert restates_existing_law(plain, regions, "A clerk may charge a fee for copies.") is False
+
+
+def test_a_deletion_inside_the_quote_is_a_change():
+    from app.pipeline.bill_layers_text import change_regions, restates_existing_law
+
+    raw = ("Section 1. Section 1.01, Florida Statutes, is amended to read:\n"
+           "(1) Industrial use includes junk yards, [deleted: meat packing facilities,] electrical generating plants.\n")
+    plain, regions = change_regions(raw)
+    assert restates_existing_law(plain, regions, "Industrial use includes junk yards, electrical generating plants.") is False
+
+
+def test_text_with_no_markers_is_never_called_existing_law():
+    from app.pipeline.bill_layers_text import change_regions, restates_existing_law
+
+    raw = "Section 1. Section 1.01, Florida Statutes, is amended to read:\n(1) A clerk shall keep records.\n"
+    plain, regions = change_regions(raw)
+    assert restates_existing_law(plain, regions, "A clerk shall keep records.") is False

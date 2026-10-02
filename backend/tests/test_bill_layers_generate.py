@@ -492,3 +492,23 @@ def test_filler_assumptions_are_removed():
     r = build_ai_interpretation("HB 1", "Pay", BILL, client)
     assert r.items[0]["assumptions"] == ["Employees have bank accounts."]
     assert r.items[1]["assumptions"] == ["None identified"]
+
+
+# R2 (HB 1389 validation, 2026-10-02): a Florida bill's title paragraph
+# paraphrases every change and can fill most of the model's window (HB 1389:
+# 2,540 of 12,000 chars; H1141: all of it). The window starts at the law.
+def test_window_starts_at_section_one_not_the_title():
+    title = "A bill to be entitled An act relating to pay; " + "amending s. 110.113, F.S.; revising salary rules; " * 200
+    client = FakeClient({"items": [{"section_ref": "Section 2", "quote": "This act shall take effect July 1, 2027."}]})
+    r = build_bill_says("HB 1", "Pay", title + "\n" + BILL, client)
+    assert "A bill to be entitled" not in client.prompts[0]
+    assert "Section 1. Subsection (2)" in client.prompts[0]
+    # The title is gone, so the law itself fits: not a "long bill".
+    assert r.scope_note == "Bill text"
+
+
+def test_text_without_section_headings_is_used_from_the_start():
+    resolution = "A RESOLUTION of the City Commission approving the agreement with the vendor.\n"
+    client = FakeClient({"items": [{"text": "Approves the agreement.", "section_ref": None, "assumptions": ["x"]}]})
+    build_ai_interpretation("R-1", "Agreement", resolution, client)
+    assert "A RESOLUTION of the City Commission" in client.prompts[0]

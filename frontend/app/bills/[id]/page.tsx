@@ -15,7 +15,7 @@ import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes, CorrectionsSection } from "@/components/Accountability";
 import { forTarget } from "@/lib/accountability";
 import { hasAnyLayer } from "@/lib/layers";
-import { effectiveLabel } from "@/lib/billStatus";
+import { effectiveLabel, provisionDateLabel } from "@/lib/billStatus";
 
 /** Permalink for a single bill.
  *
@@ -122,9 +122,31 @@ export default async function BillPage({ params }: Props) {
               {bill.effective.when}
               <span className="text-xs text-slate-500">
                 {" "}
-                (per the bill text{bill.effective.has_exceptions ? "; some sections have their own dates" : ""})
+                (per the bill text
+                {bill.effective.has_exceptions || (bill.provision_dates ?? []).length > 0
+                  ? "; some sections have their own dates"
+                  : ""}
+                )
               </span>
             </p>
+          )}
+          {isLegislation && (bill.provision_dates ?? []).length > 0 && (
+            <details className="mt-1 text-xs text-slate-600">
+              <summary className="cursor-pointer underline">
+                {bill.provision_dates!.length} {bill.provision_dates!.length === 1 ? "provision has its" : "provisions have their"} own
+                date
+              </summary>
+              <ul className="mt-1 space-y-1.5">
+                {bill.provision_dates!.map((d, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-ledger-900">{provisionDateLabel(d.kind, d.when)}</span>
+                    {" "}({[d.section, ...d.scopes.filter((s) => s !== d.section)].filter(Boolean).join("; ")})
+                    <br />
+                    <q className="italic text-slate-500">{d.quote}</q>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
         <AccountabilityNotes items={forTarget(bill, "bill", [])} withResponses={false} />

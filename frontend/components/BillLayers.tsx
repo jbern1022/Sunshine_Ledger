@@ -2,7 +2,7 @@ import type { BillLayers as Layers, LayerBlock, LayerKey, LayerVersion, Origin }
 import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes } from "@/components/Accountability";
 import { forTarget, type Accountability } from "@/lib/accountability";
-import { LAYER_META, LAYER_ORDER, ORIGINS_FOR_LAYER, formatDate, originBadge, reviewLabel } from "@/lib/layers";
+import { LAYER_META, LAYER_ORDER, ORIGINS_FOR_LAYER, billTextLabel, formatDate, originBadge, reviewLabel } from "@/lib/layers";
 
 /** The three separately labeled layers on a bill page. Pure display --
  *  server-rendered, no interactivity beyond native <details>. */
@@ -99,10 +99,10 @@ function Block({ billEntityId, layer, origin, block, hasStaffAnalysis, accountab
                   {i > 0 && "; "}
                   {s.url ? (
                     <a href={s.url} className="underline hover:text-slate-700">
-                      {origin === "legislative_staff" ? "staff analysis (PDF)" : "bill text"}
+                      {origin === "legislative_staff" ? "staff analysis (PDF)" : billTextLabel(s)}
                     </a>
                   ) : (
-                    origin === "legislative_staff" ? "staff analysis" : "bill text"
+                    origin === "legislative_staff" ? "staff analysis" : billTextLabel(s)
                   )}{" "}
                   (retrieved {formatDate(s.retrieved_at)})
                 </span>

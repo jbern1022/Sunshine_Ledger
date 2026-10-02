@@ -211,23 +211,217 @@ def section_number(ref: str | None) -> str | None:
     return m.group(1) if m else None
 
 
-def section_for_quote(quote: str, text: str) -> str | None:
-    """The last bill section heading ("Section N.") before `quote` in `text`.
-
-    The quote is located in `text` tolerating whitespace differences (as it
-    was during verification), but the search runs against the original
-    (non-normalized) text so the line-anchored `_BILL_SECTION` heading
-    pattern still means what it says.
-    """
+def quote_position(quote: str, text: str) -> int | None:
+    """Where `quote` starts in `text`, tolerating whitespace differences (as
+    verification does). The search runs against the original text, so
+    offsets and line-anchored patterns still mean what they say."""
     q = normalize_ws(quote)
     if not q:
         return None
-    quote_pattern = re.compile(r"\s+".join(re.escape(word) for word in q.split()))
-    m = quote_pattern.search(text)
-    if not m:
+    m = re.search(r"\s+".join(re.escape(word) for word in q.split()), text)
+    return m.start() if m else None
+
+
+def section_for_quote(quote: str, text: str) -> str | None:
+    """The last bill section heading ("Section N.") before `quote` in `text`."""
+    pos = quote_position(quote, text)
+    if pos is None:
         return None
-    headings = _BILL_SECTION.findall(text[: m.start()])
+    headings = _BILL_SECTION.findall(text[:pos])
     return f"Section {headings[-1]}" if headings else None
+
+
+# R6 (HB 1389 validation): a Florida bill section that amends a statute
+# opens "Section 1. Paragraphs (a) ... of subsection (7) of section
+# 125.01055, Florida Statutes, are amended to read:"; the reader's
+# reference is s. 125.01055(7)(a)1., not "Section 1".
+_AMENDED_STATUTE = re.compile(
+    r"\b(?:section|s\.)\s+(\d+\.\d+),\s+Florida\s+Statutes,?[^:]*?\b(?:amended|created|reenacted)\s+to\s+read:",
+    re.IGNORECASE,
+)
+# Subsection (7), paragraph (a), subparagraph 1., sub-subparagraph a. at the
+# start of a line. "s. 170.201" is a citation, not sub-subparagraph "s.".
+_LABELS = re.compile(r"(?m)^\s*(\(\d+\))?(\([a-z]{1,2}\))?(\d+\.(?=\s))?([a-z]\.(?=\s(?!\d)))?")
+
+
+def _label_depths(law: str, line_start: int) -> list[tuple[int, str]]:
+    m = _LABELS.match(law, line_start)
+    return [(depth, label) for depth, label in enumerate(m.groups() if m else ()) if label]
+
+
+def _statute_parts(law: str, pos: int) -> tuple[str, list[str | None]] | None:
+    """(statute number, [subsection, paragraph, subparagraph,
+    sub-subparagraph]) in force at `pos`, or None outside an amended statute."""
+    headings = [m for m in _BILL_SECTION.finditer(law) if m.start() <= pos]
+    if not headings:
+        return None
+    statute = _AMENDED_STATUTE.search(law, headings[-1].start(), pos)
+    if not statute or "\n" not in law[statute.end():pos]:
+        return None
+    levels: list[str | None] = [None, None, None, None]
+    line_start = law.index("\n", statute.end()) + 1
+    while line_start <= pos:
+        for depth, label in _label_depths(law, line_start):
+            levels[depth] = label
+            levels[depth + 1:] = [None] * (3 - depth)
+        nxt = law.find("\n", line_start)
+        if nxt == -1:
+            break
+        line_start = nxt + 1
+    return statute.group(1), levels
+
+
+def statute_at(law: str, pos: int | None) -> str | None:
+    """The statutory citation in force at `pos` in `law`: the statute the
+    enclosing bill section amends, plus the subdivision labels seen since.
+    None for a free-standing section (no "Florida Statutes ... to read:")."""
+    parts = None if pos is None else _statute_parts(law, pos)
+    if parts is None:
+        return None
+    statute, levels = parts
+    return "s. " + statute + "".join(label for label in levels if label)
+
+
+def within(ref: str | None, scope: str) -> bool:
+    """Whether citation `ref` falls under `scope` ("s. 125.01055(7)(a)1."
+    under "s. 125.01055(7)"; "Section 2" only under itself)."""
+    if not ref:
+        return False
+    if ref == scope:
+        return True
+    return ref.startswith(scope) and scope.startswith("s. ") and (scope[-1] in ")." or ref[len(scope)] == "(")
+
+
+def section_at(law: str, pos: int) -> str | None:
+    """"Section N" for the bill section in force at `pos`."""
+    headings = _BILL_SECTION.findall(law[: pos + 1])
+    return f"Section {headings[-1]}" if headings else None
+
+
+def unit_scope(law: str, pos: int, unit: str) -> list[str]:
+    """What "this section/subsection/paragraph/subparagraph" at `pos`
+    governs: a statute citation cut to that level ("s. 125.01055(7)"), or
+    the bill section when it amends no statute."""
+    parts = _statute_parts(law, pos)
+    if parts:
+        statute, levels = parts
+        depth = _UNIT_DEPTH[unit.lower()]
+        return ["s. " + statute + "".join(label for label in levels[:depth] if label)]
+    section = section_at(law, pos)
+    return [section] if section else []
+
+
+# R4 (HB 1389 validation): "This subsection does not apply to: 1. Airport-
+# impacted areas ... 7. Any portion of a property encumbered by a recorded
+# conservation easement" limits every rule in subsection (7).
+_EXCLUSION = re.compile(
+    r"\b(?P<subject>This\s+(?P<unit>section|subsection|paragraph|subparagraph)"
+    r"|(?:Sections?|ss?\.)\s+(?P<cites>\d+\.\d+[\w()]*(?:,?\s+(?:and|or)\s+\d+\.\d+[\w()]*)*))"
+    r"\s+(?:does|do|shall)\s+not\s+apply\s+to\b",
+    re.IGNORECASE,
+)
+_UNIT_DEPTH = {"section": 0, "subsection": 1, "paragraph": 2, "subparagraph": 3}
+# A sentence's end; "s. 333.03" and "ss. 380.055" are citations.
+_SENTENCE_END = re.compile(r"(?<!\bs)(?<!\bss)\.(?=\s|$)")
+
+
+def _line_start(text: str, pos: int) -> int:
+    return text.rfind("\n", 0, pos) + 1
+
+
+def _exclusion_end(law: str, m: re.Match) -> int:
+    """End of an exclusion: its sentence, or -- when it introduces a list
+    ("does not apply to:") -- the list, up to the next line labeled at the
+    lead-in's level or above, or the next bill section."""
+    colon = law.find(":", m.end())
+    sentence = _SENTENCE_END.search(law, m.end())
+    stop = sentence.end() if sentence else len(law)
+    if colon == -1 or colon > stop:
+        return stop
+    lead = _label_depths(law, _line_start(law, m.start()))
+    lead_depth = max(d for d, _ in lead) if lead else None
+    line = law.find("\n", colon)
+    while line != -1:
+        line += 1
+        if line >= len(law) or _BILL_SECTION.match(law, line):
+            return line
+        labels = _label_depths(law, line)
+        if labels:
+            if lead_depth is None:
+                lead_depth = labels[0][0] - 1
+            if labels[0][0] <= lead_depth:
+                return line
+        line = law.find("\n", line)
+    return len(law)
+
+
+def applicability_exclusions(law: str) -> list[dict]:
+    """Each "does not apply to" provision in `law`: the citations it governs
+    ("s. 125.01055(7)", or "Section 3" in a section amending no statute) and
+    its quote."""
+    found = []
+    for m in _EXCLUSION.finditer(law):
+        if m.group("cites"):
+            scopes = ["s. " + c for c in re.findall(r"\d+\.\d+[\w()]*", m.group("cites"))]
+        else:
+            scopes = unit_scope(law, m.start(), m.group("unit"))
+        if scopes:
+            found.append({"scopes": scopes, "quote": law[m.start():_exclusion_end(law, m)].strip()})
+    return found
+
+
+# R5 (HB 1389 validation): an entry can rest on law the bill leaves as is.
+# Private-use sentinels ride through law_as_amended: inserted text between
+# _IN and _OUT, a deletion point at _DEL.
+_IN, _OUT, _DEL = "\ue000", "\ue001", "\ue002"
+
+
+def change_regions(raw: str) -> tuple[str, list[tuple[int, int]]]:
+    """law_as_amended(raw), plus where in it the bill changed something:
+    (start, end) of each inserted span, and (p, p) where text was deleted."""
+    marked = re.sub(r" ?\[deleted:", lambda m: _DEL + m.group(0), raw)
+    marked = re.sub(r"\[added:\s*([^\]]*)\]", lambda m: f"[added: {_IN}{m.group(1)}{_OUT}]", marked)
+    marked = re.sub(r"\[added:\s*([^\]]*)$", lambda m: f"[added: {_IN}{m.group(1)}", marked)
+    marked = law_as_amended(marked)
+    plain: list[str] = []
+    regions: list[tuple[int, int]] = []
+    start = None
+    for ch in marked:
+        if ch == _IN:
+            start = len(plain)
+        elif ch == _OUT and start is not None:
+            regions.append((start, len(plain)))
+            start = None
+        elif ch == _DEL:
+            regions.append((len(plain), len(plain)))
+        else:
+            plain.append(ch)
+    if start is not None:
+        regions.append((start, len(plain)))
+    return "".join(plain), regions
+
+
+def restates_existing_law(law: str, regions: list[tuple[int, int]], quote: str) -> bool:
+    """True when `quote` sits in a section that amends a statute, that
+    section shows changes elsewhere, and none of them touch the quote. A
+    created section, or a bill with no change markers, is never "existing"."""
+    q = normalize_ws(quote)
+    m = re.search(r"\s+".join(re.escape(word) for word in q.split()), law) if q else None
+    if not m or not regions:
+        return False
+    headings = list(_BILL_SECTION.finditer(law))
+    before = [h for h in headings if h.start() <= m.start()]
+    if not before:
+        return False
+    sec_start = before[-1].start()
+    after = [h.start() for h in headings if h.start() > m.start()]
+    sec_end = after[0] if after else len(law)
+    statute = _AMENDED_STATUTE.search(law, sec_start, m.start())
+    if not statute or not re.search(r"\bamended\s+to\s+read:", statute.group(0), re.IGNORECASE):
+        return False
+    if not any(sec_start <= a <= sec_end for a, _ in regions):
+        return False
+    return not any(a <= m.end() and b >= m.start() for a, b in regions)
 
 
 def is_conditional(statement: str) -> bool:

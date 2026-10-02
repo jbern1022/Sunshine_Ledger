@@ -710,3 +710,18 @@ def test_bill_detail_reads_the_effective_date_from_the_text(client, db_session, 
     db_session.commit()
     assert client.get(f"/bills/{bill.id}").json()["effective"] == {"when": "July 1, 2026", "has_exceptions": False}
     assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}").json()["effective"] is None
+
+
+def test_bill_detail_lists_dates_of_particular_provisions(client, db_session, bill_factory):
+    bill = bill_factory()
+    bill.bill.full_text = (
+        "Section 1. The amendments made by this act to s. 1.01, Florida Statutes, first apply to the 2027 property tax roll.\n"
+        "Section 2. This act shall take effect July 1, 2026.\n"
+    )
+    db_session.commit()
+    body = client.get(f"/bills/{bill.id}").json()
+    assert body["provision_dates"] == [{
+        "kind": "tax_roll", "when": "the 2027 tax roll", "date": None, "section": "Section 1", "scopes": ["s. 1.01"],
+        "quote": "The amendments made by this act to s. 1.01, Florida Statutes, first apply to the 2027 property tax roll.",
+    }]
+    assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}").json()["provision_dates"] == []

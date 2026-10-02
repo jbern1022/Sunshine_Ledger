@@ -43,3 +43,16 @@ export function applicability(
   }
   return { verb: "Applies to", note: varies.trim() || null };
 }
+
+const PROVISION_DATE_LABEL: Record<string, string> = {
+  retroactive: "Applies retroactively to",
+  tax_roll: "First applies to",
+  expires: "Expires",
+  takes_effect: "Takes effect",
+  deadline: "Deadline:",
+};
+
+/** "Expires July 1, 2030" for a dated provision. */
+export function provisionDateLabel(kind: string, when: string): string {
+  return `${PROVISION_DATE_LABEL[kind] ?? "Date:"} ${when}`;
+}

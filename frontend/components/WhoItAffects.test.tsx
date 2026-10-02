@@ -70,4 +70,62 @@ describe("WhoItAffects", () => {
     expect(screen.getByText(/No group the bill directly applies to/)).toBeInTheDocument();
     expect(screen.queryByText(/Would apply to/)).toBeNull();
   });
+
+  it("says which sections a very long bill was read from", () => {
+    render(<WhoItAffects billEntityId="b1" block={block({ scope_note: "Sections 1-4 of 20" })} status="Introduced" effective={null} />);
+    expect(screen.getByText("Drawn from Sections 1-4 of 20")).toBeInTheDocument();
+  });
+
+  it("still shows the older long-bill note", () => {
+    render(<WhoItAffects billEntityId="b1" block={block({ scope_note: "Drawn from the first part of a long bill" })} status="Introduced" effective={null} />);
+    expect(screen.getByText("Drawn from the first part of a long bill")).toBeInTheDocument();
+  });
+
+  it("adds no scope note when the whole bill was read", () => {
+    render(<WhoItAffects billEntityId="b1" block={block()} status="Introduced" effective={null} />);
+    expect(screen.queryByText(/Drawn from/)).not.toBeInTheDocument();
+  });
+
+  it("names the bill text version it was drawn from", () => {
+    const sources = [{
+      id: "s1", url: "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF", publisher: "Florida Legislature",
+      document_reference: "H1389, Enrolled text, 2026-03-16", source_type: "legiscan_bill_text", retrieved_at: "2026-10-02T04:54:20Z",
+    }];
+    render(<WhoItAffects billEntityId="b1" block={block({ sources })} status="Passed" effective={null} />);
+    expect(screen.getByRole("link", { name: "Enrolled text, Mar 16, 2026" })).toHaveAttribute(
+      "href", "https://www.flsenate.gov/Session/Bill/2026/1389/BillText/er/PDF",
+    );
+  });
+
+  it("cites the statute next to the bill section", () => {
+    const b = block();
+    b.current.items[0].statute_ref = "s. 83.49(1)";
+    render(<WhoItAffects billEntityId="b1" block={b} status="Introduced" effective={null} />);
+    expect(screen.getByText(/\(Section 1, s\. 83\.49\(1\)\)/)).toBeInTheDocument();
+  });
+
+  it("labels an entry that rests on law the bill leaves unchanged", () => {
+    const b = block();
+    b.current.items[0].restates_existing_law = true;
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getAllByText("Existing law, not changed by this bill")).toHaveLength(1);
+  });
+
+  it("shows the same rule's parallel citation", () => {
+    const b = block();
+    b.current.items[0].also_in = [{ quote: "A municipality shall return deposits.", section_ref: "Section 2", statute_ref: "s. 166.1(1)" }];
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getByText(/Same rule:/)).toBeInTheDocument();
+    expect(screen.getByText(/\(Section 2, s\. 166\.1\(1\)\)/)).toBeInTheDocument();
+  });
+
+  it("folds entries past the sixth behind 'Show N more'", () => {
+    const b = block();
+    const one = b.current.items[0];
+    b.current.items = Array.from({ length: 8 }, (_, i) => ({ ...one, group: `Group ${i + 1}` }));
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getByText("Show 2 more")).toBeInTheDocument();
+    // Folded, not cut: still in the page.
+    expect(screen.getByText("Group 8")).toBeInTheDocument();
+  });
 });
