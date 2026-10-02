@@ -745,3 +745,22 @@ def test_text_with_no_markers_is_never_called_existing_law():
     raw = "Section 1. Section 1.01, Florida Statutes, is amended to read:\n(1) A clerk shall keep records.\n"
     plain, regions = change_regions(raw)
     assert restates_existing_law(plain, regions, "A clerk shall keep records.") is False
+
+
+# F3 (HB 1389 v2, 2026-10-02): two valid entries were dropped because the
+# model lowercased the quote's first letter ("a municipality may not ...").
+def test_a_quote_with_only_its_first_letter_lowercased_is_kept_as_the_bill_wrote_it():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. A municipality may not restrict the height of a proposed development below three stories."
+    kept, dropped = verify_quotes([{"quote": "a municipality may not restrict the height of a proposed development below three stories."}], text)
+    assert dropped == []
+    assert kept[0]["quote"] == "A municipality may not restrict the height of a proposed development below three stories."
+
+
+def test_other_case_differences_still_fail_verification():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. A municipality may not restrict the height of a proposed development below three stories."
+    kept, _ = verify_quotes([{"quote": "A Municipality may not restrict the height of a proposed development below three stories."}], text)
+    assert kept == []
