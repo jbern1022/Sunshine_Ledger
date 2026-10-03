@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/8"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/9"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -517,7 +517,10 @@ class QuoteRoutingClient:
     def generate(self, prompt, *, json_mode=False):
         self.prompts.append(prompt)
         flat = " ".join(re.sub(r"</?new>|<removed/>", "", prompt).split())
-        return json.dumps({"items": [e for e in self.entries if " ".join(e["quote"].split()) in flat]})
+        def shown(e):
+            q = " ".join(e["quote"].split())
+            return q in flat or (":" in q and q[: q.index(":") + 1] in flat)
+        return json.dumps({"items": [e for e in self.entries if shown(e)]})
 
 
 def test_provision_dates_reach_the_entries_they_govern():
@@ -871,3 +874,17 @@ def test_a_declined_provision_is_logged_with_its_reason():
 
     r = build_who_it_affects("H1389", "x", _hb1389_text(), Declines())
     assert {"dropped": "second pass skip", "provision": 1, "reason": "Only sets a date."} in r.dropped
+
+
+def test_a_misquoted_list_after_an_exact_lead_in_is_replaced_by_the_bills_list():
+    # HB 1389 v8 (2026-10-03): the airport entry quoted the lead-in exactly
+    # and then its list with small deviations, failing verification.
+    lead = ("Sections 125.01055(7) and 166.04151(7) do not apply to any of the following, unless the respective "
+            "application is approved by the governing body of the airport:")
+    sloppy = lead + " (a) A proposed development near a runway within a quarter mile of the runway edge."
+    entry = _who("Airport governing bodies", sloppy, "permission", "May approve affordable-housing developments in airport zones.")
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry)).items
+    quote = " ".join(item["quote"].split())
+    assert quote.startswith(lead)
+    assert "of a mile laterally from the runway edge and within an area" in quote  # the bill's words
+    assert "(c) A proposed development that exceeds maximum height restrictions" in quote
