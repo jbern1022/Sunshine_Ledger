@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/4"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/5"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -664,3 +664,39 @@ def test_a_group_with_no_footing_in_the_quote_is_dropped():
                  "other", "Can no longer see agency records.")
     r = build_who_it_affects("HB 9", "Records", bill, FakeClient({"items": [entry]}))
     assert r.items == []
+
+
+# F5 (HB 1389 v2, 2026-10-02): separate rules came back as "conditions"
+# (the 65% residential split, the setback sentence), and a merged entry
+# listed the (7)(o) block and then each of its items again.
+def test_a_condition_that_is_itself_a_rule_is_dropped():
+    rule = {"text": "65% must be residential.",
+            "quote": "For mixed-use residential projects, at least 65 percent of the total square footage must be used for residential purposes."}
+    real = {"text": "Only with 40% affordable units.",
+            "quote": "if at least 40 percent of the residential units in a proposed multifamily development are rental units"}
+    entry = _who("Counties", COUNTY_MANDATE, "obligation", "Must allow multifamily housing in commercial areas.")
+    entry["conditions"] = [rule, real]
+    r = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry))
+    [item] = [i for i in r.items if i["group"] == "Counties"]
+    quotes = [c["quote"] for c in item["conditions"]]
+    assert rule["quote"] not in quotes and real["quote"] in quotes
+    assert {"dropped": "condition", "group": "Counties", **rule} in r.dropped
+
+
+def test_an_exclusion_block_replaces_the_items_it_contains():
+    entry = _who("Counties", COUNTY_MANDATE, "obligation", "Must allow multifamily housing in commercial areas.")
+    entry["exceptions"] = [{"text": "Airport areas", "quote": "Airport-impacted areas as provided in s. 333.03."},
+                           {"text": "Wekiva", "quote": "The Wekiva Study Area, as described in s. 369.316."}]
+    [item] = [i for i in build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry)).items
+              if i["group"] == "Counties"]
+    quotes = [" ".join(x["quote"].split()) for x in item["exceptions"]]
+    assert not any(q.startswith(("Airport-impacted", "The Wekiva")) for q in quotes)
+    assert any(q.startswith("This subsection does not apply to:") for q in quotes)
+
+
+def test_merging_skips_exceptions_already_inside_a_kept_block():
+    county, city = _parallel("county", "1"), _parallel("municipality", "2")
+    city["exceptions"] = [{"text": "Wekiva", "quote": "The Wekiva Study Area, as described in s. 369.316."}]
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(county, city)).items
+    quotes = [" ".join(x["quote"].split()) for x in item["exceptions"]]
+    assert not any(q.startswith("The Wekiva") for q in quotes)
