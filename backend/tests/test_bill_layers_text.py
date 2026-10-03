@@ -791,3 +791,13 @@ def test_missing_words_still_fail_even_with_commas_ignored():
     text = "Section 1. The clerk shall keep the records, including, but not limited to, filings, and publish them annually."
     kept, _ = verify_quotes([{"quote": "The clerk shall keep the records and publish them annually."}], text)
     assert kept == []
+
+
+# HB 1389 (2026-10-03): the model quoted '0-120 percent AMI.' where the bill
+# has "0-120 percent AMI." (single vs double quotes).
+def test_single_and_double_quotes_match_and_the_bills_are_published():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = 'Section 1. renter households for the category entitled "0-120 percent AMI." and the county\'s count.'
+    kept, _ = verify_quotes([{"quote": "renter households for the category entitled '0-120 percent AMI.' and the county's count."}], text)
+    assert kept[0]["quote"] == 'renter households for the category entitled "0-120 percent AMI." and the county\'s count.'

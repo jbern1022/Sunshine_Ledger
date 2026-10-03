@@ -58,7 +58,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/9",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/10",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -177,6 +177,7 @@ List up to 8 entries. Each entry is one group and one thing the bill directly ch
 - "exceptions": exclusions the text states for this entry, each with the exact sentence that states it. Empty list if none.
 - Only direct applicability. Do not describe downstream consequences (prices, behavior, supply) -- those are not what the provision changes.
 - Do not invent exceptions, limits, or safeguards the text does not state, even if they seem likely or intended.
+- When a provision introduces a list, its change covers every item in the list: describe the list as a whole, not one item.
 - The same group may appear in more than one entry if the bill affects it in different roles.
 - One entry per distinct provision: don't list variants of the same rule, and cover each changed provision before adding a second entry about any one of them.
 
@@ -564,7 +565,7 @@ def _quoted_condition(quote: str, conditions: list[dict]) -> dict | None:
     m = _CONDITION_MARKER.search(quote)
     if not m or not quote[:m.start()].strip():
         return None
-    clause = re.split(r";\s", quote[m.start():], maxsplit=1)[0].rstrip(" .,")
+    clause = re.split(r";\s|:", quote[m.start():], maxsplit=1)[0].rstrip(" .,")
     norm = normalize_ws(clause).lower()
     for c in conditions:
         listed = normalize_ws(c["quote"]).lower()
@@ -595,6 +596,7 @@ For each provision that directly changes something for a specific group -- an ob
 - "change_kind": one of "obligation", "permission", "eligibility", "protection", "cost", "service", "prohibition", "other".
 - "quote": the sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses, without the <new>, </new> and <removed/> tags.
 - "conditions" and "exceptions": only those the text states for this entry, each with its exact sentence. Empty list if none.
+- When a provision introduces a list, its change covers every item in the list: describe the list as a whole, not one item.
 - A changed definition or exclusion is a change for the group it is about: if a provision says X no longer counts as Y, or that X is excluded or included, the group is X; if a rule now applies "unless approved by Z", Z gains a power to approve and is the group.
 - Only direct applicability; no downstream consequences. Do not invent limits, exceptions or safeguards.
 
@@ -707,6 +709,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     _attach_dates(kept, dates)
     kept, repeats = _merge_parallel(kept)
     dropped += repeats
+    _drop_rules_with_their_own_entry(kept)
     # What the bill changes first, so the cap never keeps restated law over
     # a change (F2); the order is otherwise kept.
     kept.sort(key=lambda e: bool(e.get("restates_existing_law")))
@@ -814,12 +817,35 @@ def _plural(noun: str) -> str:
     return out[:1].upper() + out[1:]
 
 
+# A quote that is only a noun list ("agencies, governmental entities, and
+# other legal or commercial entities.") names who it adds.
+_HAS_VERB = re.compile(
+    r"\b(?:is|are|was|were|be|been|shall|must|may|includes?|means|has|have|does|do|commits|waives?|applies|apply)\b",
+    re.IGNORECASE,
+)
+# A rule whose subject is the proposal itself binds whoever proposes it.
+_PROPOSAL_SUBJECT = re.compile(
+    r"^\W*(?:a|an|the|each|any)\s+(?:[\w-]+\s+){0,6}?(?:development|project|application|proposal)\b"
+    r"[^.;]{0,120}?\b(?:shall|must|may)\b",
+    re.IGNORECASE,
+)
+
+
+def _noun_list_group(quote: str) -> str | None:
+    q = normalize_ws(quote).rstrip(" .;,")
+    if not q or len(q) > 150 or _HAS_VERB.search(q):
+        return None
+    return q[:1].upper() + q[1:]
+
+
 def _quote_subject(quote: str) -> str | None:
     """Who the quote's main clause binds: "A county must ..." -> "Counties";
     "If the court finds ... it must ..." -> "Courts"; "It is unlawful to ..."
     or "A person who ..." -> "Anyone"; None when it can't be told."""
     if _ANYONE_QUOTE.search(quote):
         return "Anyone"
+    if _PROPOSAL_SUBJECT.search(quote):
+        return "Applicants"
     for m in _SUBJECT.finditer(quote):
         noun = m.group("noun").lower()
         if not set(noun.split()) & _PREPOSITIONS and noun.split()[-1] not in {"person", "persons"}:
@@ -875,11 +901,26 @@ def _grounded_group(group: str, quote: str, window: str) -> str | None:
     sentence = re.sub(r"^Section\s+\d+\.\s*", "", sentence)
     subject = _quote_subject(sentence)
     if _GENERIC_GROUP.match(group.strip()):
-        return subject or group
+        return _noun_list_group(quote) or subject or group
     head = _head_noun(group)
     if head and _singular(head)[:5] in _stems(sentence):
         return group
     return subject
+
+
+def _drop_rules_with_their_own_entry(entries: list[dict]) -> None:
+    """A condition or exception that is itself another entry's rule (HB
+    1389: the sovereign-immunity sentence attached to the courts entry) is
+    shown once, as that entry, not also as a limit on this one."""
+    quotes = [(id(e), normalize_ws(e["quote"]).lower()) for e in entries]
+    for entry in entries:
+        others = [q for i, q in quotes if i != id(entry)]
+        for field_name in ("conditions", "exceptions"):
+            entry[field_name] = [
+                c for c in entry[field_name]
+                if not any(o in normalize_ws(c["quote"]).lower() or normalize_ws(c["quote"]).lower() in o
+                           for o in others if len(o) > 40)
+            ]
 
 
 def _attach_exclusions(entries: list[dict], exclusions: list[dict]) -> None:
@@ -954,7 +995,8 @@ def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:
-        group = str(r.get("group") or "").strip()
+        group = re.sub(r"^(?:a|an|the)\s+", "", str(r.get("group") or "").strip(), flags=re.IGNORECASE)
+        group = group[:1].upper() + group[1:]
         change = str(r.get("change") or "").strip()
         if not group or not change:
             continue
