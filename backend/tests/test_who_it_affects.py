@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/2"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/3"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -448,7 +448,7 @@ def test_an_entry_on_unchanged_law_is_labeled():
            "change_kind": "prohibition", "quote": setbacks, "conditions": [], "exceptions": []}
     client = SequenceClient({"items": [entry, new]})
     items = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
-    assert [i["restates_existing_law"] for i in items] == [True, False]
+    assert {i["quote"][:20]: i["restates_existing_law"] for i in items} == {cap[:20]: True, setbacks[:20]: False}
 
 
 # R9 (HB 1389 validation): ss. 125.x (counties) and 166.x (municipalities)
@@ -477,10 +477,13 @@ def test_parallel_county_and_municipal_entries_merge():
 
 
 def test_rules_that_differ_beyond_the_local_government_stay_separate():
-    county = ("Notwithstanding any other law, local ordinance, or regulation to the contrary, a county may not "
-              "require a proposed multifamily development to obtain a zoning or land use change")
-    city = ("Notwithstanding any other law, local ordinance, or regulation to the contrary, a municipality may not "
-            "require a proposed multifamily development to obtain a zoning or land use change, special exception")
+    county = ("a county may not require a proposed multifamily development to obtain a zoning or land use change, "
+              "special exception, conditional use approval, variance, transfer of density or development units, "
+              "amendment to a development of regional impact, or comprehensive plan amendment")
+    city = ("a municipality may not require a proposed multifamily development to obtain a zoning or land use change, "
+            "special exception, conditional use approval, variance, transfer of density or development units, "
+            "amendment to a development of regional impact, amendment to a municipal charter, or comprehensive plan "
+            "amendment")
     a = {"group": "Counties", "change": "May not require rezoning.", "change_kind": "prohibition",
          "quote": county, "conditions": [], "exceptions": []}
     b = {"group": "Municipalities", "change": "May not require rezoning.", "change_kind": "prohibition",
@@ -526,3 +529,90 @@ def test_provision_dates_reach_the_entries_they_govern():
     assert {"text": "Expires July 1, 2030", "quote": "This subparagraph expires July 1, 2030."} in items["Developers"]["conditions"]
     # The deadline is in the entry's own quote: not repeated as a condition.
     assert items["Pending applicants"]["conditions"] == []
+
+
+# F2 (HB 1389 v2, 2026-10-02): 7 of 11 entries restated existing law and
+# five changed sections got none. The model now sees what the bill changes.
+def test_the_model_sees_inserted_text_and_deletion_points():
+    client = SequenceClient()
+    build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client)
+    first = client.prompts[0]
+    assert "<new>on property owned by a county, municipality, or school district;" in first
+    assert "industrial, or mixed use<new>;</new><removed/> in portions" in first
+    assert "list what this bill changes" in first.lower()
+
+
+def test_tags_in_the_models_quotes_are_removed_before_verification():
+    tagged = ("A county must authorize multifamily and mixed-use residential as allowable uses in any area zoned "
+              "for commercial, industrial, or mixed use<new>;</new><removed/> in portions of any flexibly zoned area")
+    entry = {"group": "Counties", "change": "Must allow housing on more kinds of land.", "change_kind": "obligation",
+             "quote": tagged, "conditions": [{"text": "Only on religious land over 3 acres",
+                                              "quote": "<new>on property that is more than 3 acres in size</new>"}],
+             "exceptions": []}
+    client = SequenceClient({"items": [entry]})
+    [item] = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    assert "<" not in item["quote"]
+    assert item["quote"].startswith("A county must authorize")
+    assert "on property that is more than 3 acres in size" in [c["quote"] for c in item["conditions"]]
+
+
+def test_a_bill_without_change_markers_gets_no_tags():
+    client = FakeClient({"items": []})
+    build_who_it_affects("HB 1", "Deposits", BILL, client)
+    assert "<new>" not in client.prompts[0] and "<removed/>" not in client.prompts[0]
+
+
+def test_changes_come_before_restated_law_so_the_cap_keeps_them():
+    cap = ("the county may restrict the height of the proposed development to 150 percent of the tallest building "
+           "on any property adjacent to the proposed development")
+    old = {"group": "Counties", "change": "May cap height near single-family homes.", "change_kind": "permission",
+           "quote": cap, "conditions": [], "exceptions": []}
+    setbacks = ("A county may not restrict height below the height authorized under this paragraph through other "
+                "dimensional means, such as establishing setbacks or stepbacks by height")
+    new = {"group": "Counties", "change": "May not use setbacks to cut the allowed height.",
+           "change_kind": "prohibition", "quote": setbacks, "conditions": [], "exceptions": []}
+    items = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), SequenceClient({"items": [old, new]})).items
+    assert [i["restates_existing_law"] for i in items] == [False, True]
+
+
+def test_parallel_rules_merge_when_one_quote_is_longer():
+    county = _parallel("county", "1")
+    city = _parallel("municipality", "2")
+    city["quote"] += ", or require setbacks or stepbacks that are more restrictive than the minimum permitted"
+    client = SequenceClient({"items": [county]}, {"items": [city]})
+    [item] = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
+    assert item["group"] == "Counties and municipalities"
+
+
+def test_a_permission_restated_as_a_prohibition_is_dropped():
+    # HB 1389, temperature 0: "the county may restrict the height ... to 150
+    # percent" came back as "may not restrict the height ... to 150 percent".
+    cap = ("the county may restrict the height of the proposed development to 150 percent of the tallest building "
+           "on any property adjacent to the proposed development")
+    inverted = {"group": "Counties", "change": "May not restrict the height of the proposed development to 150 percent.",
+                "change_kind": "prohibition", "quote": cap, "conditions": [], "exceptions": []}
+    r = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), SequenceClient({"items": [inverted]}))
+    assert r.items == [] and inverted in r.dropped
+
+
+def test_singular_county_and_municipality_groups_merge_under_the_plural_name():
+    county, city = _parallel("county", "1"), _parallel("municipality", "2")
+    county["group"], city["group"] = "County", "Municipality"
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), SequenceClient({"items": [county]}, {"items": [city]})).items
+    assert item["group"] == "Counties and municipalities"
+
+
+def test_the_prompt_allows_eight_entries_per_window():
+    assert "List up to 8 entries" in WHO_IT_AFFECTS_PROMPT
+
+
+def test_a_stray_not_in_the_quote_does_not_excuse_an_inverted_permission():
+    # (d)2 ends "... not to exceed 10 stories": a "not", but no prohibition.
+    cap = ("the county may restrict the height of the proposed development to 150 percent of the tallest building "
+           "on any property adjacent to the proposed development, the highest currently allowed, or allowed on July "
+           "1, 2023, height for the property provided in the county's land development regulations, or three "
+           "stories, whichever is higher, not to exceed 10 stories.")
+    inverted = {"group": "Counties", "change": "May not restrict the height of the proposed development to 150 percent.",
+                "change_kind": "prohibition", "quote": cap, "conditions": [], "exceptions": []}
+    r = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), SequenceClient({"items": [inverted]}))
+    assert r.items == []

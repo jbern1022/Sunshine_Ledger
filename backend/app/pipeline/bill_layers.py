@@ -57,7 +57,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/2",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/3",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -162,12 +162,12 @@ WHO_IT_AFFECTS_PROMPT = """You are listing who a bill directly applies to, for a
 
 Bill: {bill_number} — {title}
 
-The text below is the law as it will read once this bill takes effect (struck language already removed, inserted language already merged in):
+The text below is the law as it will read once this bill takes effect (struck language already removed, inserted language already merged in).{changes}
 \"\"\"
 {text}
 \"\"\"
 
-List up to 6 entries. Each entry is one group and one thing the bill directly changes for that group. Rules:
+List up to 8 entries. Each entry is one group and one thing the bill directly changes for that group. Rules:
 - "group": the specific group the provision names or defines (e.g. "Landlords", "County tax collectors"). If the provision applies to any person (as most criminal offenses do), write "Anyone" -- that broad coverage is what the text says.
 - "change": what changes for that group, in plain language: an obligation, eligibility, protection, cost, service, or prohibition. Keep the bill's modal strength: "shall"/"must" is a requirement, "may" is permission.
 - "change_kind": one of "obligation", "permission", "eligibility", "protection", "cost", "service", "prohibition", "other". A "may" provision is a permission, not an obligation.
@@ -417,6 +417,53 @@ def _sections_read(law: str, windows: list[tuple[int, str]], read: int) -> str:
     return f"Sections {first}-{last} of {total}"
 
 
+# F2 (HB 1389 re-validation, 2026-10-02): shown the law with no sign of
+# what changed, the model spent 7 of 11 entries on existing law.
+_CHANGES_NOTE = (
+    " Text between <new> and </new> is what this bill adds; <removed/> marks where it deletes text."
+    " List what this bill changes first: new or altered obligations, permissions, eligibility, protections,"
+    " prohibitions. Include a provision the bill leaves unchanged only when it is needed to understand a change,"
+    " and no more than 2 of those. Copy quotes without the <new>, </new> and <removed/> tags."
+)
+_TAG = re.compile(r"</?new>|<removed/>")
+
+
+def _marked(window: str, offset: int, regions: list[tuple[int, int]]) -> str:
+    """The window with inserted spans wrapped in <new>...</new> and deletion
+    points marked <removed/> (regions are positions in the whole law)."""
+    inserts: list[tuple[int, int, str]] = []  # (position, order, tag)
+    end = offset + len(window)
+    for a, b in regions:
+        if a == b:
+            if offset <= a <= end:
+                inserts.append((a - offset, 1, "<removed/>"))
+        elif a < end and b > offset:
+            inserts.append((max(a, offset) - offset, 2, "<new>"))
+            inserts.append((min(b, end) - offset, 0, "</new>"))
+    out, last = [], 0
+    for pos, _, tag in sorted(inserts):
+        out.append(window[last:pos])
+        out.append(tag)
+        last = pos
+    out.append(window[last:])
+    return "".join(out)
+
+
+def _untagged(raw: dict) -> dict:
+    """The model's entry with any copied tags taken out of its quotes."""
+    def clean(s):
+        return _DOUBLE_SPACE.sub(" ", _TAG.sub("", s)) if isinstance(s, str) else s
+
+    out = {**raw, "quote": clean(raw.get("quote"))}
+    for key in ("conditions", "exceptions"):
+        if isinstance(raw.get(key), list):
+            out[key] = [{**c, "quote": clean(c.get("quote"))} if isinstance(c, dict) else c for c in raw[key]]
+    return out
+
+
+_DOUBLE_SPACE = re.compile(r"[ \t]{2,}")
+
+
 def _round_robin(groups: list[list[dict]]) -> list[dict]:
     """Interleave per-window entries so the cap can't fill from Section 1 alone."""
     merged: list[dict] = []
@@ -427,6 +474,13 @@ def _round_robin(groups: list[list[dict]]) -> list[dict]:
 
 # Title-paragraph phrasing, should one slip past _law_text (no headings).
 _TITLE_STYLE = re.compile(r"\bamending s(?:s)?\.\s*[\d.]+,\s*F\.S\.;|^(?:requiring|prohibiting|authorizing|revising|providing|creating|removing|specifying)\b", re.IGNORECASE)
+_NEGATED_MODAL = re.compile(r"\b(?:may|shall|must|can)\s+not\b|\bcannot\b", re.IGNORECASE)
+# What a quote needs to back a "may not" entry. A bare "not" isn't enough:
+# "... not to exceed 10 stories" is a limit on a permission.
+_PROHIBITS = re.compile(
+    r"\b(?:may|shall|must|can)\s+not\b|\bcannot\b|\bunlawful\b|\bprohibit\w*|\bno\s+(?:\w+\s+){0,3}(?:may|shall)\b",
+    re.IGNORECASE,
+)
 _NEGATION = re.compile(r"\b(?:not|no|never|unlawful|prohibit\w*|may not|shall not)\b", re.IGNORECASE)
 
 # Who it affects is direct applicability only. A consequence -- rents rising,
@@ -493,7 +547,8 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     per_window: list[list[dict]] = []
     dropped: list[dict] = []
     for offset, window in windows[:read]:
-        kept, rejected = _who_entries(bill_number, title, window, client)
+        shown = _marked(window, offset, regions) if regions else window
+        kept, rejected = _who_entries(bill_number, title, window, client, shown=shown, marked=bool(regions))
         for item in kept:
             item["section_ref"] = _section_ref(item["quote"], window, law, offset)
             at = quote_position(item["quote"], window)
@@ -506,6 +561,9 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     _attach_exclusions(kept, applicability_exclusions(law))
     _attach_dates(kept, provision_dates(_law_text(full_text)))
     kept = _merge_parallel(kept)
+    # What the bill changes first, so the cap never keeps restated law over
+    # a change (F2); the order is otherwise kept.
+    kept.sort(key=lambda e: bool(e.get("restates_existing_law")))
     partial = read < len(windows)
     if not kept:
         note = "No group the bill directly applies to could be tied to its text"
@@ -533,16 +591,19 @@ def _merge_parallel(entries: list[dict]) -> list[dict]:
         entry.setdefault("also_in", [])
         quote = normalize_ws(entry["quote"]).lower()
         key = _LOCAL_GOVERNMENT.sub("<local>", quote)
-        first = by_key.get(key)
-        if key == quote or first is None or first["also_in"] or first["group"] == entry["group"]:
+        # The model may quote one version further than the other: a key
+        # inside the other counts as the same rule.
+        first = next((e for k, e in by_key.items() if key in k or k in key), None) if key != quote else None
+        if first is None or first["also_in"] or first["group"] == entry["group"]:
             by_key.setdefault(key, entry)
             merged.append(entry)
             continue
         first["also_in"].append({k: entry.get(k) for k in ("quote", "section_ref", "statute_ref")})
         first["affected_groups"] = first["affected_groups"] + [entry["group"]]
-        pair = sorted(g.lower() for g in first["affected_groups"])
+        pair = sorted(g.lower().rstrip("s").replace("countie", "county").replace("municipalitie", "municipality")
+                      for g in first["affected_groups"])
         first["group"] = (
-            "Counties and municipalities" if pair == ["counties", "municipalities"]
+            "Counties and municipalities" if pair == ["county", "municipality"]
             else f"{first['group']} and {entry['group'][:1].lower()}{entry['group'][1:]}"
         )
         for field_name in ("conditions", "exceptions"):
@@ -604,12 +665,19 @@ def _section_ref(quote: str, window: str, law: str, offset: int) -> str | None:
     return f"Section {number}" if number else None
 
 
-def _who_entries(bill_number: str, title: str, window: str, client) -> tuple[list[dict], list[dict]]:
-    """One model call on one window of the law; every guard runs against that
-    window, so an entry can only cite text the model was shown."""
+def _who_entries(
+    bill_number: str, title: str, window: str, client, *, shown: str | None = None, marked: bool = False
+) -> tuple[list[dict], list[dict]]:
+    """One model call on one window of the law (`shown`: with change tags);
+    every guard runs against the untagged window, so an entry can only cite
+    text the model was shown."""
     raw = _parse_items(client.generate(
-        WHO_IT_AFFECTS_PROMPT.format(bill_number=bill_number, title=title, text=window), json_mode=True
+        WHO_IT_AFFECTS_PROMPT.format(
+            bill_number=bill_number, title=title, text=shown or window, changes=_CHANGES_NOTE if marked else "",
+        ),
+        json_mode=True,
     ))
+    raw = [_untagged(r) for r in raw]
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:
@@ -628,6 +696,10 @@ def _who_entries(bill_number: str, title: str, window: str, client) -> tuple[lis
             # A "prohibition" worded as a bare permission is a misreading
             # (S0814: "Anyone [prohibition]: may possess any firearm ...").
             or (str(r.get("change_kind") or "").lower() == "prohibition" and not _NEGATION.search(change))
+            # The reverse: a bare permission restated as a prohibition (HB 1389,
+            # 2026-10-02: "the county may restrict the height ... to 150
+            # percent" became "may not restrict the height ...").
+            or (_NEGATED_MODAL.search(change) and not _PROHIBITS.search(verified[0]["quote"]))
         ):
             dropped.append(r)
             continue

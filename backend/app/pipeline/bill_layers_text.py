@@ -177,7 +177,9 @@ def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[d
     substance to stand as a provision on their own.
 
     "Verbatim" tolerates whitespace, curly-vs-straight quotes and dashes,
-    and mojibake in the model's output -- nothing else. A kept quote is
+    mojibake in the model's output, and the case of the first letter
+    ("a municipality may not ..." for "A municipality ...": HB 1389,
+    2026-10-02) -- nothing else. A kept quote is
     replaced by the text's own characters, so what's published is always
     exactly what the bill says.
 
@@ -191,6 +193,8 @@ def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[d
     for c in candidates:
         quote = normalize_ws(_repair_mojibake(c.get("quote") or ""))
         at = folded.find(quote.translate(_QUOTE_FOLD)) if quote else -1
+        if at < 0 and quote[:1].isalpha():
+            at = folded.find((quote[0].swapcase() + quote[1:]).translate(_QUOTE_FOLD))
         if at >= 0:
             quote = haystack[at:at + len(quote)]
         if at >= 0 and _is_substantive_quote(quote):
