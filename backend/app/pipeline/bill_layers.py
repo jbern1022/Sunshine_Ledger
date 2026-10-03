@@ -58,7 +58,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/10",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/11",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -703,7 +703,14 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
             item["restates_existing_law"] = restates_existing_law(law, regions, item["quote"])
         per_window.append(kept)
         dropped += rejected
-    kept, dupes = _dedupe_quotes(_round_robin(per_window))
+    merged = _round_robin(per_window)
+    # Of entries on the same quote, keep one whose group the sentence names
+    # over one relabeled from its subject (stable otherwise).
+    named_quotes = {e["quote"] for e in merged if not e.get("_relabeled")}
+    merged.sort(key=lambda e: bool(e.get("_relabeled")) and e["quote"] in named_quotes)
+    kept, dupes = _dedupe_quotes(merged)
+    for e in kept + dupes:
+        e.pop("_relabeled", None)
     dropped += dupes
     _attach_exclusions(kept, exclusions)
     _attach_dates(kept, dates)
@@ -1031,6 +1038,7 @@ def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict
         if grounded is None:
             dropped.append(r)
             continue
+        relabeled = grounded != group
         group = grounded
         conditions, bad_conditions = _verified_clauses(r.get("conditions"), window)
         # A "condition" that is itself a rule ("... at least 65 percent ...
@@ -1056,6 +1064,7 @@ def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict
             "quote": quote,
             "section_ref": None,
             "statute_ref": None,
+            "_relabeled": relabeled,
             "conditions": conditions,
             "exceptions": exceptions,
             "assumptions": [],

@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/10"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/11"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -943,3 +943,14 @@ def test_leading_articles_are_dropped_from_group_names():
     county["group"], city["group"] = "A county", "The municipality"
     [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(county, city)).items
     assert item["group"] == "Counties and municipalities"
+
+
+def test_of_two_entries_on_one_quote_the_one_whose_group_is_named_is_kept():
+    # HB 1389 v10: "A county" and "Religious institution" both quoted the
+    # co-application sentence; the county entry (relabeled) won the dedupe.
+    sentence = ("A proposed development on property owned by a religious institution must be applied for by both the "
+                "applicant and the religious institution")
+    wrong = _who("A county", sentence, "obligation", "Must co-apply for development on religious land.")
+    right = _who("Religious institutions", sentence, "obligation", "Must co-apply for development on its land.")
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(wrong, right)).items
+    assert item["group"] == "Religious institutions"
