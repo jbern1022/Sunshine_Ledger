@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/5"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/6"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -239,13 +239,11 @@ LONG_BILL = (
 
 
 def test_reads_every_section_of_a_long_bill():
-    client = SequenceClient(
-        {"items": [_entry("Counties", COUNTIES)]},
-        {"items": [_entry("Municipalities", CITIES)]},
-        {"items": [_entry("School districts", SCHOOLS)]},
+    client = QuoteRoutingClient(
+        _entry("Counties", COUNTIES), _entry("Municipalities", CITIES), _entry("School districts", SCHOOLS),
     )
     r = build_who_it_affects("HB 2", "Records", LONG_BILL, client)
-    assert len(client.prompts) == 3
+    assert len(client.prompts) == 4  # three ~7k sections, then the effective-date section
     assert [(i["group"], i["section_ref"]) for i in r.items] == [
         ("Counties", "Section 1"), ("Municipalities", "Section 2"), ("School districts", "Section 3"),
     ]
@@ -273,9 +271,9 @@ def test_a_section_larger_than_one_window_is_split_on_line_breaks():
     big = _section(1, COUNTIES, size=30_000)
     tail = "(999) Each county shall report its totals to the department.\n"
     bill = TITLE + big + tail + "Section 2. This act shall take effect July 1, 2027.\n"
-    client = SequenceClient({"items": []}, {"items": []}, {"items": [_entry("Counties", tail.strip())]})
+    client = QuoteRoutingClient(_entry("Counties", tail.strip()))
     r = build_who_it_affects("HB 3", "Records", bill, client)
-    assert len(client.prompts) == 3
+    assert len(client.prompts) == 4
     [item] = r.items
     # The section is found from the whole bill, not the window the quote came from.
     assert item["section_ref"] == "Section 1"
@@ -417,7 +415,7 @@ def test_an_exclusion_for_another_statute_is_not_attached():
     discrimination = "It is unlawful to discriminate in land use decisions or in the permitting of development"
     entry = {"group": "Local governments", "change": "May not discriminate in land use decisions.",
              "change_kind": "prohibition", "quote": discrimination, "conditions": [], "exceptions": []}
-    client = SequenceClient({"items": []}, {"items": []}, {"items": [entry]})
+    client = QuoteRoutingClient(entry)
     [item] = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client).items
     assert item["exceptions"] == []
 
@@ -700,3 +698,49 @@ def test_merging_skips_exceptions_already_inside_a_kept_block():
     [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(county, city)).items
     quotes = [" ".join(x["quote"].split()) for x in item["exceptions"]]
     assert not any(q.startswith("The Wekiva") for q in quotes)
+
+
+
+# Coverage of HB 1389 Sections 3, 4 and 7 (2026-10-03).
+def test_hb1389_windows_keep_short_sections_out_from_behind_long_ones():
+    import re as _re
+
+    from app.pipeline import bill_layers as bl
+
+    law, _ = bl.change_regions(bl._law_text(_hb1389_text()))
+    sections = [_re.findall(r"(?m)^\s*Section\s+(\d+)\.", w) for _, w in bl._windows(law, target=bl.WHO_WINDOW_TARGET)]
+    assert sections[:2] == [["1"], ["2"]]
+    assert "3" in sections[2] and "4" in sections[2]
+    assert len(sections) <= MAX_WHO_WINDOWS
+
+
+def test_a_list_lead_in_quote_is_kept_with_its_list():
+    lead = "unless the respective application is approved by the governing body of the airport:"
+    entry = _who("Airport governing bodies", lead, "permission",
+                 "May approve affordable-housing developments in airport zones.")
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry)).items
+    quote = " ".join(item["quote"].split())
+    assert quote.startswith(lead)
+    assert "(c) A proposed development that exceeds maximum height restrictions" in quote
+    assert "Section 8." not in quote
+    assert item["statute_ref"] == "s. 333.03(5)"
+
+
+def test_the_prompt_asks_for_one_entry_per_provision():
+    assert "One entry per distinct provision" in WHO_IT_AFFECTS_PROMPT
+
+
+def test_a_group_matching_only_the_next_sentence_is_relabeled():
+    # HB 1389 (2026-10-03): the court-relief entry came back grouped as the
+    # "person" definition's list; "agencies" is only in the next sentence.
+    group = "agencies, governmental entities, and other legal or commercial entities"
+    assert _groups(_who(group, RELIEF, "obligation", "Must order relief for discriminatory housing practices.")) == ["Courts"]
+
+
+def test_the_head_noun_decides_not_any_shared_word():
+    from app.pipeline.bill_layers import _head_noun
+
+    assert _head_noun("Owner of a property in a multifamily project") == "owner"
+    assert _head_noun("agencies, governmental entities, and other legal or commercial entities") == "agencies"
+    assert _head_noun("Applicants for development authorized under s. 125.01055(7)") == "applicants"
+    assert _head_noun("Counties and municipalities") == "municipalities"

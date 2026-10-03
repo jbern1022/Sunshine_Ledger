@@ -42,6 +42,7 @@ from app.pipeline.bill_layers_text import (
     statute_at,
     strip_page_artifacts,
     verify_quotes,
+    with_its_list,
     within,
 )
 from app.pipeline.effective_date import provision_dates
@@ -57,7 +58,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/5",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/6",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -177,6 +178,7 @@ List up to 8 entries. Each entry is one group and one thing the bill directly ch
 - Only direct applicability. Do not describe downstream consequences (prices, behavior, supply) -- those are not what the provision changes.
 - Do not invent exceptions, limits, or safeguards the text does not state, even if they seem likely or intended.
 - The same group may appear in more than one entry if the bill affects it in different roles.
+- One entry per distinct provision: don't list variants of the same rule, and cover each changed provision before adding a second entry about any one of them.
 
 Respond with JSON only: {{"items": [{{"group": "...", "change": "...", "change_kind": "obligation", "quote": "exact text", "conditions": [{{"text": "...", "quote": "exact text"}}], "exceptions": [{{"text": "...", "quote": "exact text"}}]}}]}}"""
 
@@ -365,31 +367,40 @@ _PERMITS = re.compile(r"\bmay\b(?!\s+not\b)", re.IGNORECASE)
 # very long bill is read up to this many windows, and the block says which
 # sections that covered.
 MAX_WHO_WINDOWS = 4
+# Windows stop taking sections at about half the limit: HB 1389's Sections 3
+# and 4 rode at the end of a window led by the 9,600-char Section 2 and got
+# no entry (2026-10-03).
+WHO_WINDOW_TARGET = 6_000
 # Entries kept per bill; the page shows the first 6 and folds the rest.
 MAX_WHO_ENTRIES = 12
 _SECTION_NUMBER = re.compile(r"Section\s+(\d+)\.", re.IGNORECASE)
 
 
-def _windows(law: str, limit: int = MAX_BILL_TEXT_CHARS) -> list[tuple[int, str]]:
+def _windows(law: str, limit: int = MAX_BILL_TEXT_CHARS, target: int | None = None) -> list[tuple[int, str]]:
     """(offset, text) windows of at most `limit` chars, packing consecutive
     "Section N." sections; a section longer than that is split at line
-    breaks (and a single line longer still, at `limit`)."""
+    breaks (and a single line longer still, at `limit`). With `target`, a
+    window takes no further section once it has `target` chars, so a short
+    section isn't buried behind a long one."""
     starts = [m.start() for m in _BILL_SECTION_HEADING.finditer(law)]
     if not starts or starts[0] != 0:
         starts.insert(0, 0)
-    units: list[tuple[int, str]] = []
+    units: list[tuple[int, str, bool]] = []  # (offset, text, starts a section)
     for a, b in zip(starts, starts[1:] + [len(law)]):
         if b - a <= limit:
-            units.append((a, law[a:b]))
+            units.append((a, law[a:b], True))
             continue
         pos = a
         for line in law[a:b].splitlines(keepends=True):
             for i in range(0, len(line), limit):
-                units.append((pos + i, line[i:i + limit]))
+                units.append((pos + i, line[i:i + limit], pos + i == a))
             pos += len(line)
     windows: list[tuple[int, str]] = []
-    for offset, text in units:
-        if windows and len(windows[-1][1]) + len(text) <= limit:
+    for offset, text, new_section in units:
+        room = windows and len(windows[-1][1]) + len(text) <= limit
+        # The target only decides where a new section starts; a long
+        # section's own lines still fill a window to the limit.
+        if room and (target is None or not new_section or len(windows[-1][1]) < target):
             windows[-1] = (windows[-1][0], windows[-1][1] + text)
         else:
             windows.append((offset, text))
@@ -549,7 +560,7 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     law, regions = change_regions(_law_text(full_text))
     if law != law_as_amended(_law_text(full_text)):
         regions = []  # never label from a text the model didn't see
-    windows = _windows(law)
+    windows = _windows(law, target=WHO_WINDOW_TARGET)
     read = min(len(windows), MAX_WHO_WINDOWS)
     per_window: list[list[dict]] = []
     dropped: list[dict] = []
@@ -640,8 +651,16 @@ _PRONOUN_SUBJECT = re.compile(r"\b(?:it|they)\s+(?:may|shall|must)\b", re.IGNORE
 _DEFINITE = re.compile(r"\bthe\s+(?P<noun>[a-z-]+)\b", re.IGNORECASE)
 
 
+def _singular(word: str) -> str:
+    if word.endswith("ies") and len(word) > 4:
+        return word[:-3] + "y"
+    if word.endswith("s") and not word.endswith("ss") and len(word) > 3:
+        return word[:-1]
+    return word
+
+
 def _stems(text: str) -> set[str]:
-    return {w[:5] for w in re.findall(r"[a-z]{4,}", text.lower())}
+    return {_singular(w)[:5] for w in re.findall(r"[a-z]{3,}", text.lower())}
 
 
 def _plural(noun: str) -> str:
@@ -695,8 +714,19 @@ def _sentence_around(quote: str, window: str) -> str:
     start = 0
     for m in _SENTENCE_BREAK.finditer(window, 0, at):
         start = m.end()
-    end = _SENTENCE_END.search(window, at + len(quote) - 1)
+    m = re.search(r"\s+".join(re.escape(word) for word in normalize_ws(quote).split()), window)
+    end = _SENTENCE_END.search(window, (m.end() if m else at + 1) - 1)
     return normalize_ws(window[start:end.end() if end else len(window)])
+
+
+_HEAD_STOP = re.compile(r",|\s(?:of|in|for|with|under|who|that|which|whose|from|on|at|to)\s", re.IGNORECASE)
+
+
+def _head_noun(group: str) -> str:
+    """The noun a group is about: "Owner of a property ..." -> owner;
+    "agencies, governmental entities, ..." -> agencies."""
+    words = re.findall(r"[a-z][a-z'-]*", _HEAD_STOP.split(group, maxsplit=1)[0].lower())
+    return words[-1] if words else ""
 
 
 def _grounded_group(group: str, quote: str, window: str) -> str | None:
@@ -707,7 +737,8 @@ def _grounded_group(group: str, quote: str, window: str) -> str | None:
     subject = _quote_subject(sentence)
     if _GENERIC_GROUP.match(group.strip()):
         return subject or group
-    if _stems(group) & _stems(sentence):
+    head = _head_noun(group)
+    if head and _singular(head)[:5] in _stems(sentence):
         return group
     return subject
 
@@ -784,7 +815,8 @@ def _who_entries(
         change = str(r.get("change") or "").strip()
         if not group or not change:
             continue
-        verified, _ = verify_quotes([r], window)
+        listed = with_its_list(str(r.get("quote") or ""), window)
+        verified, _ = verify_quotes([{**r, "quote": listed} if listed else r], window)
         if (
             not verified
             or _EFFECTIVE_DATE_CLAUSE.search(verified[0]["quote"])

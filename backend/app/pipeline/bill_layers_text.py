@@ -172,14 +172,43 @@ def _repair_mojibake(s: str) -> str:
         return s
 
 
+def _find_ignoring_commas(quote: str, folded: str) -> tuple[int, int] | None:
+    """(start, end) in `folded` of `quote` when the two differ only in
+    commas (HB 1389, 2026-10-03: "practice, it must issue" for the amended
+    "practice it must issue"). Words, their order and other punctuation
+    must still match; the caller publishes the bill's own span."""
+    def strip(s: str) -> tuple[str, list[int]]:
+        out, index = [], []
+        for i, ch in enumerate(s):
+            if ch == ",":
+                continue
+            if ch == " " and out and out[-1] == " ":
+                continue
+            out.append(ch)
+            index.append(i)
+        return "".join(out), index
+
+    needle, _ = strip(quote)
+    hay, index = strip(folded)
+    if not needle.strip(" "):
+        return None
+    at = hay.find(needle.strip(" "))
+    if at < 0 and needle[:1].isalpha():
+        at = hay.find((needle[0].swapcase() + needle[1:]).strip(" "))
+    if at < 0:
+        return None
+    end = at + len(needle.strip(" ")) - 1
+    return index[at], index[end] + 1
+
+
 def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[dict]]:
     """Keep only quotes that appear verbatim in `text` and that carry enough
     substance to stand as a provision on their own.
 
     "Verbatim" tolerates whitespace, curly-vs-straight quotes and dashes,
-    mojibake in the model's output, and the case of the first letter
+    mojibake in the model's output, the case of the first letter
     ("a municipality may not ..." for "A municipality ...": HB 1389,
-    2026-10-02) -- nothing else. A kept quote is
+    2026-10-02), and commas -- nothing else. A kept quote is
     replaced by the text's own characters, so what's published is always
     exactly what the bill says.
 
@@ -197,6 +226,11 @@ def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[d
             at = folded.find((quote[0].swapcase() + quote[1:]).translate(_QUOTE_FOLD))
         if at >= 0:
             quote = haystack[at:at + len(quote)]
+        elif quote:
+            span = _find_ignoring_commas(quote.translate(_QUOTE_FOLD), folded)
+            if span:
+                at = span[0]
+                quote = haystack[span[0]:span[1]]
         if at >= 0 and _is_substantive_quote(quote):
             kept.append({**c, "quote": quote})
         else:
@@ -333,16 +367,10 @@ def _line_start(text: str, pos: int) -> int:
     return text.rfind("\n", 0, pos) + 1
 
 
-def _exclusion_end(law: str, m: re.Match) -> int:
-    """End of an exclusion: its sentence, or -- when it introduces a list
-    ("does not apply to:") -- the list, up to the next line labeled at the
-    lead-in's level or above, or the next bill section."""
-    colon = law.find(":", m.end())
-    sentence = _SENTENCE_END.search(law, m.end())
-    stop = sentence.end() if sentence else len(law)
-    if colon == -1 or colon > stop:
-        return stop
-    lead = _label_depths(law, _line_start(law, m.start()))
+def _list_end(law: str, lead_start: int, colon: int) -> int:
+    """End of the list a lead-in ending at `colon` introduces: the next line
+    labeled at the lead-in's level or above, or the next bill section."""
+    lead = _label_depths(law, _line_start(law, lead_start))
     lead_depth = max(d for d, _ in lead) if lead else None
     line = law.find("\n", colon)
     while line != -1:
@@ -357,6 +385,35 @@ def _exclusion_end(law: str, m: re.Match) -> int:
                 return line
         line = law.find("\n", line)
     return len(law)
+
+
+def _exclusion_end(law: str, m: re.Match) -> int:
+    """End of an exclusion: its sentence, or -- when it introduces a list
+    ("does not apply to:") -- the list."""
+    colon = law.find(":", m.end())
+    sentence = _SENTENCE_END.search(law, m.end())
+    stop = sentence.end() if sentence else len(law)
+    if colon == -1 or colon > stop:
+        return stop
+    return _list_end(law, m.start(), colon)
+
+
+def with_its_list(quote: str, text: str) -> str | None:
+    """A quote that ends in a list's lead-in ("... do not apply to any of the
+    following, unless ...:") extended through the list, as it reads in
+    `text`; None when the quote isn't a lead-in found there. HB 1389's s.
+    333.03(5) airport provision was proposed this way and dropped as a bare
+    lead-in (2026-10-03)."""
+    q = normalize_ws(quote)
+    if not q.endswith(":"):
+        return None
+    m = re.search(r"\s+".join(re.escape(word) for word in q.split()), text)
+    if not m:
+        return None
+    pos, colon = m.start(), m.end() - 1
+    end = _list_end(text, pos, colon)
+    block = text[pos:end].strip()
+    return block if len(block) > len(q) else None
 
 
 def applicability_exclusions(law: str) -> list[dict]:
