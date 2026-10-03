@@ -146,7 +146,10 @@ def _is_substantive_quote(quote: str) -> bool:
 # Curly quotes and dashes the model may swap for their plain forms (or the
 # other way round). Every entry maps one character to one character, so an
 # index into the folded text is an index into the original too.
-_QUOTE_FOLD = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": "'", "\u2019": "'",
+# Matching only (the bill's own characters are published): curly and
+# straight, single and double quotes are one character, as are dashes.
+# HB 1389: '0-120 percent AMI.' for "0-120 percent AMI." (2026-10-03).
+_QUOTE_FOLD = str.maketrans({"\u201c": '"', "\u201d": '"', "\u2018": '"', "\u2019": '"', "'": '"',
                              "\u2014": "-", "\u2013": "-"})
 
 

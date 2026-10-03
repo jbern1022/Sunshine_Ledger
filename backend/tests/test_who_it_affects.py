@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/9"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/10"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -888,3 +888,58 @@ def test_a_misquoted_list_after_an_exact_lead_in_is_replaced_by_the_bills_list()
     assert quote.startswith(lead)
     assert "of a mile laterally from the runway edge and within an area" in quote  # the bill's words
     assert "(c) A proposed development that exceeds maximum height restrictions" in quote
+
+
+# Quality gaps from the HB 1389 v9 validation (2026-10-03).
+IMMUNITY = ("In accordance with s. 13, Art. X of the State Constitution, the state, for itself and its agencies or "
+            "political subdivisions, waives sovereign immunity for a cause of action based upon the application of "
+            "this section.")
+
+
+def test_a_clause_that_is_another_entrys_rule_is_not_also_its_condition():
+    courts = _who("Courts", RELIEF, "obligation", "Must order relief for discriminatory housing practices.")
+    courts["conditions"] = [{"text": "The state waives immunity.", "quote": IMMUNITY}]
+    state = _who("State", IMMUNITY, "protection", "Waives sovereign immunity for these actions.")
+    items = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(courts, state)).items
+    by_group = {i["group"]: i for i in items}
+    assert by_group["Courts"]["conditions"] == []
+    assert "State" in by_group
+
+
+def test_an_unless_condition_stops_at_a_list_lead_in():
+    lead = ("Sections 125.01055(7) and 166.04151(7) do not apply to any of the following, unless the respective "
+            "application is approved by the governing body of the airport:")
+    entry = _who("Airport governing bodies", lead, "permission", "May approve affordable-housing developments in airport zones.")
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry)).items
+    assert [c["quote"] for c in item["conditions"]] in (
+        [], ["unless the respective application is approved by the governing body of the airport"],
+    )
+
+
+def test_a_noun_list_quote_names_its_own_group():
+    fragment = "agencies, governmental entities, and other legal or commercial entities."
+    entry = _who("Anyone", fragment, "other", "Now count as persons under the Fair Housing Act.")
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry)).items
+    assert item["group"] == "Agencies, governmental entities, and other legal or commercial entities"
+
+
+def test_a_rule_about_a_development_is_about_its_applicants():
+    assemblage = ("A multifamily or mixed-use residential development proposed under this section shall not exclude "
+                  "an assemblage of parcels under common ownership or control")
+    entry = _who("Anyone", assemblage, "prohibition", "May not be denied for including nearby parcels under common ownership.")
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(entry)).items
+    assert item["group"] == "Applicants"
+
+
+def test_prompts_say_a_list_change_covers_every_item():
+    from app.pipeline.bill_layers import WHO_FOLLOWUP_PROMPT
+
+    for prompt in (WHO_IT_AFFECTS_PROMPT, WHO_FOLLOWUP_PROMPT):
+        assert "covers every item in the list" in prompt
+
+
+def test_leading_articles_are_dropped_from_group_names():
+    county, city = _parallel("county", "1"), _parallel("municipality", "2")
+    county["group"], city["group"] = "A county", "The municipality"
+    [item] = build_who_it_affects("H1389", "x", _hb1389_text(), QuoteRoutingClient(county, city)).items
+    assert item["group"] == "Counties and municipalities"
