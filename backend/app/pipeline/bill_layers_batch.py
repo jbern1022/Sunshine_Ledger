@@ -224,7 +224,7 @@ if __name__ == "__main__":
                         break
             print(f"\n{n} bill(s) with work.")
         else:
-            client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0)
+            client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=4096)
             ok, bad = process_bills(db, client, limit=args.limit, max_minutes=args.max_minutes)
             print(f"\nDone: {ok} block version(s) written, {bad} bill(s) failed.")
             sys.exit(exit_code(written=ok, failed=bad))

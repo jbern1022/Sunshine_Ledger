@@ -157,3 +157,16 @@ def test_temperature_is_sent_only_when_set(monkeypatch):
     fixed.generate("p", json_mode=True)
     assert "options" not in bodies[0]
     assert bodies[1]["options"] == {"temperature": 0}
+
+
+def test_num_predict_caps_output_when_set(monkeypatch):
+    bodies = []
+
+    def post(url, json=None):
+        bodies.append(json)
+        return _FakeResponse(200, {"response": "ok"})
+
+    client = OllamaClient(temperature=0, num_predict=3072)
+    monkeypatch.setattr(client._client, "post", post)
+    client.generate("p", json_mode=True)
+    assert bodies[0]["options"] == {"temperature": 0, "num_predict": 3072}

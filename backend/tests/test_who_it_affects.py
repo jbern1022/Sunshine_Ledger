@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/6"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/7"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -212,7 +212,13 @@ class SequenceClient:
     def generate(self, prompt, *, json_mode=False):
         assert json_mode
         self.prompts.append(prompt)
+        if "have no entry yet" in prompt:  # second-pass calls answer nothing here
+            return json.dumps({"items": []})
         return json.dumps(self.payloads.pop(0) if self.payloads else {"items": []})
+
+    @property
+    def first_pass(self):
+        return [p for p in self.prompts if "have no entry yet" not in p]
 
 
 def _section(n: int, sentence: str, size: int = 7_000) -> str:
@@ -295,13 +301,13 @@ def test_hb1389_is_read_in_full():
     text = (Path(__file__).parent / "fixtures" / "bill_text" / "hb1389_2026_enrolled.txt").read_text()
     client = SequenceClient()
     r = build_who_it_affects("H1389", "Affordable Housing", text, client)
-    seen = "".join(client.prompts)
-    assert len(client.prompts) <= MAX_WHO_WINDOWS
+    seen = "".join(client.first_pass)
+    assert len(client.first_pass) <= MAX_WHO_WINDOWS
     assert "An act relating to affordable housing" not in seen
     for n in range(1, 14):
         assert f"Section {n}." in seen
     # Sections 1 and 2 (counties, municipalities) are each ~9-10k chars.
-    assert "Section 1." in client.prompts[0] and "Section 2." in client.prompts[1]
+    assert "Section 1." in client.first_pass[0] and "Section 2." in client.first_pass[1]
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
 
 
@@ -491,13 +497,13 @@ def test_rules_that_differ_beyond_the_local_government_stay_separate():
     assert [i["group"] for i in items] == ["Counties", "Municipalities"]
 
 
-def test_up_to_twelve_entries_are_kept_and_more_are_counted():
-    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, 15))
+def test_up_to_twenty_entries_are_kept_and_more_are_counted():
+    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, 23))
     bill = "Section 1. Reports.\n" + lines
-    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, 15)]
+    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, 23)]
     r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
-    assert len(r.items) == 12
-    assert r.scope_note == "Bill text · first 12 of 14 entries"
+    assert len(r.items) == 20
+    assert r.scope_note == "Bill text · first 20 of 22 entries"
 
 
 class QuoteRoutingClient:
@@ -744,3 +750,101 @@ def test_the_head_noun_decides_not_any_shared_word():
     assert _head_noun("agencies, governmental entities, and other legal or commercial entities") == "agencies"
     assert _head_noun("Applicants for development authorized under s. 125.01055(7)") == "applicants"
     assert _head_noun("Counties and municipalities") == "municipalities"
+
+
+# Second pass (2026-10-03): changed provisions the first pass left without an
+# entry are listed back to the model, one extra call per window.
+def test_the_second_pass_lists_changed_provisions_without_an_entry():
+    client = SequenceClient()  # the first pass finds nothing anywhere
+    build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), client)
+    followups = [p for p in client.prompts if "have no entry yet" in p]
+    assert followups, "a second-pass prompt is sent"
+    listed = "\n".join(p.split("have no entry yet", 1)[1] for p in followups)
+    assert "An applicant for a proposed development authorized under s. 125.01055(7)" in listed  # Section 4
+    assert "unless the respective application is approved by the governing body of the airport" in listed  # Section 7
+    assert "Farms and farm operations" in listed  # (7)(n), behind Section 3
+    # Pure date rules and exclusion-list items are shown elsewhere.
+    assert "apply retroactively to January 1, 2024" not in listed
+    assert "Any area of critical state concern" not in listed
+
+
+def test_provisions_already_covered_are_not_listed_again():
+    entry = _who("Counties", COUNTY_MANDATE, "obligation", "Must allow multifamily housing in commercial areas.")
+    client = QuoteRoutingClient(entry)
+    build_who_it_affects("H1389", "x", _hb1389_text(), client)
+    followups = [p for p in client.prompts if "have no entry yet" in p]
+    listed = "\n".join(p.split("have no entry yet", 1)[1] for p in followups)
+    assert "A county must authorize multifamily and mixed-use residential" not in listed
+
+
+def test_second_pass_entries_go_through_every_guard():
+    airport = ("Sections 125.01055(7) and 166.04151(7) do not apply to any of the following, unless the respective "
+               "application is approved by the governing body of the airport:")
+    good = _who("Airport governing bodies", airport, "permission", "May approve affordable-housing developments in airport zones.")
+    invented = _who("Airport governing bodies", "The airport may veto any housing.", "permission", "May veto housing.")
+
+    class SecondPassOnly:
+        model = "fake:1"
+        prompts = []
+
+        def generate(self, prompt, *, json_mode=False):
+            self.prompts.append(prompt)
+            hit = "have no entry yet" in prompt and "governing body of the airport" in prompt
+            return json.dumps({"items": [good, invented] if hit else []})
+
+    r = build_who_it_affects("H1389", "x", _hb1389_text(), SecondPassOnly())
+    assert [i["statute_ref"] for i in r.items] == ["s. 333.03(5)"]
+    assert invented in r.dropped
+
+
+def test_no_second_pass_without_change_markers():
+    client = FakeClient({"items": []})
+    build_who_it_affects("HB 1", "Deposits", BILL, client)
+    assert len(client.prompts) == 1
+
+
+def test_a_failed_second_pass_keeps_the_first_pass_entries():
+    entry = _who("Counties", COUNTY_MANDATE, "obligation", "Must allow multifamily housing in commercial areas.")
+
+    class FlakyFollowup(QuoteRoutingClient):
+        def generate(self, prompt, *, json_mode=False):
+            if "have no entry yet" in prompt:
+                raise TimeoutError("timed out")
+            return super().generate(prompt, json_mode=json_mode)
+
+    r = build_who_it_affects("H1389", "x", _hb1389_text(), FlakyFollowup(entry))
+    assert r.evidence_state == "supported"
+    assert any(i["group"] == "Counties" for i in r.items)
+    assert any(d.get("dropped") == "second pass" for d in r.dropped)
+
+
+def test_sentences_do_not_end_inside_a_subparagraph_label_or_an_abbreviation():
+    from app.pipeline.bill_layers import _sentence_bounds
+
+    w = "Section 1. The owner may apply under sub-subparagraph (d)1.a. after meeting the requirements of s. 13, Art. X of the State Constitution."
+    s0, s1 = _sentence_bounds(w, w.index("after meeting"))
+    assert w[s0:s1].strip().startswith("The owner may apply")
+
+
+def test_repeats_of_a_kept_rule_are_dropped_as_duplicates():
+    from app.pipeline.bill_layers import _merge_parallel
+
+    def e(group, quote):
+        return {"group": group, "quote": quote, "conditions": [], "exceptions": [], "affected_groups": [group],
+                "section_ref": None, "statute_ref": None}
+
+    county = e("County", "A county may not restrict height below the height authorized under this paragraph")
+    city = e("Municipality", "A municipality may not restrict height below the height authorized under this paragraph")
+    city_again = e("municipality", "A municipality may not restrict height below the height authorized under this paragraph through")
+    owner = e("Owners", "the owner of a property in a multifamily project that was issued a building permit")
+    owner_longer = e("Owners", "Notwithstanding an ordinance, the owner of a property in a multifamily project that was issued a building permit on or after")
+    other_group = e("Taxing authorities", "the owner of a property in a multifamily project that was issued a building permit")
+    merged, dupes = _merge_parallel([county, city, city_again, owner, owner_longer, other_group])
+    assert [m["group"] for m in merged] == ["Counties and municipalities", "Owners", "Taxing authorities"]
+    assert dupes == [city_again, owner_longer]
+
+
+def test_up_to_twenty_entries_are_kept():
+    from app.pipeline.bill_layers import MAX_WHO_ENTRIES
+
+    assert MAX_WHO_ENTRIES == 20
