@@ -57,7 +57,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/3",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/4",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -478,7 +478,10 @@ _NEGATED_MODAL = re.compile(r"\b(?:may|shall|must|can)\s+not\b|\bcannot\b", re.I
 # What a quote needs to back a "may not" entry. A bare "not" isn't enough:
 # "... not to exceed 10 stories" is a limit on a permission.
 _PROHIBITS = re.compile(
-    r"\b(?:may|shall|must|can)\s+not\b|\bcannot\b|\bunlawful\b|\bprohibit\w*|\bno\s+(?:\w+\s+){0,3}(?:may|shall)\b",
+    r"\b(?:may|shall|must|can)\s+not\b|\bcannot\b|\bunlawful\b|\bprohibit\w*|\bno\s+(?:\w+\s+){0,3}(?:may|shall)\b"
+    # A criminal offense prohibits by penalty: "A person who ... commits a
+    # misdemeanor of the first degree".
+    r"|\bcommits\s+(?:a|an)\b|\bis\s+guilty\s+of\b|\bis\s+subject\s+to\s+a\s+(?:civil\s+)?(?:penalty|fine)\b",
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"\b(?:not|no|never|unlawful|prohibit\w*|may not|shall not)\b", re.IGNORECASE)
@@ -615,6 +618,94 @@ def _merge_parallel(entries: list[dict]) -> list[dict]:
     return merged
 
 
+# F4 (HB 1389 re-validation): the group must be who the quote names. 760.35(4)
+# "If the court finds ... it must issue an order" came back as "Person";
+# 760.26 "It is unlawful to discriminate in land use decisions" as "Landlord".
+_GENERIC_GROUP = re.compile(r"^(?:anyone|any\s+person|persons?|people|everyone|individuals?)$", re.IGNORECASE)
+_ANYONE_QUOTE = re.compile(
+    r"^\W*(?:it\s+is\s+unlawful|(?:a|any|no)\s+person\b|anyone|whoever|every\s+person)", re.IGNORECASE
+)
+_PREPOSITIONS = {"of", "in", "on", "by", "for", "to", "with", "under", "from", "at", "as", "or", "and"}
+_SUBJECT = re.compile(
+    r"\b(?:a|an|the|each|any|every)\s+(?P<noun>(?:[a-z-]+\s+)?[a-z-]+)\s+(?:may|shall|must|is\s+required|are\s+required)\b",
+    re.IGNORECASE,
+)
+_PRONOUN_SUBJECT = re.compile(r"\b(?:it|they)\s+(?:may|shall|must)\b", re.IGNORECASE)
+_DEFINITE = re.compile(r"\bthe\s+(?P<noun>[a-z-]+)\b", re.IGNORECASE)
+
+
+def _stems(text: str) -> set[str]:
+    return {w[:5] for w in re.findall(r"[a-z]{4,}", text.lower())}
+
+
+def _plural(noun: str) -> str:
+    words = noun.split()
+    last = words[-1]
+    if last.endswith("y") and last[-2:-1] not in "aeiou":
+        last = last[:-1] + "ies"
+    elif last.endswith(("s", "x", "ch", "sh")):
+        last += "es"
+    else:
+        last += "s"
+    out = " ".join(words[:-1] + [last])
+    return out[:1].upper() + out[1:]
+
+
+def _quote_subject(quote: str) -> str | None:
+    """Who the quote's main clause binds: "A county must ..." -> "Counties";
+    "If the court finds ... it must ..." -> "Courts"; "It is unlawful to ..."
+    or "A person who ..." -> "Anyone"; None when it can't be told."""
+    if _ANYONE_QUOTE.search(quote):
+        return "Anyone"
+    for m in _SUBJECT.finditer(quote):
+        noun = m.group("noun").lower()
+        if not set(noun.split()) & _PREPOSITIONS and noun.split()[-1] not in {"person", "persons"}:
+            return _plural(noun)
+        if noun.split()[-1] in {"person", "persons"}:
+            return "Anyone"
+    pronoun = _PRONOUN_SUBJECT.search(quote)
+    if pronoun:
+        antecedent = _DEFINITE.search(quote, 0, pronoun.start())
+        if antecedent:
+            return _plural(antecedent.group("noun").lower())
+    return None
+
+
+# A sentence's end; "s. 333.03" and "ss. 380.055" are citations.
+_SENTENCE_END = re.compile(r"(?<!\bs)(?<!\bss)\.(?=\s|$)")
+# Where a sentence can start: after one ends, after a statute catchline
+# ("760.26 Prohibited discrimination ...—It is unlawful"), or after a
+# "... amended to read:" lead-in.
+_SENTENCE_BREAK = re.compile(r"(?<!\bs)(?<!\bss)\.(?=\s|$)|—|:\s*\n")
+
+
+def _sentence_around(quote: str, window: str) -> str:
+    """The whole sentence a (possibly fragmentary) quote sits in, so a
+    fragment like "may notify the county ... by July 1, 2026" is read with
+    its subject ("An applicant ... may notify")."""
+    at = quote_position(quote, window)
+    if at is None:
+        return quote
+    start = 0
+    for m in _SENTENCE_BREAK.finditer(window, 0, at):
+        start = m.end()
+    end = _SENTENCE_END.search(window, at + len(quote) - 1)
+    return normalize_ws(window[start:end.end() if end else len(window)])
+
+
+def _grounded_group(group: str, quote: str, window: str) -> str | None:
+    """The entry's group if its sentence supports it, else the sentence's own
+    subject, else None (the entry can't be tied to anyone the bill names)."""
+    sentence = _sentence_around(quote, window)
+    sentence = re.sub(r"^Section\s+\d+\.\s*", "", sentence)
+    subject = _quote_subject(sentence)
+    if _GENERIC_GROUP.match(group.strip()):
+        return subject or group
+    if _stems(group) & _stems(sentence):
+        return group
+    return subject
+
+
 def _attach_exclusions(entries: list[dict], exclusions: list[dict]) -> None:
     """Add each "does not apply to" provision to the entries it governs,
     unless the entry already lists it (R4, HB 1389 validation)."""
@@ -704,6 +795,11 @@ def _who_entries(
             dropped.append(r)
             continue
         quote = verified[0]["quote"]
+        grounded = _grounded_group(group, quote, window)
+        if grounded is None:
+            dropped.append(r)
+            continue
+        group = grounded
         conditions, bad_conditions = _verified_clauses(r.get("conditions"), window)
         exceptions, bad_exceptions = _verified_clauses(r.get("exceptions"), window)
         dropped += [{"dropped": "condition", "group": group, **c} for c in bad_conditions]

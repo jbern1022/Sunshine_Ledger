@@ -1,4 +1,5 @@
 import json
+import re
 
 from app.pipeline.bill_layers import MAX_WHO_WINDOWS, METHOD_VERSIONS, WHO_IT_AFFECTS_PROMPT, build_who_it_affects
 
@@ -107,15 +108,14 @@ def test_downstream_effects_are_left_to_expected_effect():
 
 
 def test_one_group_may_appear_in_several_roles():
-    as_landlord = _landlord(group="Small-business owners")
-    as_tenant = {
-        "group": "Small-business owners",
-        "change": "May apply for a rent assistance grant if 65 or older.",
-        "change_kind": "eligibility",
-        "quote": "A tenant who is 65 years of age or older may apply to the county for a rent assistance grant.",
-        "conditions": [], "exceptions": [],
+    bill = ("Section 1. A landlord shall return a tenant's security deposit within 15 days.\n"
+            "Section 2. A landlord may apply to the county for a repair grant.\n")
+    as_obligated = _landlord(quote="A landlord shall return a tenant's security deposit within 15 days.", exceptions=[])
+    as_eligible = {
+        "group": "Landlords", "change": "May apply for a repair grant.", "change_kind": "eligibility",
+        "quote": "A landlord may apply to the county for a repair grant.", "conditions": [], "exceptions": [],
     }
-    r = build_who_it_affects("HB 1", "Mixed", BILL, FakeClient({"items": [as_landlord, as_tenant]}))
+    r = build_who_it_affects("HB 1", "Mixed", bill, FakeClient({"items": [as_obligated, as_eligible]}))
     assert [i["change_kind"] for i in r.items] == ["obligation", "eligibility"]
 
 
@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/3"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/4"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -262,11 +262,11 @@ def test_a_quote_must_be_in_the_window_the_model_saw():
 
 
 def test_later_sections_are_not_crowded_out_by_the_first():
-    first = [_entry(f"Group {i}", f"({i}) The department shall keep record number 1-{i} on file.") for i in range(6)]
+    first = [_entry(f"Department {i}", f"({i}) The department shall keep record number 1-{i} on file.") for i in range(6)]
     client = SequenceClient({"items": first}, {"items": [_entry("Municipalities", CITIES)]}, {"items": []})
     r = build_who_it_affects("HB 2", "Records", LONG_BILL, client)
     assert len(r.items) == 7
-    assert [i["group"] for i in r.items][:2] == ["Group 0", "Municipalities"]
+    assert [i["group"] for i in r.items][:2] == ["Department 0", "Municipalities"]
 
 
 def test_a_section_larger_than_one_window_is_split_on_line_breaks():
@@ -512,7 +512,7 @@ class QuoteRoutingClient:
 
     def generate(self, prompt, *, json_mode=False):
         self.prompts.append(prompt)
-        flat = " ".join(prompt.split())
+        flat = " ".join(re.sub(r"</?new>|<removed/>", "", prompt).split())
         return json.dumps({"items": [e for e in self.entries if " ".join(e["quote"].split()) in flat]})
 
 
@@ -615,4 +615,52 @@ def test_a_stray_not_in_the_quote_does_not_excuse_an_inverted_permission():
     inverted = {"group": "Counties", "change": "May not restrict the height of the proposed development to 150 percent.",
                 "change_kind": "prohibition", "quote": cap, "conditions": [], "exceptions": []}
     r = build_who_it_affects("H1389", "Affordable Housing", _hb1389_text(), SequenceClient({"items": [inverted]}))
+    assert r.items == []
+
+
+# F4 (HB 1389 v2/v3, 2026-10-02): the group must be who the quote names.
+RELIEF = ("If the court finds that a person has engaged in a discriminatory housing practice it must issue an order "
+          "prohibiting the practice and providing affirmative relief from the effects of the practice")
+LAND_USE = "It is unlawful to discriminate in land use decisions or in the permitting of development"
+REZONING = ("a county may not require a proposed multifamily development to obtain a zoning or land use change, "
+            "special exception, conditional use approval, variance")
+
+
+def _who(group, quote, kind="prohibition", change="May not discriminate."):
+    return {"group": group, "change": change, "change_kind": kind, "quote": quote, "conditions": [], "exceptions": []}
+
+
+def _groups(*entries):
+    client = QuoteRoutingClient(*entries)
+    return [i["group"] for i in build_who_it_affects("H1389", "x", _hb1389_text(), client).items]
+
+
+def test_a_generic_group_takes_the_actor_the_quote_names():
+    assert _groups(_who("Person", RELIEF, "obligation", "Must order relief for discriminatory housing practices.")) == ["Courts"]
+    assert _groups(_who("Anyone", REZONING, change="May not require rezoning.")) == ["Counties"]
+
+
+def test_a_group_the_quote_never_mentions_is_relabeled_from_its_subject():
+    # 760.26 is impersonal: it binds anyone making land use decisions.
+    assert _groups(_who("Landlords", LAND_USE)) == ["Anyone"]
+
+
+def test_groups_the_quote_names_are_kept():
+    assert _groups(_who("Counties", REZONING, change="May not require rezoning.")) == ["Counties"]
+    assert _groups(_who("Anyone", LAND_USE)) == ["Anyone"]
+
+
+def test_anyone_is_kept_for_a_person_who_offense():
+    bill = "Section 1. A person who knowingly sells a forged permit commits a misdemeanor of the first degree.\n"
+    entry = _who("Anyone", "A person who knowingly sells a forged permit commits a misdemeanor of the first degree.",
+                 "prohibition", "May not sell forged permits.")
+    [item] = build_who_it_affects("HB 8", "Permits", bill, FakeClient({"items": [entry]})).items
+    assert item["group"] == "Anyone"
+
+
+def test_a_group_with_no_footing_in_the_quote_is_dropped():
+    bill = "Section 1. Records of the agency are confidential and exempt from disclosure.\n"
+    entry = _who("Journalists", "Records of the agency are confidential and exempt from disclosure.",
+                 "other", "Can no longer see agency records.")
+    r = build_who_it_affects("HB 9", "Records", bill, FakeClient({"items": [entry]}))
     assert r.items == []
