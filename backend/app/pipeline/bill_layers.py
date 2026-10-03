@@ -58,7 +58,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/7",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/8",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -595,9 +595,12 @@ For each provision that directly changes something for a specific group -- an ob
 - "change_kind": one of "obligation", "permission", "eligibility", "protection", "cost", "service", "prohibition", "other".
 - "quote": the sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses, without the <new>, </new> and <removed/> tags.
 - "conditions" and "exceptions": only those the text states for this entry, each with its exact sentence. Empty list if none.
+- A changed definition or exclusion is a change for the group it is about: if a provision says X no longer counts as Y, or that X is excluded or included, the group is X; if a rule now applies "unless approved by Z", Z gains a power to approve and is the group.
 - Only direct applicability; no downstream consequences. Do not invent limits, exceptions or safeguards.
 
-Respond with JSON only: {{"items": [{{"group": "...", "change": "...", "change_kind": "obligation", "quote": "exact text", "conditions": [{{"text": "...", "quote": "exact text"}}], "exceptions": [{{"text": "...", "quote": "exact text"}}]}}]}}"""
+Answer every numbered provision: give its entry with "provision": <number>, or, only if it truly changes nothing for anyone, {{"provision": <number>, "skip": "<one-line reason>"}}.
+
+Respond with JSON only: {{"items": [{{"provision": 1, "group": "...", "change": "...", "change_kind": "obligation", "quote": "exact text", "conditions": [{{"text": "...", "quote": "exact text"}}], "exceptions": [{{"text": "...", "quote": "exact text"}}]}}]}}"""
 MAX_FOLLOWUP_PROVISIONS = 8
 _MIN_INSERTED_CHARS = 15
 # Date-only rules already show as provision dates; deadlines can carry a
@@ -651,7 +654,11 @@ def _who_followup(
         ),
         json_mode=True,
     ))
-    return _filter_entries([_untagged(r) for r in raw], window)
+    # A provision the model declined, with its reason, is logged, not shown.
+    skipped = [{"dropped": "second pass skip", "provision": r.get("provision"), "reason": r.get("skip")}
+               for r in raw if r.get("skip") and not r.get("group")]
+    kept, dropped = _filter_entries([_untagged(r) for r in raw if not (r.get("skip") and not r.get("group"))], window)
+    return kept, dropped + skipped
 
 
 def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -> LayerResult:

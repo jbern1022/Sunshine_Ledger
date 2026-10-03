@@ -146,7 +146,7 @@ def test_prompt_and_method_version():
     assert r.scope_note == "No group the bill directly applies to could be tied to its text"
     assert "Do not invent" in WHO_IT_AFFECTS_PROMPT
     assert "HB 1" in client.prompts[0]
-    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/7"
+    assert METHOD_VERSIONS[("who_it_affects", "sunshine_ledger_ai")] == "who_it_affects/sunshine_ledger_ai/8"
 
 
 def test_quotes_from_the_title_paragraph_are_not_the_law():
@@ -848,3 +848,26 @@ def test_up_to_twenty_entries_are_kept():
     from app.pipeline.bill_layers import MAX_WHO_ENTRIES
 
     assert MAX_WHO_ENTRIES == 20
+
+
+
+# Prompt tweak (2026-10-03): the second pass misread the airport provision
+# as an obligation and passed over the (7)(n) farm definitions.
+def test_the_second_pass_prompt_covers_definitions_exclusions_and_asks_about_each_provision():
+    from app.pipeline.bill_layers import WHO_FOLLOWUP_PROMPT
+
+    assert "A changed definition or exclusion is a change for the group it is about" in WHO_FOLLOWUP_PROMPT
+    assert "Answer every numbered provision" in WHO_FOLLOWUP_PROMPT
+
+
+def test_a_declined_provision_is_logged_with_its_reason():
+    class Declines:
+        model = "fake:1"
+
+        def generate(self, prompt, *, json_mode=False):
+            if "have no entry yet" in prompt:
+                return json.dumps({"items": [{"provision": 1, "skip": "Only sets a date."}]})
+            return json.dumps({"items": []})
+
+    r = build_who_it_affects("H1389", "x", _hb1389_text(), Declines())
+    assert {"dropped": "second pass skip", "provision": 1, "reason": "Only sets a date."} in r.dropped
