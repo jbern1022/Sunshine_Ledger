@@ -58,7 +58,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/8",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/9",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -958,8 +958,15 @@ def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict
         change = str(r.get("change") or "").strip()
         if not group or not change:
             continue
-        listed = with_its_list(str(r.get("quote") or ""), window)
+        quote_in = str(r.get("quote") or "")
+        listed = with_its_list(quote_in, window)
         verified, _ = verify_quotes([{**r, "quote": listed} if listed else r], window)
+        if not verified and ":" in quote_in:
+            # A lead-in copied exactly, then its list copied loosely (HB 1389's
+            # airport provision): publish the bill's own list instead.
+            lead = with_its_list(quote_in[: quote_in.index(":") + 1], window)
+            if lead:
+                verified, _ = verify_quotes([{**r, "quote": lead}], window)
         if (
             not verified
             or _EFFECTIVE_DATE_CLAUSE.search(verified[0]["quote"])
