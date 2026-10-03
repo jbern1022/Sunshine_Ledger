@@ -58,7 +58,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/6",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/7",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -183,10 +183,31 @@ List up to 8 entries. Each entry is one group and one thing the bill directly ch
 Respond with JSON only: {{"items": [{{"group": "...", "change": "...", "change_kind": "obligation", "quote": "exact text", "conditions": [{{"text": "...", "quote": "exact text"}}], "exceptions": [{{"text": "...", "quote": "exact text"}}]}}]}}"""
 
 
+def _complete_items(raw: str) -> list[dict]:
+    """The items that finished before an answer was cut off (the output cap,
+    HB 1389 2026-10-03): decode them one by one until the broken one."""
+    start = re.search(r'"items"\s*:\s*\[', raw)
+    if not start:
+        return []
+    decoder, pos, items = json.JSONDecoder(), start.end(), []
+    while True:
+        while pos < len(raw) and raw[pos] in " \t\r\n,":
+            pos += 1
+        try:
+            item, pos = decoder.raw_decode(raw, pos)
+        except json.JSONDecodeError:
+            return items
+        if isinstance(item, dict):
+            items.append(item)
+
+
 def _parse_items(raw: str) -> list[dict]:
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
+        salvaged = _complete_items(raw)
+        if salvaged:
+            return salvaged
         raise LayerGenerationError(f"model returned invalid JSON: {raw[:200]!r}") from exc
     items = data.get("items") if isinstance(data, dict) else None
     if not isinstance(items, list):
@@ -372,7 +393,8 @@ MAX_WHO_WINDOWS = 4
 # no entry (2026-10-03).
 WHO_WINDOW_TARGET = 6_000
 # Entries kept per bill; the page shows the first 6 and folds the rest.
-MAX_WHO_ENTRIES = 12
+# 20 since the second pass (HB 1389: 18 distinct changes).
+MAX_WHO_ENTRIES = 20
 _SECTION_NUMBER = re.compile(r"Section\s+(\d+)\.", re.IGNORECASE)
 
 
@@ -551,6 +573,87 @@ def _quoted_condition(quote: str, conditions: list[dict]) -> dict | None:
     return {"text": clause[0].upper() + clause[1:], "quote": clause}
 
 
+# Second pass (HB 1389, 2026-10-03): the first pass picks some changes and
+# skips others (Section 4's pending applicants, Section 7's airport approval,
+# the (7)(n) farm definitions). Changed provisions with no entry are listed
+# back to the model, one extra call per window that has any.
+WHO_FOLLOWUP_PROMPT = """You are listing who a bill directly applies to, for a civic transparency website.
+
+Bill: {bill_number} — {title}
+
+The text below is the law as it will read once this bill takes effect.{changes}
+\"\"\"
+{text}
+\"\"\"
+
+These provisions in the text above are new or changed by this bill and have no entry yet:
+{provisions}
+
+For each provision that directly changes something for a specific group -- an obligation, permission, eligibility, protection, cost, service, or prohibition -- give one entry. Skip a provision that only sets a date or doesn't change anything for anyone directly. Rules:
+- "group": the specific group the provision names or defines. If it applies to any person, write "Anyone".
+- "change": what changes for that group, in plain language. Keep the bill's modal strength: "shall"/"must" is a requirement, "may" is permission.
+- "change_kind": one of "obligation", "permission", "eligibility", "protection", "cost", "service", "prohibition", "other".
+- "quote": the sentence or clause from the text above that creates this change, copied EXACTLY -- character for character, no ellipses, without the <new>, </new> and <removed/> tags.
+- "conditions" and "exceptions": only those the text states for this entry, each with its exact sentence. Empty list if none.
+- Only direct applicability; no downstream consequences. Do not invent limits, exceptions or safeguards.
+
+Respond with JSON only: {{"items": [{{"group": "...", "change": "...", "change_kind": "obligation", "quote": "exact text", "conditions": [{{"text": "...", "quote": "exact text"}}], "exceptions": [{{"text": "...", "quote": "exact text"}}]}}]}}"""
+MAX_FOLLOWUP_PROVISIONS = 8
+_MIN_INSERTED_CHARS = 15
+# Date-only rules already show as provision dates; deadlines can carry a
+# permission or duty ("may notify ... by July 1, 2026"), so they stay.
+_DATE_ONLY_KINDS = {"retroactive", "tax_roll", "expires", "takes_effect"}
+
+
+def _sentence_bounds(window: str, pos: int) -> tuple[int, int]:
+    start = 0
+    for m in _SENTENCE_BREAK.finditer(window, 0, pos):
+        start = m.end()
+    end = _SENTENCE_END.search(window, pos)
+    return start, (end.end() if end else len(window))
+
+
+def _uncovered_changes(
+    window: str, offset: int, regions: list[tuple[int, int]], kept: list[dict], skip: list[str]
+) -> list[str]:
+    """Sentences of the window holding inserted text that no kept entry
+    quotes or cites, and that aren't in `skip` (date-only rules, items of a
+    "does not apply to" list)."""
+    end = offset + len(window)
+    said = [normalize_ws(q).lower() for e in kept for q in
+            [e["quote"]] + [c["quote"] for c in e["conditions"]] + [x["quote"] for x in e["exceptions"]]]
+    skipped = [normalize_ws(q).lower() for q in skip]
+    found: list[str] = []
+    for a, b in regions:
+        if b - a < _MIN_INSERTED_CHARS or b <= offset or a >= end:
+            continue
+        pos, stop = max(a, offset) - offset, min(b, end) - offset
+        while pos < stop:
+            s0, s1 = _sentence_bounds(window, pos)
+            sentence = normalize_ws(window[s0:s1])
+            low = sentence.lower()
+            pos = max(s1, pos + 1)
+            if len(sentence) < 40 or sentence in found:
+                continue
+            if any(low in q or q in low for q in said) or any(low in q for q in skipped):
+                continue
+            found.append(sentence)
+    return found[:MAX_FOLLOWUP_PROVISIONS]
+
+
+def _who_followup(
+    bill_number: str, title: str, window: str, shown: str, provisions: list[str], client
+) -> tuple[list[dict], list[dict]]:
+    listed = "\n".join(f'{i}. "{p}"' for i, p in enumerate(provisions, 1))
+    raw = _parse_items(client.generate(
+        WHO_FOLLOWUP_PROMPT.format(
+            bill_number=bill_number, title=title, text=shown, changes=_CHANGES_NOTE, provisions=listed,
+        ),
+        json_mode=True,
+    ))
+    return _filter_entries([_untagged(r) for r in raw], window)
+
+
 def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -> LayerResult:
     """Who the bill directly applies to: group, what changes, the provision
     that changes it (verified quote), and the conditions and exceptions the
@@ -564,9 +667,26 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     read = min(len(windows), MAX_WHO_WINDOWS)
     per_window: list[list[dict]] = []
     dropped: list[dict] = []
+    exclusions = applicability_exclusions(law)
+    dates = provision_dates(_law_text(full_text))
+    # List items of a "does not apply to" block are attached as exceptions;
+    # its lead-in stays eligible (HB 1389's airport approval is in one).
+    skip = [d["quote"] for d in dates if d["kind"] in _DATE_ONLY_KINDS]
+    skip += [x["quote"].split(":", 1)[1] for x in exclusions if ":" in x["quote"]]
     for offset, window in windows[:read]:
         shown = _marked(window, offset, regions) if regions else window
         kept, rejected = _who_entries(bill_number, title, window, client, shown=shown, marked=bool(regions))
+        if regions:
+            missing = _uncovered_changes(window, offset, regions, kept, skip)
+            if missing:
+                # Best effort: a failed second pass never costs the first
+                # pass's entries.
+                try:
+                    more, more_rejected = _who_followup(bill_number, title, window, shown, missing, client)
+                except Exception as exc:  # noqa: BLE001 -- timeout, bad JSON, Ollama error
+                    more, more_rejected = [], [{"dropped": "second pass", "error": str(exc)[:200]}]
+                kept += more
+                rejected += more_rejected
         for item in kept:
             item["section_ref"] = _section_ref(item["quote"], window, law, offset)
             at = quote_position(item["quote"], window)
@@ -576,9 +696,10 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
         dropped += rejected
     kept, dupes = _dedupe_quotes(_round_robin(per_window))
     dropped += dupes
-    _attach_exclusions(kept, applicability_exclusions(law))
-    _attach_dates(kept, provision_dates(_law_text(full_text)))
-    kept = _merge_parallel(kept)
+    _attach_exclusions(kept, exclusions)
+    _attach_dates(kept, dates)
+    kept, repeats = _merge_parallel(kept)
+    dropped += repeats
     # What the bill changes first, so the cap never keeps restated law over
     # a change (F2); the order is otherwise kept.
     kept.sort(key=lambda e: bool(e.get("restates_existing_law")))
@@ -599,24 +720,34 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
 _LOCAL_GOVERNMENT = re.compile(r"\b(?:count(?:y|ies)|municipalit(?:y|ies))(?:'s)?\b", re.IGNORECASE)
 
 
-def _merge_parallel(entries: list[dict]) -> list[dict]:
+def _merge_parallel(entries: list[dict]) -> tuple[list[dict], list[dict]]:
     """Fold an entry into an earlier one whose quote is the same once
     "county"/"municipality" are set aside: one entry, both groups, the
-    second citation kept under also_in, conditions and exceptions merged."""
+    second citation kept under also_in, conditions and exceptions merged.
+    An entry repeating a kept rule for a group it already covers is a
+    duplicate (the second pass re-proposes rules at another length):
+    returned separately, never shown twice."""
     merged: list[dict] = []
-    by_key: dict[str, dict] = {}
+    dupes: list[dict] = []
+    keys: list[tuple[list[str], dict]] = []  # every quote key an entry covers
     for entry in entries:
         entry.setdefault("also_in", [])
         quote = normalize_ws(entry["quote"]).lower()
         key = _LOCAL_GOVERNMENT.sub("<local>", quote)
         # The model may quote one version further than the other: a key
         # inside the other counts as the same rule.
-        first = next((e for k, e in by_key.items() if key in k or k in key), None) if key != quote else None
-        if first is None or first["also_in"] or first["group"] == entry["group"]:
-            by_key.setdefault(key, entry)
+        first = next((e for ks, e in keys if any(key in k or k in key for k in ks)), None)
+        if first is not None and _singular(_head_noun(entry["group"])) in {
+            _singular(_head_noun(g)) for g in first["affected_groups"] + [first["group"]]
+        }:
+            dupes.append(entry)
+            continue
+        if first is None or key == quote or first["also_in"] or first["group"] == entry["group"]:
+            keys.append(([key], entry))
             merged.append(entry)
             continue
         first["also_in"].append({k: entry.get(k) for k in ("quote", "section_ref", "statute_ref")})
+        next(ks for ks, e in keys if e is first).append(key)
         first["affected_groups"] = first["affected_groups"] + [entry["group"]]
         pair = sorted(g.lower().rstrip("s").replace("countie", "county").replace("municipalitie", "municipality")
                       for g in first["affected_groups"])
@@ -632,7 +763,7 @@ def _merge_parallel(entries: list[dict]) -> list[dict]:
                     first[field_name].append(x)
                     seen.append(q)
         first["restates_existing_law"] = bool(first.get("restates_existing_law") and entry.get("restates_existing_law"))
-    return merged
+    return merged, dupes
 
 
 # F4 (HB 1389 re-validation): the group must be who the quote names. 760.35(4)
@@ -697,11 +828,12 @@ def _quote_subject(quote: str) -> str | None:
 
 
 # A sentence's end; "s. 333.03" and "ss. 380.055" are citations.
-_SENTENCE_END = re.compile(r"(?<!\bs)(?<!\bss)\.(?=\s|$)")
+# Not after "s."/"ss." (citations), "Art." or a label like "(d)1.a.".
+_SENTENCE_END = re.compile(r"(?<!\bs)(?<!\bss)(?<!\bArt)(?<!\.[a-z])\.(?=\s|$)")
 # Where a sentence can start: after one ends, after a statute catchline
 # ("760.26 Prohibited discrimination ...—It is unlawful"), or after a
 # "... amended to read:" lead-in.
-_SENTENCE_BREAK = re.compile(r"(?<!\bs)(?<!\bss)\.(?=\s|$)|—|:\s*\n")
+_SENTENCE_BREAK = re.compile(r"(?<!\bs)(?<!\bss)(?<!\bArt)(?<!\.[a-z])\.(?=\s|$)|—|:\s*\n")
 
 
 def _sentence_around(quote: str, window: str) -> str:
@@ -807,7 +939,11 @@ def _who_entries(
         ),
         json_mode=True,
     ))
-    raw = [_untagged(r) for r in raw]
+    return _filter_entries([_untagged(r) for r in raw], window)
+
+
+def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict]]:
+    """Every guard, against the window the model was shown."""
     kept: list[dict] = []
     dropped: list[dict] = []
     for r in raw:

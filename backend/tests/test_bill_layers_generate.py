@@ -512,3 +512,17 @@ def test_text_without_section_headings_is_used_from_the_start():
     client = FakeClient({"items": [{"text": "Approves the agreement.", "section_ref": None, "assumptions": ["x"]}]})
     build_ai_interpretation("R-1", "Agreement", resolution, client)
     assert "A RESOLUTION of the City Commission" in client.prompts[0]
+
+
+def test_an_answer_cut_off_by_the_output_cap_keeps_its_complete_items():
+    from app.pipeline.bill_layers import _parse_items
+
+    cut = '{"items": [{"text": "One.", "section_ref": "Section 1"}, {"text": "Two.", "section_ref": "Sec'
+    assert _parse_items(cut) == [{"text": "One.", "section_ref": "Section 1"}]
+
+
+def test_a_cut_off_answer_with_no_complete_item_still_raises():
+    from app.pipeline.bill_layers import _parse_items
+
+    with pytest.raises(LayerGenerationError):
+        _parse_items('{"items": [{"text": "On')
