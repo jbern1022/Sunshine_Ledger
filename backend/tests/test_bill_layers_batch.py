@@ -20,7 +20,7 @@ None.
 
 
 WHO = {"items": [{
-    "group": "Salary payment recipients", "change": "May be paid by direct deposit.", "change_kind": "other",
+    "group": "Salary payments", "change": "May be paid by direct deposit.", "change_kind": "other",
     "quote": "Salary payments may be made by direct deposit.", "conditions": [], "exceptions": [],
 }]}
 
@@ -185,7 +185,7 @@ def test_who_it_affects_is_planned_only_when_enabled(db_session, bill_factory, m
     assert process_bills(db_session, RoutingClient()) == (4, 0)
     who = db_session.query(BillLayer).filter_by(layer="who_it_affects").one()
     assert who.evidence_state == "supported"
-    assert who.items[0]["group"] == "Salary payment recipients"
+    assert who.items[0]["group"] == "Salary payments"
     assert who.items[0]["section_ref"] == "Section 1"
 
 

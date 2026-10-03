@@ -764,3 +764,30 @@ def test_other_case_differences_still_fail_verification():
     text = "Section 1. A municipality may not restrict the height of a proposed development below three stories."
     kept, _ = verify_quotes([{"quote": "A Municipality may not restrict the height of a proposed development below three stories."}], text)
     assert kept == []
+
+
+# HB 1389 (2026-10-03): the model wrote "practice, it must issue" where the
+# amended law reads "practice it must issue" (the comma was in deleted text).
+def test_a_quote_that_differs_only_in_commas_is_kept_as_the_bill_wrote_it():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. If the court finds that a person has engaged in a discriminatory housing practice it must issue an order."
+    kept, dropped = verify_quotes([{"quote": "If the court finds that a person has engaged in a discriminatory housing practice, it must issue an order."}], text)
+    assert dropped == []
+    assert kept[0]["quote"] == "If the court finds that a person has engaged in a discriminatory housing practice it must issue an order."
+
+
+def test_a_comma_the_model_drops_is_restored_from_the_bill():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. The clerk shall keep the records, and the agency shall publish them annually."
+    kept, _ = verify_quotes([{"quote": "The clerk shall keep the records and the agency shall publish them annually."}], text)
+    assert kept[0]["quote"] == "The clerk shall keep the records, and the agency shall publish them annually."
+
+
+def test_missing_words_still_fail_even_with_commas_ignored():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. The clerk shall keep the records, including, but not limited to, filings, and publish them annually."
+    kept, _ = verify_quotes([{"quote": "The clerk shall keep the records and publish them annually."}], text)
+    assert kept == []
