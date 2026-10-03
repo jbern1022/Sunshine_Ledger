@@ -57,7 +57,7 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
     ("interpretation", "sunshine_ledger_ai"): "interpretation/sunshine_ledger_ai/6",
     ("expected_effect", "legislative_staff"): "expected_effect/legislative_staff/4",
     ("expected_effect", "sunshine_ledger_ai"): "expected_effect/sunshine_ledger_ai/5",
-    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/4",
+    ("who_it_affects", "sunshine_ledger_ai"): "who_it_affects/sunshine_ledger_ai/5",
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
@@ -510,6 +510,10 @@ def _verified_clauses(raw, amended: str) -> tuple[list[dict], list[dict]]:
     ], dropped
 
 
+_IS_RULE = re.compile(r"\b(?:must|shall|may|is\s+required|are\s+required)\b", re.IGNORECASE)
+_CONDITION_LEAD = re.compile(r"^\W*(?:if|unless|when|where|provided|only|so\s+long\s+as|on\s+condition)\b", re.IGNORECASE)
+
+
 # A condition the entry's own quote states (R3, HB 1389 validation): "...
 # regardless of the underlying zoning, if at least 40 percent of the
 # residential units ... are affordable" came back with conditions: [].
@@ -610,10 +614,12 @@ def _merge_parallel(entries: list[dict]) -> list[dict]:
             else f"{first['group']} and {entry['group'][:1].lower()}{entry['group'][1:]}"
         )
         for field_name in ("conditions", "exceptions"):
-            seen = {normalize_ws(x["quote"]).lower() for x in first[field_name]}
+            seen = [normalize_ws(x["quote"]).lower() for x in first[field_name]]
             for x in entry[field_name]:
-                if normalize_ws(x["quote"]).lower() not in seen:
+                q = normalize_ws(x["quote"]).lower()
+                if not any(q in kept for kept in seen):  # already said, or inside a kept block
                     first[field_name].append(x)
+                    seen.append(q)
         first["restates_existing_law"] = bool(first.get("restates_existing_law") and entry.get("restates_existing_law"))
     return merged
 
@@ -716,8 +722,10 @@ def _attach_exclusions(entries: list[dict], exclusions: list[dict]) -> None:
                 continue
             quote = normalize_ws(exclusion["quote"]).lower()
             listed = [normalize_ws(x["quote"]).lower() for x in entry["exceptions"]]
-            if any(q in quote or quote in q for q in listed):
+            if any(quote in q for q in listed):
                 continue
+            # The whole block replaces any of its items listed one by one (F5).
+            entry["exceptions"] = [x for x, q in zip(entry["exceptions"], listed) if q not in quote]
             entry["exceptions"].append({"text": normalize_ws(exclusion["quote"]), "quote": exclusion["quote"]})
 
 
@@ -801,6 +809,12 @@ def _who_entries(
             continue
         group = grounded
         conditions, bad_conditions = _verified_clauses(r.get("conditions"), window)
+        # A "condition" that is itself a rule ("... at least 65 percent ...
+        # must be used for residential purposes") is a separate provision,
+        # not a limit on this one (F5, HB 1389).
+        rules = [c for c in conditions if _IS_RULE.search(c["quote"]) and not _CONDITION_LEAD.match(c["quote"])]
+        conditions = [c for c in conditions if c not in rules]
+        bad_conditions = bad_conditions + rules
         exceptions, bad_exceptions = _verified_clauses(r.get("exceptions"), window)
         dropped += [{"dropped": "condition", "group": group, **c} for c in bad_conditions]
         dropped += [{"dropped": "exception", "group": group, **c} for c in bad_exceptions]
