@@ -25,7 +25,7 @@ from app.impact_lens.vocabulary import (
 from app.models import BillLayer, BillLayerCriteria
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/2"
+METHOD_VERSION = "impact_lens_criteria/3"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -42,7 +42,7 @@ Exceptions (exclusions the bill states):
 
 Vocabulary
 - role (who the entry is about): {roles}
-- jurisdiction: "county:<Name>" for a Florida county, "municipality:<Name>" for an incorporated city, town or village. Names found in the entry text: {names}
+- jurisdiction: a value is "county:" or "municipality:" followed by the name, for example "county:Duval" or "municipality:Miami". Use only names that appear in the entry text. Names found there: {names}
 - property_type: {property_types}
 
 Rules

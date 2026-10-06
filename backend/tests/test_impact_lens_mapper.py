@@ -125,3 +125,8 @@ def test_export_sheet_lists_each_entry_with_a_verdict_line(db_session, bill_fact
     assert "**Review tier:** needs_review" in sheet  # it has an exclusion
     assert sheet.count("**Verdict:**") == 1
     assert "### Entry 1: Tenants" in sheet and "Not mapped yet" in sheet
+
+
+def test_the_prompt_has_no_placeholder_the_model_could_copy():
+    p = mapper.build_prompt(ENTRY)
+    assert "<Name>" not in p and 'for example "county:Duval"' in p

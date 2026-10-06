@@ -24,7 +24,7 @@ ROLE_WORDS = {
     "renter": r"\b(tenants?|renters?|lessees?)\b",
     "landlord": r"\b(landlords?|lessors?)\b",
     "homeowner": r"\b(home ?owners?|owner-occupants?)\b",
-    "property_developer": r"\b(developers?|builders?|applicants?)\b",
+    "property_developer": r"\b(developers?|builders?)\b",
     "employer": r"\bemployers?\b",
     "employee": r"\b(employees?|workers?)\b",
     "business_owner": r"\bbusiness(es)? owners?\b",
