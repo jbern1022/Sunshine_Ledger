@@ -12,6 +12,7 @@ so a retry is possible; a model that answers badly is stored as unmapped.
 from __future__ import annotations
 
 import json
+import logging
 import re
 
 from sqlalchemy import select
@@ -24,8 +25,15 @@ from app.impact_lens.vocabulary import (
 )
 from app.models import BillLayer, BillLayerCriteria
 
+logger = logging.getLogger(__name__)
+
+# Two tries when the model's answer is not a JSON object. The model's failures
+# are intermittent (H1389 entries 6 and 19 failed in different runs); a connection
+# or timeout error is not retried here (the client already retries connections).
+MAX_ATTEMPTS = 2
+
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/6"
+METHOD_VERSION = "impact_lens_criteria/7"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -117,15 +125,23 @@ def entry_quotes(entry: dict) -> set[str]:
 def map_entry(entry: dict, entry_index: int, client, *, registry: dict[str, Attribute] = REGISTRY) -> dict:
     """Criteria for one entry. Raises MapperError if the model call fails or
     does not return a JSON object."""
-    try:
-        raw_text = client.generate(build_prompt(entry, registry), json_mode=True)
-        raw = json.loads(raw_text)
-    except (json.JSONDecodeError, TypeError) as exc:
-        raise MapperError(f"model returned invalid JSON for entry {entry_index}") from exc
-    except Exception as exc:  # noqa: BLE001 -- connection, timeout, HTTP status
-        raise MapperError(f"model call failed for entry {entry_index}: {exc}") from exc
-    if not isinstance(raw, dict):
-        raise MapperError(f"model returned {type(raw).__name__}, not an object, for entry {entry_index}")
+    prompt = build_prompt(entry, registry)
+    problem = ""
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            raw_text = client.generate(prompt, json_mode=True)
+        except Exception as exc:  # noqa: BLE001 -- connection, timeout, HTTP status
+            raise MapperError(f"model call failed for entry {entry_index}: {exc}") from exc
+        try:
+            raw = json.loads(raw_text)
+        except (json.JSONDecodeError, TypeError):
+            problem = f"invalid JSON ({len(raw_text or '')} chars, starts {str(raw_text)[:80]!r}, ends {str(raw_text)[-40:]!r})"
+            continue
+        if isinstance(raw, dict):
+            break
+        problem = f"{type(raw).__name__}, not an object"
+    else:
+        raise MapperError(f"model returned {problem} for entry {entry_index} after {MAX_ATTEMPTS} attempts")
     return validate_criteria(
         raw,
         entry_index=entry_index,
@@ -157,7 +173,8 @@ def map_layer(db: Session, layer: BillLayer, client, *, generated_by: str, regis
             continue
         try:
             criteria = map_entry(entry, i, client, registry=registry)
-        except MapperError:
+        except MapperError as exc:
+            logger.warning("entry %d not mapped: %s", i, exc)
             failed += 1
             continue
         db.add(BillLayerCriteria(

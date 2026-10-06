@@ -130,3 +130,44 @@ def test_export_sheet_lists_each_entry_with_a_verdict_line(db_session, bill_fact
 def test_the_prompt_has_no_placeholder_the_model_could_copy():
     p = mapper.build_prompt(ENTRY)
     assert "<Name>" not in p and 'for example "county:Duval"' in p
+
+
+class FlakyClient:
+    """Returns the given answers in order, one per call."""
+
+    def __init__(self, *answers):
+        self.answers, self.calls = list(answers), 0
+
+    def generate(self, prompt, *, json_mode=False):
+        self.calls += 1
+        return self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
+
+def test_one_bad_answer_is_retried_and_a_second_succeeds():
+    client = FlakyClient('{"audience": {"kind": "attr", "attr": "role", "any_of": ["lan', json.dumps(GOOD_ANSWER))
+    out = mapper.map_entry(ENTRY, 0, client)
+    assert client.calls == 2 and out["audience"]["any_of"] == ["landlord"]
+
+
+def test_two_bad_answers_fail_with_the_reason_and_it_is_logged(caplog):
+    client = FlakyClient('{"audience": {"kind": "attr", "attr": "ro')
+    with pytest.raises(mapper.MapperError) as err:
+        mapper.map_entry(ENTRY, 7, client)
+    assert client.calls == mapper.MAX_ATTEMPTS
+    assert "invalid JSON" in str(err.value) and "entry 7" in str(err.value) and "starts" in str(err.value)
+
+
+def test_a_connection_error_is_not_retried():
+    client = FakeClient(RuntimeError("connection refused"))
+    with pytest.raises(mapper.MapperError):
+        mapper.map_entry(ENTRY, 0, client)
+    assert len(client.prompts) == 1
+
+
+def test_map_layer_logs_why_an_entry_failed(db_session, bill_factory, caplog):
+    layer = _who_layer(bill_factory(), [ENTRY])
+    db_session.add(layer)
+    db_session.commit()
+    with caplog.at_level("WARNING"):
+        assert mapper.map_layer(db_session, layer, FlakyClient("nope"), generated_by="x") == (0, 0, 1)
+    assert "entry 0 not mapped" in caplog.text and "invalid JSON" in caplog.text
