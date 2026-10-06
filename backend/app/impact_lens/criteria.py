@@ -97,6 +97,7 @@ def validate_criteria(
 
     unmapped: list[dict] = []
     notes: list[str] = []
+    moved_to_affected: list[str] = []
     # Why an item was unmapped; the first reason recorded for an index wins.
     reasons: dict[tuple[str, int], str] = {}
 
@@ -127,8 +128,13 @@ def validate_criteria(
             audience, audience_unmapped = None, f"'anyone' is only for a group the bill calls Anyone; this group is '{group}'"
         elif audience["kind"] == "attr":
             keep = guards.supported_roles(group, audience["any_of"])
+            said = " ".join(str(entry.get(k) or "") for k in ("group", "text", "change", "quote"))
             for dropped in [r for r in audience["any_of"] if r not in keep]:
-                notes.append(f"audience: dropped '{dropped}' (the group '{group}' does not name it)")
+                if dropped in guards.PEOPLE_ROLES and guards.affected_roles(said, [dropped]):
+                    moved_to_affected.append(dropped)
+                    notes.append(f"audience: moved '{dropped}' to the affected party (the group '{group}' does not name it, the entry's words do)")
+                else:
+                    notes.append(f"audience: dropped '{dropped}' (the group '{group}' does not name it)")
             if keep:
                 audience = {**audience, "any_of": keep}
             else:
@@ -148,6 +154,9 @@ def validate_criteria(
     # it binds). Roles only; each must be mentioned in the entry's own words.
     affected: dict | None = None
     a2 = raw.get("affected")
+    if moved_to_affected:
+        given = a2.get("any_of") if isinstance(a2, dict) and isinstance(a2.get("any_of"), list) else []
+        a2 = {"kind": "attr", "attr": "role", "any_of": list(dict.fromkeys([*given, *moved_to_affected]))}
     if isinstance(a2, dict) and a2.get("kind") == "attr":
         test2, _ = _check_test({"attr": a2.get("attr"), "op": "in", "values": a2.get("any_of")}, registry)
         if test2 is not None and registry[test2["attr"]].audience:

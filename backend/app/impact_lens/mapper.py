@@ -25,7 +25,7 @@ from app.impact_lens.vocabulary import (
 from app.models import BillLayer, BillLayerCriteria
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/5"
+METHOD_VERSION = "impact_lens_criteria/6"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -46,7 +46,7 @@ Vocabulary
 - property_type: {property_types}
 
 Rules
-- "audience": {{"kind": "attr", "attr": "role", "any_of": [...]}} when the group is one of the roles. {{"kind": "anyone"}} when the group is "Anyone" / any person. null when no role fits. Never force a fit.
+- "audience": the group ONLY, never the people it protects (those go in "affected"). {{"kind": "attr", "attr": "role", "any_of": [...]}} when the group is one of the roles. {{"kind": "anyone"}} when the group is "Anyone" / any person. null when no role fits. Never force a fit.
 - "affected": the roles of the people the provision protects, benefits or burdens, other than the group itself, when the entry names them (for example an insurer that "shall disclose to every insured" affects "insured"). {{"kind": "attr", "attr": "role", "any_of": [...]}} or null. Never guess: only roles the entry's own words mention.
 - "requires": one item per condition you can express with the vocabulary: {{"attr": "...", "op": "in", "values": [...], "from": {{"kind": "condition", "index": N}}}}.
 - "excludes": the same for exceptions, with "from": {{"kind": "exception", "index": N}}.

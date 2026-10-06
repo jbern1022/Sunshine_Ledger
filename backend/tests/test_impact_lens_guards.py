@@ -142,3 +142,24 @@ def test_insured_and_provider_roles_are_head_nouns_of_their_groups():
     assert run({}, {"group": "Insureds"})["audience"]["any_of"] == ["insured"]
     assert run({}, {"group": "Health maintenance organizations"})["audience"] is None
     assert run({}, {"group": "Pharmacy benefit managers"})["audience"] is None
+
+
+def test_a_protected_person_offered_as_the_audience_moves_to_affected():
+    insurer = {"group": "Each health insurer", "text": "shall disclose to every insured that payments count toward the deductible",
+               "quote": "A health insurer shall disclose to each policyholder that ..."}
+    out = run({"audience": role("insured")}, insurer)
+    assert out["audience"] is None and out["affected"] == {"kind": "attr", "attr": "role", "any_of": ["insured"]}
+    assert out["notes"] == ["audience: moved 'insured' to the affected party (the group 'Each health insurer' does not name it, the entry's words do)"]
+    # merged with what the model already put in `affected`, no duplicates
+    both = run({"audience": role("insured"), "affected": {"kind": "attr", "attr": "role", "any_of": ["insured", "healthcare_provider"]}},
+               {**insurer, "text": insurer["text"] + " and to each physician"})
+    assert both["affected"]["any_of"] == ["insured", "healthcare_provider"]
+
+
+def test_only_people_roles_move_and_only_when_the_entry_mentions_them():
+    taxing = {"group": "Taxing authority", "text": "must find that a county that is part of its jurisdiction is in a region ...", "quote": "a county that is part of the jurisdiction"}
+    out = run({"audience": role("local_government")}, taxing)
+    assert out["affected"] is None  # a government is never moved, only dropped
+    farm = {"group": "Farms and farm operations", "text": "are excluded from commercial use", "quote": "are not commercial use"}
+    out2 = run({"audience": role("renter", "homeowner")}, farm)
+    assert out2["affected"] is None and out2["audience"] is None  # not mentioned: dropped

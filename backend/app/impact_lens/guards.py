@@ -68,6 +68,12 @@ def supported_roles(group: str, roles: list[str]) -> list[str]:
     return out
 
 
+# People a rule can protect or burden. A role the model wrongly offered as the
+# audience moves to the affected side only if it is one of these AND the entry's
+# own words mention it (a county named in a taxing-authority rule stays out).
+PEOPLE_ROLES = ('insured', 'renter', 'homeowner', 'employee')
+
+
 def affected_roles(text: str, roles: list[str]) -> list[str]:
     """The roles an entry's own text mentions anywhere (not only as the group):
     who a rule protects or burdens ("disclose to every insured")."""
