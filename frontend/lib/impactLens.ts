@@ -323,3 +323,51 @@ export function matchBill(bill: LensBill, answers: Answers): LensResult {
 
   return { result, label: RESULT_LABEL[result], basis, everyone, why, ask, unreviewed, ambiguity, evaluations };
 }
+
+// ---- the API response (GET /bills/{id}/impact-lens) -----------------------
+
+export interface LensOption {
+  value: string;
+  label: string;
+}
+
+export interface LensQuestion {
+  /** The matcher's answer key. */
+  key: QuestionKey;
+  label: string;
+  question: string;
+  /** Every list ends with a "none_of_these" option. */
+  options: LensOption[];
+  /** municipality only: the counties each option lies in. */
+  counties?: Record<string, string[]> | null;
+}
+
+export interface ImpactLensResponse {
+  bill_entity_id: string;
+  available: boolean;
+  unavailable_reason: string | null;
+  vocabulary_version: number;
+  complete: boolean;
+  incomplete_reasons: string[];
+  layer: { id: string; version: number; evidence_state: string; scope_note: string; method_version: string; created_at: string } | null;
+  entries: LensEntry[];
+  questions: LensQuestion[];
+}
+
+export function toLensBill(r: ImpactLensResponse): LensBill {
+  return { entries: r.entries, complete: r.complete };
+}
+
+/** Answers are only ever these four keys; anything else in storage is dropped. */
+export const ANSWER_KEYS: QuestionKey[] = ["role", "county", "municipality", "property_type"];
+
+export function cleanAnswers(raw: unknown): Answers {
+  const out: Answers = {};
+  if (raw && typeof raw === "object") {
+    for (const k of ANSWER_KEYS) {
+      const v = (raw as Record<string, unknown>)[k];
+      if (typeof v === "string" && v) out[k] = v;
+    }
+  }
+  return out;
+}

@@ -1,3 +1,4 @@
+import type { ImpactLensResponse } from "./impactLens";
 import type {
   BillDetail,
   BillListResponse,
@@ -43,6 +44,14 @@ export async function fetchBills(params: BillSearchParams = {}): Promise<BillLis
 export async function fetchBill(entityId: string): Promise<BillDetail> {
   const res = await fetch(`${API_URL}/bills/${entityId}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch bill: ${res.status}`);
+  return res.json();
+}
+
+/** What the Impact Lens needs for one bill. Read-only; the reader's answers are
+ *  never sent anywhere. */
+export async function fetchImpactLens(entityId: string): Promise<ImpactLensResponse> {
+  const res = await fetch(`${API_URL}/bills/${entityId}/impact-lens`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch the Impact Lens: ${res.status}`);
   return res.json();
 }
 

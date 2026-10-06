@@ -11,6 +11,7 @@ import LegislativeTimeline from "@/components/LegislativeTimeline";
 import TextComparison from "@/components/TextComparison";
 import WhoItAffects from "@/components/WhoItAffects";
 import AreaContext from "@/components/AreaContext";
+import ImpactLens from "@/components/ImpactLens";
 import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes, CorrectionsSection } from "@/components/Accountability";
 import { forTarget } from "@/lib/accountability";
@@ -29,7 +30,7 @@ import { effectiveLabel, provisionDateLabel } from "@/lib/billStatus";
  *  Pure display, no interactivity, so no client component is needed.
  */
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams?: Promise<{ lens?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -49,8 +50,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function BillPage({ params }: Props) {
+export default async function BillPage({ params, searchParams }: Props) {
   const { id } = await params;
+  // The Impact Lens is behind ?lens=1 while it is being checked (Todoist 6hWgXrfvgCJmxF9p).
+  const showLens = (searchParams ? (await searchParams).lens : undefined) === "1";
   const [bill, statuses] = await Promise.all([getBill(id), getSourceStatus()]);
   if (!bill) notFound();
   const dataSource = sourceForBill(statuses, bill.source_system);
@@ -182,6 +185,7 @@ export default async function BillPage({ params }: Props) {
         </>
       )}
 
+      {isLegislation && showLens && <ImpactLens billEntityId={bill.entity_id} />}
       {isLegislation && <AreaContext overlays={bill.demographic_overlays ?? []} />}
 
       {bill.actions && bill.actions.length > 0 && (
