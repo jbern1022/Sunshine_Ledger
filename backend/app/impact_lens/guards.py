@@ -29,6 +29,8 @@ ROLE_WORDS = {
     "employee": r"\b(employees?|workers?)\b",
     "business_owner": r"\bbusiness(es)? owners?\b",
     "local_government": r"\b(counties|county|municipalit(y|ies)|local governments?|cit(y|ies)|towns?|villages?)\b",
+    "insured": r"\b(insureds?|policyholders?|subscribers?|enrollees?)\b",
+    "healthcare_provider": r"\b(physicians?|doctors?|health ?care providers?|hospitals?)\b",
 }
 
 PROPERTY_WORDS = {
@@ -64,6 +66,12 @@ def supported_roles(group: str, roles: list[str]) -> list[str]:
         if re.search(pattern[:-2] + r"\b" + _HEAD_END, group or "", re.IGNORECASE):
             out.append(r)
     return out
+
+
+def affected_roles(text: str, roles: list[str]) -> list[str]:
+    """The roles an entry's own text mentions anywhere (not only as the group):
+    who a rule protects or burdens ("disclose to every insured")."""
+    return [r for r in roles if r in ROLE_WORDS and re.search(ROLE_WORDS[r], text or "", re.IGNORECASE)]
 
 
 def too_complex(text: str, quote: str) -> str | None:

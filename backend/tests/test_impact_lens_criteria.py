@@ -4,7 +4,7 @@ import pytest
 
 from app.impact_lens import criteria as C
 from app.impact_lens.vocabulary import (
-    FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, NUMBER, REGISTRY, Attribute, county_value,
+    VOCABULARY_VERSION, FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, NUMBER, REGISTRY, Attribute, county_value,
     is_forbidden, jurisdiction_label, municipality_value,
 )
 
@@ -64,7 +64,7 @@ def test_a_good_mapping_is_kept_and_fully_mapped():
     assert out["requires"][0]["from"] == {"kind": "condition", "index": 0}
     assert out["excludes"][0]["values"] == ["single_family"]
     assert out["unmapped"] == [] and C.is_fully_mapped(out)
-    assert out["vocabulary_version"] == 1 and out["relevance"] == "direct"
+    assert out["vocabulary_version"] == VOCABULARY_VERSION and out["relevance"] == "direct"
 
 
 def test_unknown_attribute_or_value_is_unmapped_not_kept():

@@ -25,7 +25,7 @@ from app.impact_lens.vocabulary import (
 from app.models import BillLayer, BillLayerCriteria
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/4"
+METHOD_VERSION = "impact_lens_criteria/5"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -47,12 +47,13 @@ Vocabulary
 
 Rules
 - "audience": {{"kind": "attr", "attr": "role", "any_of": [...]}} when the group is one of the roles. {{"kind": "anyone"}} when the group is "Anyone" / any person. null when no role fits. Never force a fit.
+- "affected": the roles of the people the provision protects, benefits or burdens, other than the group itself, when the entry names them (for example an insurer that "shall disclose to every insured" affects "insured"). {{"kind": "attr", "attr": "role", "any_of": [...]}} or null. Never guess: only roles the entry's own words mention.
 - "requires": one item per condition you can express with the vocabulary: {{"attr": "...", "op": "in", "values": [...], "from": {{"kind": "condition", "index": N}}}}.
 - "excludes": the same for exceptions, with "from": {{"kind": "exception", "index": N}}.
 - Anything you cannot express exactly (dates, dollar amounts, unit counts, anything outside the vocabulary): do not approximate. List it in "unmapped": {{"kind": "condition" or "exception", "index": N, "reason": "..."}}.
 - "ambiguous": only when the quote itself supports two reasonable readings that would change who is affected. Give {{"question": "...", "quote": "<one quote above, copied exactly>"}}. Otherwise null.
 
-Respond with JSON only: {{"audience": ..., "requires": [], "excludes": [], "unmapped": [], "ambiguous": null}}"""
+Respond with JSON only: {{"audience": ..., "affected": null, "requires": [], "excludes": [], "unmapped": [], "ambiguous": null}}"""
 
 
 class MapperError(RuntimeError):
