@@ -96,6 +96,29 @@ def month_to_date(db: Session) -> int:
     ).scalar_one()
 
 
+class MonthlyBudgetExceeded(RuntimeError):
+    """A manual run would spend calls the month no longer has."""
+
+
+def remaining_monthly_calls(db: Session) -> int:
+    """Calls left under settings.legiscan_monthly_limit this month (never negative)."""
+    return max(0, settings.legiscan_monthly_limit - month_to_date(db))
+
+
+def cap_to_monthly_budget(db: Session, requested: int, *, reserve: int = 0) -> int:
+    """The `--max-calls` a manual backfill may use: what it asked for, cut to
+    what the month has left once `reserve` (calls it makes before the capped
+    part, e.g. the 2-call session dataset) is set aside. Raises
+    MonthlyBudgetExceeded when not even the reserve fits."""
+    left = remaining_monthly_calls(db)
+    if left < reserve:
+        raise MonthlyBudgetExceeded(
+            f"{left} LegiScan calls left this month (limit {settings.legiscan_monthly_limit}); "
+            f"this run needs at least {reserve}."
+        )
+    return min(requested, left - reserve)
+
+
 def report_api_usage(db: Session) -> str:
     """Record this run's calls in the ledger and return the summary to
     print, with the month-to-date total. What every CLI prints at the end,
