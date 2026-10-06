@@ -59,8 +59,10 @@ describe("ImpactLens", () => {
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applies to You"));
     expect(screen.getByText("Quote for Tenants.")).toBeInTheDocument();
-    expect(screen.getByText(/Role: renter · County: Duval/)).toBeInTheDocument();
+    expect(screen.getByText("Role: Renter · Duval County")).toBeInTheDocument(); // labels, not raw values
+    expect(screen.queryByText(/local_government|none_of_these/)).toBeNull();
     expect(screen.getByText("Applies to everyone")).toBeInTheDocument();
+    expect(screen.getByText("Anyone:")).toBeInTheDocument(); // the group leads each line
     expect(screen.getByText("Automatically mapped, not yet reviewed by a person.")).toBeInTheDocument();
     expect(screen.getByText(/not legal or financial advice/)).toBeInTheDocument();
     // answers live in this browser only

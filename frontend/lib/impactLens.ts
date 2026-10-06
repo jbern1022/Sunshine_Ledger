@@ -111,7 +111,9 @@ export interface EntryEvaluation {
 }
 
 export interface WhyStep {
-  circumstances: string[];
+  /** The reader's answers that were used, as keys and raw values; the page turns
+   *  them into labels from the bill's own questions. */
+  circumstances: { key: QuestionKey; value: string }[];
   quote: string;
   reasoning: string;
 }
@@ -259,12 +261,12 @@ export function evaluateEntry(entry: LensEntry, index: number, answers: Answers)
 
 // ---- the bill -------------------------------------------------------------
 
-function circumstances(answers: Answers): string[] {
-  const out: string[] = [];
-  if (answers.role !== undefined) out.push(`Role: ${answers.role}`);
-  if (answers.county !== undefined) out.push(`County: ${answers.county}`);
-  if (answers.municipality !== undefined) out.push(`Municipality: ${answers.municipality}`);
-  if (answers.property_type !== undefined) out.push(`Property type: ${answers.property_type}`);
+function circumstances(answers: Answers): { key: QuestionKey; value: string }[] {
+  const out: { key: QuestionKey; value: string }[] = [];
+  for (const key of ["role", "county", "municipality", "property_type"] as QuestionKey[]) {
+    const value = answers[key];
+    if (value !== undefined) out.push({ key, value });
+  }
   return out;
 }
 
