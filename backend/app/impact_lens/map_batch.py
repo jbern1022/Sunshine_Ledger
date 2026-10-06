@@ -80,6 +80,9 @@ def export_sheet(db: Session, pairs: list[tuple[Bill, BillLayer]]) -> str:
             c = row.criteria
             aud = c["audience"]
             out.append("- **Audience:** " + ("unmapped" if aud is None else "anyone" if aud["kind"] == "anyone" else f'{aud["attr"]} in {aud["any_of"]}'))
+            aff = c.get("affected")
+            if aff:
+                out.append(f'- **Affected party:** role in {aff["any_of"]}')
             out += [f"- **Requires:** {_fmt_test(t)}" for t in c["requires"]]
             out += [f"- **Excludes:** {_fmt_test(t)}" for t in c["excludes"]]
             out += [f"- **Unmapped:** {u['kind']} {u['index']}: {u['reason']}" for u in c["unmapped"]]

@@ -144,6 +144,23 @@ def validate_criteria(
     if audience is None:
         unmapped.append({"kind": "audience", "index": None, "reason": audience_unmapped})
 
+    # --- affected party: who the rule protects or burdens (the audience is who
+    # it binds). Roles only; each must be mentioned in the entry's own words.
+    affected: dict | None = None
+    a2 = raw.get("affected")
+    if isinstance(a2, dict) and a2.get("kind") == "attr":
+        test2, _ = _check_test({"attr": a2.get("attr"), "op": "in", "values": a2.get("any_of")}, registry)
+        if test2 is not None and registry[test2["attr"]].audience:
+            roles = [r for r in test2["values"] if audience is None or audience["kind"] != "attr" or r not in audience["any_of"]]
+            if entry is not None:
+                said = " ".join(str(entry.get(k) or "") for k in ("group", "text", "change", "quote"))
+                keep = guards.affected_roles(said, roles)
+                for dropped in [r for r in roles if r not in keep]:
+                    notes.append(f"affected: dropped '{dropped}' (the entry's own words do not mention it)")
+                roles = keep
+            if roles:
+                affected = {"kind": "attr", "attr": test2["attr"], "any_of": roles}
+
     # --- requirements (from conditions) and exclusions (from exceptions)
     def collect(field: str, kind: str, count: int) -> list[dict]:
         kept: list[dict] = []
@@ -217,6 +234,7 @@ def validate_criteria(
         "vocabulary_version": vocabulary_version,
         "relevance": relevance,
         "audience": audience,
+        "affected": affected,
         "requires": requires,
         "excludes": excludes,
         "unmapped": unmapped,
@@ -242,7 +260,7 @@ def review_tier(criteria: dict, registry: dict[str, Attribute] | None = None) ->
     tests, no exclusions, no unmapped items, no ambiguity, and a direct entry.
     """
     registry = REGISTRY if registry is None else registry
-    if criteria["relevance"] != "direct" or criteria["ambiguous"] is not None:
+    if criteria["relevance"] != "direct" or criteria["ambiguous"] is not None or criteria.get("affected"):
         return "needs_review"
     if criteria["audience"] is None or criteria["unmapped"] or criteria["excludes"]:
         return "needs_review"

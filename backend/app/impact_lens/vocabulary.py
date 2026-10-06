@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-VOCABULARY_VERSION = 1
+VOCABULARY_VERSION = 2
 
 # Dimensions the privacy boundary excludes from the anonymous Impact Lens.
 # Matched as substrings of an attribute key, so "immigration_status" and
@@ -81,7 +81,7 @@ ROLE = Attribute(
     type=CHOICE,
     question="Which best describes you in relation to this bill?",
     values=("renter", "landlord", "homeowner", "property_developer", "employer", "employee",
-            "business_owner", "local_government"),
+            "business_owner", "local_government", "insured", "healthcare_provider"),
     audience=True,
 )
 # One attribute for both levels so a single condition ("any county or city that

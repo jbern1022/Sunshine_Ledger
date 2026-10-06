@@ -118,3 +118,27 @@ def test_a_role_cannot_be_used_as_a_condition_or_exception():
     out = run({"excludes": [{"attr": "role", "op": "in", "values": ["employer"], "from": {"kind": "exception", "index": 0}}]}, entry)
     assert out["excludes"] == []
     assert out["unmapped"][-1] == {"kind": "exception", "index": 0, "reason": "'role' can only be an audience, not a condition"}
+
+
+def test_the_affected_party_must_be_mentioned_in_the_entrys_own_words():
+    entry = {"group": "Each health insurer", "text": "shall disclose to every insured that payments count toward the deductible",
+             "quote": "A health insurer shall disclose to each policyholder that ..."}
+    aff = {"kind": "attr", "attr": "role", "any_of": ["insured", "renter", "healthcare_provider"]}
+    out = run({"affected": aff}, entry)
+    assert out["affected"] == {"kind": "attr", "attr": "role", "any_of": ["insured"]}
+    assert out["notes"] == ["affected: dropped 'renter' (the entry's own words do not mention it)",
+                            "affected: dropped 'healthcare_provider' (the entry's own words do not mention it)"]
+    assert C.review_tier(out) == "needs_review"  # an affected party always needs a person
+    assert run({}, entry)["affected"] is None
+    assert run({"affected": {"kind": "anyone"}}, entry)["affected"] is None
+    # a role already bound by the group is not repeated as affected
+    both = run({"audience": role("healthcare_provider"), "affected": {"kind": "attr", "attr": "role", "any_of": ["healthcare_provider", "insured"]}},
+               {"group": "Treating physicians", "text": "must notify the insured", "quote": "The physician shall notify the insured."})
+    assert both["audience"]["any_of"] == ["healthcare_provider"] and both["affected"]["any_of"] == ["insured"]
+
+
+def test_insured_and_provider_roles_are_head_nouns_of_their_groups():
+    assert run({}, {"group": "Treating physicians"})["audience"]["any_of"] == ["healthcare_provider"]
+    assert run({}, {"group": "Insureds"})["audience"]["any_of"] == ["insured"]
+    assert run({}, {"group": "Health maintenance organizations"})["audience"] is None
+    assert run({}, {"group": "Pharmacy benefit managers"})["audience"] is None
