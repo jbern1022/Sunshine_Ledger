@@ -151,6 +151,10 @@ def validate_criteria(
         for item in items if isinstance(items, list) else []:
             idx, why = _check_from(item, kind, count)
             test, why2 = _check_test(item, registry)
+            if test is not None and registry[test["attr"]].audience:
+                # A role says who a rule is about, never a limit on it: the model
+                # turned "small employer carriers" into an employer exclusion.
+                test, why2 = None, f"'{test['attr']}' can only be an audience, not a condition"
             if idx is None or test is None:
                 # A bad pointer leaves nothing to attribute the reason to.
                 note(kind, idx, why or why2 or "invalid")

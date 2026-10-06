@@ -97,3 +97,24 @@ def test_a_rejected_audience_falls_back_to_the_groups_own_words():
     assert run({"audience": {"kind": "anyone"}}, {"group": "Courts"})["audience"] is None
     assert run({}, {"group": "Anyone"})["audience"] is None
     assert run({"audience": role("property_developer")}, {"group": "Owner of a property in a multifamily project"})["audience"] is None
+
+
+def test_a_role_word_must_be_the_head_noun_of_the_group():
+    # S1166 entry 6: small employer carriers are insurers, not employers
+    assert run({"audience": role("employer")}, {"group": "Small employer carriers"})["audience"] is None
+    assert run({"audience": role("employer")}, {"group": "Employers"})["audience"]["any_of"] == ["employer"]
+    assert run({"audience": role("employer")}, {"group": "Each employer"})["audience"]["any_of"] == ["employer"]
+    assert run({"audience": role("renter")}, {"group": "Tenants in covered properties"})["audience"]["any_of"] == ["renter"]
+    assert run({"audience": role("landlord")}, {"group": "Landlords of residential property"})["audience"]["any_of"] == ["landlord"]
+    for g in ("County or municipality", "Counties and municipalities", "Local government", "Municipality"):
+        assert run({}, {"group": g})["audience"]["any_of"] == ["local_government"], g
+    # a county word inside a longer noun phrase is not the group
+    assert run({}, {"group": "County tax collectors"})["audience"] is None
+
+
+def test_a_role_cannot_be_used_as_a_condition_or_exception():
+    entry = {"group": "Health maintenance organizations",
+             "exceptions": [{"text": "unless the contract is for a small employer", "quote": "unless the contract is for a small employer"}]}
+    out = run({"excludes": [{"attr": "role", "op": "in", "values": ["employer"], "from": {"kind": "exception", "index": 0}}]}, entry)
+    assert out["excludes"] == []
+    assert out["unmapped"][-1] == {"kind": "exception", "index": 0, "reason": "'role' can only be an audience, not a condition"}
