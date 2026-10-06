@@ -38,11 +38,13 @@ def test_a_role_must_be_named_by_the_group():
     assert run({"audience": role("property_developer")}, {"group": "Municipality"})["audience"]["any_of"] == ["local_government"]
     assert run({"audience": role("local_government")}, {"group": "Counties and municipalities"})["audience"]["any_of"] == ["local_government"]
     assert run({"audience": role("landlord")}, {"group": "Landlords"})["audience"]["any_of"] == ["landlord"]
-    assert run({"audience": role("property_developer")}, {"group": "Applicants for development authorized under s. 125.01055(7)"})["audience"]
+    # an "applicant" may be a landowner, not a developer: not enough to name the role
+    assert run({"audience": role("property_developer")}, {"group": "Applicants for development authorized under s. 125.01055(7)"})["audience"] is None
+    assert run({"audience": role("property_developer")}, {"group": "Developer"})["audience"]["any_of"] == ["property_developer"]
 
 
 def test_a_date_is_never_mapped_to_a_property_type():
-    entry = {"group": "Applicants", "conditions": [DATE_COND]}
+    entry = {"group": "Developers", "conditions": [DATE_COND]}
     raw = {"audience": role("property_developer"),
            "requires": [{"attr": "property_type", "op": "in", "values": ["multifamily", "commercial"], "from": {"kind": "condition", "index": 0}}]}
     out = run(raw, entry)
