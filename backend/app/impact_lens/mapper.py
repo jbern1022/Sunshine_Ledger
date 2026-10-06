@@ -18,6 +18,7 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.impact_lens import guards
 from app.impact_lens.criteria import validate_criteria
 from app.impact_lens.vocabulary import (
     FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, REGISTRY, VOCABULARY_VERSION, Attribute,
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 2
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/7"
+METHOD_VERSION = "impact_lens_criteria/8"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -71,7 +72,15 @@ class MapperError(RuntimeError):
 def _numbered(items: list[dict]) -> str:
     if not items:
         return "(none)"
-    return "\n".join(f'{i}. {it.get("text", "")}  Quote: "{it.get("quote", "")}"' for i, it in enumerate(items))
+    lines = []
+    for i, it in enumerate(items):
+        # What the guards would refuse anyway is not shown: H1389 entry 19 has four
+        # very long exceptions and the model answered each at length, until it was cut off.
+        if guards.too_complex(str(it.get("text") or ""), str(it.get("quote") or "")):
+            lines.append(f"{i}. (not shown: too long or compound to map. Leave it out.)")
+        else:
+            lines.append(f'{i}. {it.get("text", "")}  Quote: "{it.get("quote", "")}"')
+    return "\n".join(lines)
 
 
 def names_in(text: str) -> list[str]:

@@ -171,3 +171,21 @@ def test_map_layer_logs_why_an_entry_failed(db_session, bill_factory, caplog):
     with caplog.at_level("WARNING"):
         assert mapper.map_layer(db_session, layer, FlakyClient("nope"), generated_by="x") == (0, 0, 1)
     assert "entry 0 not mapped" in caplog.text and "invalid JSON" in caplog.text
+
+
+LONG = "This subsection does not apply to: " + "Airport-impacted areas and other places. " * 12
+
+
+def test_items_the_guards_would_refuse_are_not_shown_to_the_model():
+    entry = {**ENTRY, "exceptions": [{"text": LONG, "quote": LONG}, ENTRY["exceptions"][0]]}
+    p = mapper.build_prompt(entry)
+    assert "0. (not shown: too long or compound to map. Leave it out.)" in p
+    assert "Airport-impacted areas" not in p
+    assert "1. Not single-family homes rented by their owner." in p  # the plain one stays
+    assert len(p) < 3000
+
+
+def test_an_unaddressed_long_item_gets_the_real_reason():
+    entry = {**ENTRY, "exceptions": [{"text": LONG, "quote": LONG}]}
+    out = mapper.map_entry(entry, 0, FakeClient({"audience": {"kind": "attr", "attr": "role", "any_of": ["landlord"]}}))
+    assert {"kind": "exception", "index": 0, "reason": "It is too long or compound to map exactly"} in out["unmapped"]
