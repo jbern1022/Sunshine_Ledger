@@ -362,6 +362,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     flsenate.set_budget(args.max_documents)
+    # The session dataset costs 2 calls before anything is capped.
+    session = SessionLocal()
+    try:
+        args.max_calls = legiscan.cap_to_monthly_budget(session, args.max_calls, reserve=2)
+    except legiscan.MonthlyBudgetExceeded as exc:
+        raise SystemExit(f"Refusing to run: {exc}")
+    finally:
+        session.close()
+    print(f"LegiScan fallback cap for this run: {args.max_calls} calls (month's remaining budget applied).")
     api = LegiScanClient()
     dataset = DatasetClient(fetch_session_dataset(api, settings.legiscan_state, args.session), fallback=api)
     session = SessionLocal()

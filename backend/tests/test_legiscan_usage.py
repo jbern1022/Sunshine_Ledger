@@ -73,3 +73,28 @@ def test_a_failed_send_is_retried_next_run(db_session):
 
     assert usage_alerts.check_monthly_usage(db_session, send=down) is None
     assert usage_alerts.check_monthly_usage(db_session, send=lambda m: None) == 70
+
+
+def test_budget_cap_never_exceeds_what_is_left(db_session):
+    legiscan.API_CALLS["getBill"] = 90  # 10 of 100 left
+    legiscan.record_api_usage(db_session)
+    assert legiscan.remaining_monthly_calls(db_session) == 10
+    assert legiscan.cap_to_monthly_budget(db_session, 1500) == 10
+    assert legiscan.cap_to_monthly_budget(db_session, 4) == 4
+
+
+def test_budget_cap_is_zero_when_over_and_refuses_with_a_reserve(db_session):
+    legiscan.API_CALLS["getBill"] = 120  # over the limit
+    legiscan.record_api_usage(db_session)
+    assert legiscan.remaining_monthly_calls(db_session) == 0
+    assert legiscan.cap_to_monthly_budget(db_session, 10) == 0
+    with pytest.raises(legiscan.MonthlyBudgetExceeded):
+        legiscan.cap_to_monthly_budget(db_session, 10, reserve=2)
+
+
+def test_budget_cap_reserves_calls_for_the_fixed_cost(db_session):
+    legiscan.API_CALLS["getBill"] = 98  # 2 left; the dataset alone costs 2
+    legiscan.record_api_usage(db_session)
+    with pytest.raises(legiscan.MonthlyBudgetExceeded):
+        legiscan.cap_to_monthly_budget(db_session, 50, reserve=3)
+    assert legiscan.cap_to_monthly_budget(db_session, 50, reserve=2) == 0
