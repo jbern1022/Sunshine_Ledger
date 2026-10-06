@@ -31,6 +31,16 @@ router = APIRouter(prefix="/bills", tags=["impact-lens"])
 _CAPPED = re.compile(r"first \d+ of \d+ entries")
 
 
+# Every question a reader can answer must have an answer for "none of the above":
+# the lists only hold what the bill mentions. The matcher treats any value that is
+# not named in the criteria as matching nothing.
+NONE_OF_THESE = "none_of_these"
+
+
+def _with_none(options: list[LensOptionOut]) -> list[LensOptionOut]:
+    return [*options, LensOptionOut(value=NONE_OF_THESE, label="None of These")]
+
+
 def _title(value: str) -> str:
     return " ".join(w.capitalize() for w in value.replace("_", " ").split())
 
@@ -81,7 +91,7 @@ def _questions(criteria_rows: list[dict]) -> list[LensQuestionOut]:
         role_attr = REGISTRY["role"]
         out.append(LensQuestionOut(
             key="role", label=role_attr.label, question=role_attr.question,
-            options=[LensOptionOut(value=v, label=_title(v)) for v in role_attr.values if v in roles],
+            options=_with_none([LensOptionOut(value=v, label=_title(v)) for v in role_attr.values if v in roles]),
         ))
     if jurisdictions:
         out.append(LensQuestionOut(
@@ -91,20 +101,19 @@ def _questions(criteria_rows: list[dict]) -> list[LensQuestionOut]:
         named = sorted(v.partition(":")[2] for v in jurisdictions if v.startswith("municipality:"))
         named = [n for n in named if n in MUNICIPALITY_COUNTIES]
         if named:
-            # Only the places the bill names. A reader outside them answers
-            # "none of these", which the client records as an answer that
-            # matches no municipality.
+            # Only the places the bill names; a reader outside them picks
+            # "None of These"
             out.append(LensQuestionOut(
                 key="municipality", label="City, Town or Village",
                 question="Do you live in one of these cities, towns or villages?",
-                options=[LensOptionOut(value=n, label=n) for n in named],
+                options=_with_none([LensOptionOut(value=n, label=n) for n in named]),
                 counties={n: list(MUNICIPALITY_COUNTIES[n]) for n in named},
             ))
     if property_types:
         pt = REGISTRY["property_type"]
         out.append(LensQuestionOut(
             key="property_type", label=pt.label, question=pt.question,
-            options=[LensOptionOut(value=v, label=_title(v)) for v in pt.values if v in property_types],
+            options=_with_none([LensOptionOut(value=v, label=_title(v)) for v in pt.values if v in property_types]),
         ))
     return out
 

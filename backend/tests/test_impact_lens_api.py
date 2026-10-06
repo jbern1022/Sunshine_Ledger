@@ -74,10 +74,11 @@ def test_a_fully_mapped_supported_layer_is_complete_with_the_slice_it_needs(clie
     keys = [q["key"] for q in body["questions"]]
     assert keys == ["role", "county", "property_type"]  # no municipality: the bill names none
     role = body["questions"][0]
-    assert [o["value"] for o in role["options"]] == ["landlord"] and role["options"][0]["label"] == "Landlord"
+    assert [o["value"] for o in role["options"]] == ["landlord", "none_of_these"] and role["options"][0]["label"] == "Landlord"
+    assert role["options"][-1]["label"] == "None of These"  # a renter reading a landlord bill can still answer
     counties = body["questions"][1]["options"]
-    assert len(counties) == 67 and {"value": "Duval", "label": "Duval County"} in counties
-    assert [o["value"] for o in body["questions"][2]["options"]] == ["single_family"]
+    assert len(counties) == 67 and "none_of_these" not in [c["value"] for c in counties] and {"value": "Duval", "label": "Duval County"} in counties
+    assert [o["value"] for o in body["questions"][2]["options"]] == ["single_family", "none_of_these"]
     assert body["layer"]["version"] == 1 and body["layer"]["evidence_state"] == "supported"
 
 
@@ -90,7 +91,7 @@ def test_municipalities_only_the_places_the_bill_names(client, db_session, bill_
                       "from": {"kind": "condition", "index": 0}}],
     })
     questions = {q["key"]: q for q in client.get(f"/bills/{entity.id}/impact-lens").json()["questions"]}
-    assert [o["value"] for o in questions["municipality"]["options"]] == ["Jacksonville"]
+    assert [o["value"] for o in questions["municipality"]["options"]] == ["Jacksonville", "none_of_these"]
     assert questions["municipality"]["counties"] == {"Jacksonville": ["Duval"]}
     assert "property_type" not in questions
 
