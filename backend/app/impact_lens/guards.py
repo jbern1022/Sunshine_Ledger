@@ -48,9 +48,22 @@ def is_anyone(group: str) -> bool:
     return bool(ANYONE.match(group or ""))
 
 
+# A role word names the group only when it is the head noun: not followed by
+# another noun ("small employer carriers" are insurers, not employers).
+_HEAD_END = r"(?=\s*(?:$|[,.;(]|\b(?:and|or|of|that|who|which|in|under|for|with|to)\b))"
+
+
 def supported_roles(group: str, roles: list[str]) -> list[str]:
-    """The roles whose words the group itself contains."""
-    return [r for r in roles if r in ROLE_WORDS and re.search(ROLE_WORDS[r], group or "", re.IGNORECASE)]
+    """The roles the group itself names as its head noun."""
+    out = []
+    for r in roles:
+        if r not in ROLE_WORDS:
+            continue
+        pattern = ROLE_WORDS[r]
+        # ROLE_WORDS patterns are \b(...)\b; add the head-noun lookahead after the last \b
+        if re.search(pattern[:-2] + r"\b" + _HEAD_END, group or "", re.IGNORECASE):
+            out.append(r)
+    return out
 
 
 def too_complex(text: str, quote: str) -> str | None:
