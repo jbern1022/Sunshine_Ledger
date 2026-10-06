@@ -51,7 +51,7 @@ describe("the four core results", () => {
     expect(r.ask).toEqual([]);
     expect(r.basis[0].entry.group).toBe("Tenants");
     expect(r.why[0].quote).toBe("Quote for Tenants.");
-    expect(r.why[0].circumstances).toEqual(["Role: renter", "County: Duval"]);
+    expect(r.why[0].circumstances).toEqual([{ key: "role", value: "renter" }, { key: "county", value: "Duval" }]);
   });
 
   it("a renter whose county is unknown: Can't Determine, asking only the county", () => {

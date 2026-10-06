@@ -153,6 +153,12 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
 
   const answeredChips = (["role", "county", "municipality", "property_type"] as QuestionKey[]).filter((k) => answers[k] !== undefined);
   const labelFor = (k: QuestionKey, v: string) => byKey.get(k)?.options.find((o) => o.value === v)?.label ?? v;
+  // "Role: Local Government", but "Duval County" rather than "County: Duval County".
+  const describe = (k: QuestionKey, v: string) => {
+    const option = labelFor(k, v);
+    const name = byKey.get(k)?.label ?? k;
+    return option.toLowerCase().includes(name.toLowerCase()) ? option : `${name}: ${option}`;
+  };
 
   return (
     <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="impact-lens-heading">
@@ -221,7 +227,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
               <ol className="mt-1 list-decimal space-y-2 pl-5 text-slate-800">
                 {result.why.map((w, i) => (
                   <li key={i}>
-                    <span className="block text-xs text-slate-600">{w.circumstances.join(" · ")}</span>
+                    <span className="block text-xs text-slate-600">{w.circumstances.map((c) => describe(c.key, c.value)).join(" · ")}</span>
                     <q className="italic">{w.quote}</q>
                     <span className="block">{w.reasoning}</span>
                   </li>
@@ -236,7 +242,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 {result.everyone.map((e) => (
                   <li key={e.index}>
-                    {e.entry.text} <q className="italic">{e.entry.quote}</q>
+                    <strong>{e.entry.group}:</strong> {e.entry.text} <q className="italic">{e.entry.quote}</q>
                   </li>
                 ))}
               </ul>
