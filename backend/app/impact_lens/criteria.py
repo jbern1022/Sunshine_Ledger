@@ -225,9 +225,13 @@ def validate_criteria(
     for kind, count in (("condition", n_conditions), ("exception", n_exceptions)):
         for idx in range(count):
             if (kind, idx) not in covered:
+                prescreen = None
+                if entry is not None:
+                    cited = (entry.get("conditions" if kind == "condition" else "exceptions") or [])[idx]
+                    prescreen = guards.too_complex(str(cited.get("text") or ""), str(cited.get("quote") or ""))
                 unmapped.append({
                     "kind": kind, "index": idx,
-                    "reason": reasons.get((kind, idx), "the mapper did not address it"),
+                    "reason": reasons.get((kind, idx)) or (f"{prescreen[0].upper()}{prescreen[1:]}" if prescreen else "the mapper did not address it"),
                 })
 
     # --- ambiguity: must cite one of the entry's verified quotes
