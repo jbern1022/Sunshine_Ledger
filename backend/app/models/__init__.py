@@ -11,6 +11,7 @@ from app.models.tag import BillTag, SubjectMapping, Tag
 from app.models.demographic_overlay import DemographicOverlay
 from app.models.staff_analysis import StaffAnalysis
 from app.models.bill_layer import BillLayer, BillLayerSource, BillLayerReview
+from app.models.bill_layer_criteria import BillLayerCriteria, BillLayerCriteriaReview
 from app.models.source_check import SourceCheck
 from app.models.bill_text_version import BillTextVersion
 from app.models.legiscan_call import LegiScanCallCount
@@ -35,6 +36,8 @@ __all__ = [
     "BillLayer",
     "BillLayerSource",
     "BillLayerReview",
+    "BillLayerCriteria",
+    "BillLayerCriteriaReview",
     "SourceCheck",
     "BillTextVersion",
     "LegiScanCallCount",

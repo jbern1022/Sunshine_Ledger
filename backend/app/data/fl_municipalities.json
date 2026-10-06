@@ -1,0 +1,2895 @@
+{
+ "source": "U.S. Census Bureau, 2020 place-by-county relationship file (national_place_by_county2020.txt)",
+ "vintage": 2020,
+ "note": "Incorporated places only. Municipal boundaries change; rebuild when a newer vintage is available.",
+ "municipalities": [
+  {
+   "name": "Alachua",
+   "place_fips": "00375",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Alford",
+   "place_fips": "00625",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Altamonte Springs",
+   "place_fips": "00950",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Altha",
+   "place_fips": "01000",
+   "counties": [
+    "Calhoun"
+   ]
+  },
+  {
+   "name": "Anna Maria",
+   "place_fips": "01475",
+   "counties": [
+    "Manatee"
+   ]
+  },
+  {
+   "name": "Apalachicola",
+   "place_fips": "01625",
+   "counties": [
+    "Franklin"
+   ]
+  },
+  {
+   "name": "Apopka",
+   "place_fips": "01700",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Arcadia",
+   "place_fips": "01750",
+   "counties": [
+    "DeSoto"
+   ]
+  },
+  {
+   "name": "Archer",
+   "place_fips": "01775",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Astatula",
+   "place_fips": "02250",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Atlantic Beach",
+   "place_fips": "02400",
+   "counties": [
+    "Duval"
+   ]
+  },
+  {
+   "name": "Atlantis",
+   "place_fips": "02500",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Auburndale",
+   "place_fips": "02550",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Aventura",
+   "place_fips": "02681",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Avon Park",
+   "place_fips": "02750",
+   "counties": [
+    "Highlands"
+   ]
+  },
+  {
+   "name": "Bal Harbour",
+   "place_fips": "03275",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Baldwin",
+   "place_fips": "03250",
+   "counties": [
+    "Duval"
+   ]
+  },
+  {
+   "name": "Bartow",
+   "place_fips": "03675",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Bascom",
+   "place_fips": "03725",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Bay Harbor Islands",
+   "place_fips": "03975",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Bay Lake",
+   "place_fips": "04150",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Bell",
+   "place_fips": "04975",
+   "counties": [
+    "Gilchrist"
+   ]
+  },
+  {
+   "name": "Belle Glade",
+   "place_fips": "05200",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Belle Isle",
+   "place_fips": "05300",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Belleair",
+   "place_fips": "05075",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Belleair Beach",
+   "place_fips": "05100",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Belleair Bluffs",
+   "place_fips": "05125",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Belleair Shore",
+   "place_fips": "05150",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Belleview",
+   "place_fips": "05375",
+   "counties": [
+    "Marion"
+   ]
+  },
+  {
+   "name": "Beverly Beach",
+   "place_fips": "06100",
+   "counties": [
+    "Flagler"
+   ]
+  },
+  {
+   "name": "Biscayne Park",
+   "place_fips": "06600",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Blountstown",
+   "place_fips": "06925",
+   "counties": [
+    "Calhoun"
+   ]
+  },
+  {
+   "name": "Boca Raton",
+   "place_fips": "07300",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Bonifay",
+   "place_fips": "07450",
+   "counties": [
+    "Holmes"
+   ]
+  },
+  {
+   "name": "Bonita Springs",
+   "place_fips": "07525",
+   "counties": [
+    "Lee"
+   ]
+  },
+  {
+   "name": "Bowling Green",
+   "place_fips": "07775",
+   "counties": [
+    "Hardee"
+   ]
+  },
+  {
+   "name": "Boynton Beach",
+   "place_fips": "07875",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Bradenton",
+   "place_fips": "07950",
+   "counties": [
+    "Manatee"
+   ]
+  },
+  {
+   "name": "Bradenton Beach",
+   "place_fips": "07975",
+   "counties": [
+    "Manatee"
+   ]
+  },
+  {
+   "name": "Branford",
+   "place_fips": "08175",
+   "counties": [
+    "Suwannee"
+   ]
+  },
+  {
+   "name": "Briny Breezes",
+   "place_fips": "08575",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Bristol",
+   "place_fips": "08600",
+   "counties": [
+    "Liberty"
+   ]
+  },
+  {
+   "name": "Bronson",
+   "place_fips": "08700",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Brooker",
+   "place_fips": "08725",
+   "counties": [
+    "Bradford"
+   ]
+  },
+  {
+   "name": "Brooksville",
+   "place_fips": "08800",
+   "counties": [
+    "Hernando"
+   ]
+  },
+  {
+   "name": "Bunnell",
+   "place_fips": "09550",
+   "counties": [
+    "Flagler"
+   ]
+  },
+  {
+   "name": "Bushnell",
+   "place_fips": "09625",
+   "counties": [
+    "Sumter"
+   ]
+  },
+  {
+   "name": "Callahan",
+   "place_fips": "09700",
+   "counties": [
+    "Nassau"
+   ]
+  },
+  {
+   "name": "Callaway",
+   "place_fips": "09725",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "Campbellton",
+   "place_fips": "09900",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Cape Canaveral",
+   "place_fips": "10250",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Cape Coral",
+   "place_fips": "10275",
+   "counties": [
+    "Lee"
+   ]
+  },
+  {
+   "name": "Carrabelle",
+   "place_fips": "10725",
+   "counties": [
+    "Franklin"
+   ]
+  },
+  {
+   "name": "Caryville",
+   "place_fips": "10975",
+   "counties": [
+    "Washington"
+   ]
+  },
+  {
+   "name": "Casselberry",
+   "place_fips": "11050",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Cedar Key",
+   "place_fips": "11225",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Center Hill",
+   "place_fips": "11325",
+   "counties": [
+    "Sumter"
+   ]
+  },
+  {
+   "name": "Century",
+   "place_fips": "11362",
+   "counties": [
+    "Escambia"
+   ]
+  },
+  {
+   "name": "Chattahoochee",
+   "place_fips": "11800",
+   "counties": [
+    "Gadsden"
+   ]
+  },
+  {
+   "name": "Chiefland",
+   "place_fips": "11925",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Chipley",
+   "place_fips": "11975",
+   "counties": [
+    "Washington"
+   ]
+  },
+  {
+   "name": "Cinco Bayou",
+   "place_fips": "12325",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Clearwater",
+   "place_fips": "12875",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Clermont",
+   "place_fips": "12925",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Clewiston",
+   "place_fips": "13000",
+   "counties": [
+    "Hendry"
+   ]
+  },
+  {
+   "name": "Cloud Lake",
+   "place_fips": "13050",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Cocoa",
+   "place_fips": "13150",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Cocoa Beach",
+   "place_fips": "13175",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Coconut Creek",
+   "place_fips": "13275",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Coleman",
+   "place_fips": "13400",
+   "counties": [
+    "Sumter"
+   ]
+  },
+  {
+   "name": "Cooper City",
+   "place_fips": "14125",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Coral Gables",
+   "place_fips": "14250",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Coral Springs",
+   "place_fips": "14400",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Cottondale",
+   "place_fips": "14850",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Crescent City",
+   "place_fips": "15375",
+   "counties": [
+    "Putnam"
+   ]
+  },
+  {
+   "name": "Crestview",
+   "place_fips": "15475",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Cross City",
+   "place_fips": "15575",
+   "counties": [
+    "Dixie"
+   ]
+  },
+  {
+   "name": "Crystal River",
+   "place_fips": "15775",
+   "counties": [
+    "Citrus"
+   ]
+  },
+  {
+   "name": "Cutler Bay",
+   "place_fips": "15968",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Dade City",
+   "place_fips": "16125",
+   "counties": [
+    "Pasco"
+   ]
+  },
+  {
+   "name": "Dania Beach",
+   "place_fips": "16335",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Davenport",
+   "place_fips": "16450",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Davie",
+   "place_fips": "16475",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Daytona Beach",
+   "place_fips": "16525",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Daytona Beach Shores",
+   "place_fips": "16550",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "DeBary",
+   "place_fips": "16675",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "DeFuniak Springs",
+   "place_fips": "16800",
+   "counties": [
+    "Walton"
+   ]
+  },
+  {
+   "name": "DeLand",
+   "place_fips": "16875",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Deerfield Beach",
+   "place_fips": "16725",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Delray Beach",
+   "place_fips": "17100",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Deltona",
+   "place_fips": "17200",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Destin",
+   "place_fips": "17325",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Doral",
+   "place_fips": "17935",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Dundee",
+   "place_fips": "18550",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Dunedin",
+   "place_fips": "18575",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Dunnellon",
+   "place_fips": "18675",
+   "counties": [
+    "Marion"
+   ]
+  },
+  {
+   "name": "Eagle Lake",
+   "place_fips": "18875",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Eatonville",
+   "place_fips": "19650",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Ebro",
+   "place_fips": "19725",
+   "counties": [
+    "Washington"
+   ]
+  },
+  {
+   "name": "Edgewater",
+   "place_fips": "19825",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Edgewood",
+   "place_fips": "19900",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "El Portal",
+   "place_fips": "20650",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Estero",
+   "place_fips": "21150",
+   "counties": [
+    "Lee"
+   ]
+  },
+  {
+   "name": "Esto",
+   "place_fips": "21250",
+   "counties": [
+    "Holmes"
+   ]
+  },
+  {
+   "name": "Eustis",
+   "place_fips": "21350",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Everglades",
+   "place_fips": "21425",
+   "counties": [
+    "Collier"
+   ]
+  },
+  {
+   "name": "Fanning Springs",
+   "place_fips": "21850",
+   "counties": [
+    "Gilchrist",
+    "Levy"
+   ]
+  },
+  {
+   "name": "Fellsmere",
+   "place_fips": "22100",
+   "counties": [
+    "Indian River"
+   ]
+  },
+  {
+   "name": "Fernandina Beach",
+   "place_fips": "22175",
+   "counties": [
+    "Nassau"
+   ]
+  },
+  {
+   "name": "Flagler Beach",
+   "place_fips": "22550",
+   "counties": [
+    "Flagler",
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Florida City",
+   "place_fips": "22975",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Fort Lauderdale",
+   "place_fips": "24000",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Fort Meade",
+   "place_fips": "24100",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Fort Myers",
+   "place_fips": "24125",
+   "counties": [
+    "Lee"
+   ]
+  },
+  {
+   "name": "Fort Myers Beach",
+   "place_fips": "24150",
+   "counties": [
+    "Lee"
+   ]
+  },
+  {
+   "name": "Fort Pierce",
+   "place_fips": "24300",
+   "counties": [
+    "St. Lucie"
+   ]
+  },
+  {
+   "name": "Fort Walton Beach",
+   "place_fips": "24475",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Fort White",
+   "place_fips": "24500",
+   "counties": [
+    "Columbia"
+   ]
+  },
+  {
+   "name": "Freeport",
+   "place_fips": "24825",
+   "counties": [
+    "Walton"
+   ]
+  },
+  {
+   "name": "Frostproof",
+   "place_fips": "24900",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Fruitland Park",
+   "place_fips": "24975",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Gainesville",
+   "place_fips": "25175",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Glen Ridge",
+   "place_fips": "26050",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Glen St. Mary",
+   "place_fips": "26075",
+   "counties": [
+    "Baker"
+   ]
+  },
+  {
+   "name": "Golden Beach",
+   "place_fips": "26250",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Golf",
+   "place_fips": "26550",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Graceville",
+   "place_fips": "27000",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Grand Ridge",
+   "place_fips": "27175",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Grant-Valkaria",
+   "place_fips": "27256",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Green Cove Springs",
+   "place_fips": "27400",
+   "counties": [
+    "Clay"
+   ]
+  },
+  {
+   "name": "Greenacres",
+   "place_fips": "27322",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Greensboro",
+   "place_fips": "27550",
+   "counties": [
+    "Gadsden"
+   ]
+  },
+  {
+   "name": "Greenville",
+   "place_fips": "27575",
+   "counties": [
+    "Madison"
+   ]
+  },
+  {
+   "name": "Greenwood",
+   "place_fips": "27600",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Gretna",
+   "place_fips": "27650",
+   "counties": [
+    "Gadsden"
+   ]
+  },
+  {
+   "name": "Groveland",
+   "place_fips": "27800",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Gulf Breeze",
+   "place_fips": "28000",
+   "counties": [
+    "Santa Rosa"
+   ]
+  },
+  {
+   "name": "Gulf Stream",
+   "place_fips": "28275",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Gulfport",
+   "place_fips": "28175",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Haines City",
+   "place_fips": "28400",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Hallandale Beach",
+   "place_fips": "28452",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Hampton",
+   "place_fips": "28575",
+   "counties": [
+    "Bradford"
+   ]
+  },
+  {
+   "name": "Havana",
+   "place_fips": "29150",
+   "counties": [
+    "Gadsden"
+   ]
+  },
+  {
+   "name": "Haverhill",
+   "place_fips": "29200",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Hawthorne",
+   "place_fips": "29275",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Hialeah",
+   "place_fips": "30000",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Hialeah Gardens",
+   "place_fips": "30025",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "High Springs",
+   "place_fips": "30525",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Highland Beach",
+   "place_fips": "30200",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Highland Park",
+   "place_fips": "30325",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Hillcrest Heights",
+   "place_fips": "30700",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Hilliard",
+   "place_fips": "30750",
+   "counties": [
+    "Nassau"
+   ]
+  },
+  {
+   "name": "Hillsboro Beach",
+   "place_fips": "30850",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Holly Hill",
+   "place_fips": "31350",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Hollywood",
+   "place_fips": "32000",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Holmes Beach",
+   "place_fips": "32150",
+   "counties": [
+    "Manatee"
+   ]
+  },
+  {
+   "name": "Homestead",
+   "place_fips": "32275",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Horseshoe Beach",
+   "place_fips": "32650",
+   "counties": [
+    "Dixie"
+   ]
+  },
+  {
+   "name": "Howey-in-the-Hills",
+   "place_fips": "32775",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Hypoluxo",
+   "place_fips": "33150",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Indialantic",
+   "place_fips": "33375",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Indian Creek",
+   "place_fips": "33425",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Indian Harbour Beach",
+   "place_fips": "33450",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Indian River Shores",
+   "place_fips": "33600",
+   "counties": [
+    "Indian River"
+   ]
+  },
+  {
+   "name": "Indian Rocks Beach",
+   "place_fips": "33625",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Indian Shores",
+   "place_fips": "33675",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Indiantown",
+   "place_fips": "33700",
+   "counties": [
+    "Martin"
+   ]
+  },
+  {
+   "name": "Inglis",
+   "place_fips": "33800",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Interlachen",
+   "place_fips": "33900",
+   "counties": [
+    "Putnam"
+   ]
+  },
+  {
+   "name": "Inverness",
+   "place_fips": "33950",
+   "counties": [
+    "Citrus"
+   ]
+  },
+  {
+   "name": "Islamorada, Village of Islands",
+   "place_fips": "34132",
+   "counties": [
+    "Monroe"
+   ]
+  },
+  {
+   "name": "Jacksonville",
+   "place_fips": "35000",
+   "counties": [
+    "Duval"
+   ]
+  },
+  {
+   "name": "Jacksonville Beach",
+   "place_fips": "35050",
+   "counties": [
+    "Duval"
+   ]
+  },
+  {
+   "name": "Jacob City",
+   "place_fips": "35200",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Jasper",
+   "place_fips": "35375",
+   "counties": [
+    "Hamilton"
+   ]
+  },
+  {
+   "name": "Jay",
+   "place_fips": "35425",
+   "counties": [
+    "Santa Rosa"
+   ]
+  },
+  {
+   "name": "Jennings",
+   "place_fips": "35525",
+   "counties": [
+    "Hamilton"
+   ]
+  },
+  {
+   "name": "Juno Beach",
+   "place_fips": "35850",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Jupiter",
+   "place_fips": "35875",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Jupiter Inlet Colony",
+   "place_fips": "35900",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Jupiter Island",
+   "place_fips": "35925",
+   "counties": [
+    "Martin"
+   ]
+  },
+  {
+   "name": "Kenneth City",
+   "place_fips": "36175",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Key Biscayne",
+   "place_fips": "36300",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Key Colony Beach",
+   "place_fips": "36325",
+   "counties": [
+    "Monroe"
+   ]
+  },
+  {
+   "name": "Key West",
+   "place_fips": "36550",
+   "counties": [
+    "Monroe"
+   ]
+  },
+  {
+   "name": "Keystone Heights",
+   "place_fips": "36475",
+   "counties": [
+    "Clay"
+   ]
+  },
+  {
+   "name": "Kissimmee",
+   "place_fips": "36950",
+   "counties": [
+    "Osceola"
+   ]
+  },
+  {
+   "name": "La Crosse",
+   "place_fips": "37300",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "LaBelle",
+   "place_fips": "37225",
+   "counties": [
+    "Hendry"
+   ]
+  },
+  {
+   "name": "Lady Lake",
+   "place_fips": "37375",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Lake Alfred",
+   "place_fips": "37525",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Lake Buena Vista",
+   "place_fips": "37625",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Lake Butler",
+   "place_fips": "37650",
+   "counties": [
+    "Union"
+   ]
+  },
+  {
+   "name": "Lake City",
+   "place_fips": "37775",
+   "counties": [
+    "Columbia"
+   ]
+  },
+  {
+   "name": "Lake Clarke Shores",
+   "place_fips": "37800",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Lake Hamilton",
+   "place_fips": "37975",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Lake Helen",
+   "place_fips": "38025",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Lake Mary",
+   "place_fips": "38425",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Lake Park",
+   "place_fips": "38600",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Lake Placid",
+   "place_fips": "38625",
+   "counties": [
+    "Highlands"
+   ]
+  },
+  {
+   "name": "Lake Wales",
+   "place_fips": "38950",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Lake Worth Beach",
+   "place_fips": "39081",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Lakeland",
+   "place_fips": "38250",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Lantana",
+   "place_fips": "39375",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Largo",
+   "place_fips": "39425",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Lauderdale Lakes",
+   "place_fips": "39525",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Lauderdale-by-the-Sea",
+   "place_fips": "39475",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Lauderhill",
+   "place_fips": "39550",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Laurel Hill",
+   "place_fips": "39650",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Lawtey",
+   "place_fips": "39700",
+   "counties": [
+    "Bradford"
+   ]
+  },
+  {
+   "name": "Layton",
+   "place_fips": "39725",
+   "counties": [
+    "Monroe"
+   ]
+  },
+  {
+   "name": "Lazy Lake",
+   "place_fips": "39750",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Lee",
+   "place_fips": "39850",
+   "counties": [
+    "Madison"
+   ]
+  },
+  {
+   "name": "Leesburg",
+   "place_fips": "39875",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Lighthouse Point",
+   "place_fips": "40450",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Live Oak",
+   "place_fips": "40875",
+   "counties": [
+    "Suwannee"
+   ]
+  },
+  {
+   "name": "Longboat Key",
+   "place_fips": "41150",
+   "counties": [
+    "Manatee",
+    "Sarasota"
+   ]
+  },
+  {
+   "name": "Longwood",
+   "place_fips": "41250",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Loxahatchee Groves",
+   "place_fips": "41577",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Lynn Haven",
+   "place_fips": "41825",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "Macclenny",
+   "place_fips": "41950",
+   "counties": [
+    "Baker"
+   ]
+  },
+  {
+   "name": "Madeira Beach",
+   "place_fips": "42400",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Madison",
+   "place_fips": "42425",
+   "counties": [
+    "Madison"
+   ]
+  },
+  {
+   "name": "Maitland",
+   "place_fips": "42575",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Malabar",
+   "place_fips": "42625",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Malone",
+   "place_fips": "42650",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Manalapan",
+   "place_fips": "42700",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Mangonia Park",
+   "place_fips": "42900",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Marathon",
+   "place_fips": "43000",
+   "counties": [
+    "Monroe"
+   ]
+  },
+  {
+   "name": "Marco Island",
+   "place_fips": "43083",
+   "counties": [
+    "Collier"
+   ]
+  },
+  {
+   "name": "Margate",
+   "place_fips": "43125",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Marianna",
+   "place_fips": "43175",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Marineland",
+   "place_fips": "43250",
+   "counties": [
+    "Flagler",
+    "St. Johns"
+   ]
+  },
+  {
+   "name": "Mary Esther",
+   "place_fips": "43375",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Mascotte",
+   "place_fips": "43425",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Mayo",
+   "place_fips": "43575",
+   "counties": [
+    "Lafayette"
+   ]
+  },
+  {
+   "name": "McIntosh",
+   "place_fips": "42150",
+   "counties": [
+    "Marion"
+   ]
+  },
+  {
+   "name": "Medley",
+   "place_fips": "43900",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Melbourne",
+   "place_fips": "43975",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Melbourne Beach",
+   "place_fips": "44000",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Melbourne Village",
+   "place_fips": "44075",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Mexico Beach",
+   "place_fips": "44300",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "Miami",
+   "place_fips": "45000",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Miami Beach",
+   "place_fips": "45025",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Miami Gardens",
+   "place_fips": "45060",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Miami Lakes",
+   "place_fips": "45100",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Miami Shores",
+   "place_fips": "45175",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Miami Springs",
+   "place_fips": "45200",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Micanopy",
+   "place_fips": "45225",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Midway",
+   "place_fips": "45425",
+   "counties": [
+    "Gadsden"
+   ]
+  },
+  {
+   "name": "Milton",
+   "place_fips": "45750",
+   "counties": [
+    "Santa Rosa"
+   ]
+  },
+  {
+   "name": "Minneola",
+   "place_fips": "45900",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Miramar",
+   "place_fips": "45975",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Monticello",
+   "place_fips": "46500",
+   "counties": [
+    "Jefferson"
+   ]
+  },
+  {
+   "name": "Montverde",
+   "place_fips": "46525",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Moore Haven",
+   "place_fips": "46550",
+   "counties": [
+    "Glades"
+   ]
+  },
+  {
+   "name": "Mount Dora",
+   "place_fips": "47050",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Mulberry",
+   "place_fips": "47200",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Naples",
+   "place_fips": "47625",
+   "counties": [
+    "Collier"
+   ]
+  },
+  {
+   "name": "Neptune Beach",
+   "place_fips": "48100",
+   "counties": [
+    "Duval"
+   ]
+  },
+  {
+   "name": "New Port Richey",
+   "place_fips": "48500",
+   "counties": [
+    "Pasco"
+   ]
+  },
+  {
+   "name": "New Smyrna Beach",
+   "place_fips": "48625",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Newberry",
+   "place_fips": "48200",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Niceville",
+   "place_fips": "48750",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Noma",
+   "place_fips": "48900",
+   "counties": [
+    "Holmes"
+   ]
+  },
+  {
+   "name": "North Bay Village",
+   "place_fips": "49225",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "North Lauderdale",
+   "place_fips": "49425",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "North Miami",
+   "place_fips": "49450",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "North Miami Beach",
+   "place_fips": "49475",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "North Palm Beach",
+   "place_fips": "49600",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "North Port",
+   "place_fips": "49675",
+   "counties": [
+    "Sarasota"
+   ]
+  },
+  {
+   "name": "North Redington Beach",
+   "place_fips": "49725",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Oak Hill",
+   "place_fips": "50450",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Oakland",
+   "place_fips": "50525",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Oakland Park",
+   "place_fips": "50575",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Ocala",
+   "place_fips": "50750",
+   "counties": [
+    "Marion"
+   ]
+  },
+  {
+   "name": "Ocean Breeze",
+   "place_fips": "50875",
+   "counties": [
+    "Martin"
+   ]
+  },
+  {
+   "name": "Ocean Ridge",
+   "place_fips": "50950",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Ocoee",
+   "place_fips": "51075",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Okeechobee",
+   "place_fips": "51200",
+   "counties": [
+    "Okeechobee"
+   ]
+  },
+  {
+   "name": "Oldsmar",
+   "place_fips": "51350",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Opa-locka",
+   "place_fips": "51650",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Orange City",
+   "place_fips": "51825",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Orange Park",
+   "place_fips": "52125",
+   "counties": [
+    "Clay"
+   ]
+  },
+  {
+   "name": "Orchid",
+   "place_fips": "52175",
+   "counties": [
+    "Indian River"
+   ]
+  },
+  {
+   "name": "Orlando",
+   "place_fips": "53000",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Ormond Beach",
+   "place_fips": "53150",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Otter Creek",
+   "place_fips": "53500",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Oviedo",
+   "place_fips": "53575",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Pahokee",
+   "place_fips": "53800",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Palatka",
+   "place_fips": "53875",
+   "counties": [
+    "Putnam"
+   ]
+  },
+  {
+   "name": "Palm Bay",
+   "place_fips": "54000",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Palm Beach",
+   "place_fips": "54025",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Palm Beach Gardens",
+   "place_fips": "54075",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Palm Beach Shores",
+   "place_fips": "54150",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Palm Coast",
+   "place_fips": "54200",
+   "counties": [
+    "Flagler"
+   ]
+  },
+  {
+   "name": "Palm Shores",
+   "place_fips": "54425",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Palm Springs",
+   "place_fips": "54450",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Palmetto",
+   "place_fips": "54250",
+   "counties": [
+    "Manatee"
+   ]
+  },
+  {
+   "name": "Palmetto Bay",
+   "place_fips": "54275",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Panama City",
+   "place_fips": "54700",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "Panama City Beach",
+   "place_fips": "54725",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "Parker",
+   "place_fips": "55075",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "Parkland",
+   "place_fips": "55125",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Paxton",
+   "place_fips": "55475",
+   "counties": [
+    "Walton"
+   ]
+  },
+  {
+   "name": "Pembroke Park",
+   "place_fips": "55750",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Pembroke Pines",
+   "place_fips": "55775",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Penney Farms",
+   "place_fips": "55875",
+   "counties": [
+    "Clay"
+   ]
+  },
+  {
+   "name": "Pensacola",
+   "place_fips": "55925",
+   "counties": [
+    "Escambia"
+   ]
+  },
+  {
+   "name": "Perry",
+   "place_fips": "56150",
+   "counties": [
+    "Taylor"
+   ]
+  },
+  {
+   "name": "Pierson",
+   "place_fips": "56425",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Pinecrest",
+   "place_fips": "56625",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Pinellas Park",
+   "place_fips": "56975",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Plant City",
+   "place_fips": "57550",
+   "counties": [
+    "Hillsborough"
+   ]
+  },
+  {
+   "name": "Plantation",
+   "place_fips": "57425",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Polk City",
+   "place_fips": "57950",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Pomona Park",
+   "place_fips": "58025",
+   "counties": [
+    "Putnam"
+   ]
+  },
+  {
+   "name": "Pompano Beach",
+   "place_fips": "58050",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Ponce Inlet",
+   "place_fips": "58200",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Ponce de Leon",
+   "place_fips": "58175",
+   "counties": [
+    "Holmes"
+   ]
+  },
+  {
+   "name": "Port Orange",
+   "place_fips": "58575",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "Port Richey",
+   "place_fips": "58600",
+   "counties": [
+    "Pasco"
+   ]
+  },
+  {
+   "name": "Port St. Joe",
+   "place_fips": "58675",
+   "counties": [
+    "Gulf"
+   ]
+  },
+  {
+   "name": "Port St. Lucie",
+   "place_fips": "58715",
+   "counties": [
+    "St. Lucie"
+   ]
+  },
+  {
+   "name": "Punta Gorda",
+   "place_fips": "59200",
+   "counties": [
+    "Charlotte"
+   ]
+  },
+  {
+   "name": "Quincy",
+   "place_fips": "59325",
+   "counties": [
+    "Gadsden"
+   ]
+  },
+  {
+   "name": "Raiford",
+   "place_fips": "59400",
+   "counties": [
+    "Union"
+   ]
+  },
+  {
+   "name": "Reddick",
+   "place_fips": "59675",
+   "counties": [
+    "Marion"
+   ]
+  },
+  {
+   "name": "Redington Beach",
+   "place_fips": "59725",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Redington Shores",
+   "place_fips": "59750",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Riviera Beach",
+   "place_fips": "60975",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Rockledge",
+   "place_fips": "61500",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Royal Palm Beach",
+   "place_fips": "62100",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Safety Harbor",
+   "place_fips": "62425",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "San Antonio",
+   "place_fips": "63375",
+   "counties": [
+    "Pasco"
+   ]
+  },
+  {
+   "name": "Sanford",
+   "place_fips": "63650",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Sanibel",
+   "place_fips": "63700",
+   "counties": [
+    "Lee"
+   ]
+  },
+  {
+   "name": "Sarasota",
+   "place_fips": "64175",
+   "counties": [
+    "Sarasota"
+   ]
+  },
+  {
+   "name": "Satellite Beach",
+   "place_fips": "64400",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Sea Ranch Lakes",
+   "place_fips": "64725",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Sebastian",
+   "place_fips": "64825",
+   "counties": [
+    "Indian River"
+   ]
+  },
+  {
+   "name": "Sebring",
+   "place_fips": "64875",
+   "counties": [
+    "Highlands"
+   ]
+  },
+  {
+   "name": "Seminole",
+   "place_fips": "64975",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Sewall's Point",
+   "place_fips": "65225",
+   "counties": [
+    "Martin"
+   ]
+  },
+  {
+   "name": "Shalimar",
+   "place_fips": "65425",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Sneads",
+   "place_fips": "66725",
+   "counties": [
+    "Jackson"
+   ]
+  },
+  {
+   "name": "Sopchoppy",
+   "place_fips": "66925",
+   "counties": [
+    "Wakulla"
+   ]
+  },
+  {
+   "name": "South Bay",
+   "place_fips": "67175",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "South Daytona",
+   "place_fips": "67325",
+   "counties": [
+    "Volusia"
+   ]
+  },
+  {
+   "name": "South Miami",
+   "place_fips": "67550",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "South Palm Beach",
+   "place_fips": "67650",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "South Pasadena",
+   "place_fips": "67675",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Southwest Ranches",
+   "place_fips": "68135",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Springfield",
+   "place_fips": "68275",
+   "counties": [
+    "Bay"
+   ]
+  },
+  {
+   "name": "St. Augustine",
+   "place_fips": "62500",
+   "counties": [
+    "St. Johns"
+   ]
+  },
+  {
+   "name": "St. Augustine Beach",
+   "place_fips": "62525",
+   "counties": [
+    "St. Johns"
+   ]
+  },
+  {
+   "name": "St. Cloud",
+   "place_fips": "62625",
+   "counties": [
+    "Osceola"
+   ]
+  },
+  {
+   "name": "St. Leo",
+   "place_fips": "62775",
+   "counties": [
+    "Pasco"
+   ]
+  },
+  {
+   "name": "St. Lucie Village",
+   "place_fips": "62800",
+   "counties": [
+    "St. Lucie"
+   ]
+  },
+  {
+   "name": "St. Marks",
+   "place_fips": "62825",
+   "counties": [
+    "Wakulla"
+   ]
+  },
+  {
+   "name": "St. Pete Beach",
+   "place_fips": "62885",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "St. Petersburg",
+   "place_fips": "63000",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Starke",
+   "place_fips": "68525",
+   "counties": [
+    "Bradford"
+   ]
+  },
+  {
+   "name": "Stuart",
+   "place_fips": "68875",
+   "counties": [
+    "Martin"
+   ]
+  },
+  {
+   "name": "Sunny Isles Beach",
+   "place_fips": "69555",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Sunrise",
+   "place_fips": "69700",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Surfside",
+   "place_fips": "70075",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Sweetwater",
+   "place_fips": "70345",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Tallahassee",
+   "place_fips": "70600",
+   "counties": [
+    "Leon"
+   ]
+  },
+  {
+   "name": "Tamarac",
+   "place_fips": "70675",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Tampa",
+   "place_fips": "71000",
+   "counties": [
+    "Hillsborough"
+   ]
+  },
+  {
+   "name": "Tarpon Springs",
+   "place_fips": "71150",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Tavares",
+   "place_fips": "71225",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Temple Terrace",
+   "place_fips": "71400",
+   "counties": [
+    "Hillsborough"
+   ]
+  },
+  {
+   "name": "Tequesta",
+   "place_fips": "71525",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Titusville",
+   "place_fips": "71900",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "Treasure Island",
+   "place_fips": "72325",
+   "counties": [
+    "Pinellas"
+   ]
+  },
+  {
+   "name": "Trenton",
+   "place_fips": "72350",
+   "counties": [
+    "Gilchrist"
+   ]
+  },
+  {
+   "name": "Umatilla",
+   "place_fips": "73025",
+   "counties": [
+    "Lake"
+   ]
+  },
+  {
+   "name": "Valparaiso",
+   "place_fips": "73675",
+   "counties": [
+    "Okaloosa"
+   ]
+  },
+  {
+   "name": "Venice",
+   "place_fips": "73900",
+   "counties": [
+    "Sarasota"
+   ]
+  },
+  {
+   "name": "Vernon",
+   "place_fips": "74125",
+   "counties": [
+    "Washington"
+   ]
+  },
+  {
+   "name": "Vero Beach",
+   "place_fips": "74150",
+   "counties": [
+    "Indian River"
+   ]
+  },
+  {
+   "name": "Virginia Gardens",
+   "place_fips": "74575",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "Waldo",
+   "place_fips": "74925",
+   "counties": [
+    "Alachua"
+   ]
+  },
+  {
+   "name": "Wauchula",
+   "place_fips": "75375",
+   "counties": [
+    "Hardee"
+   ]
+  },
+  {
+   "name": "Wausau",
+   "place_fips": "75450",
+   "counties": [
+    "Washington"
+   ]
+  },
+  {
+   "name": "Webster",
+   "place_fips": "75600",
+   "counties": [
+    "Sumter"
+   ]
+  },
+  {
+   "name": "Weeki Wachee",
+   "place_fips": "75625",
+   "counties": [
+    "Hernando"
+   ]
+  },
+  {
+   "name": "Welaka",
+   "place_fips": "75750",
+   "counties": [
+    "Putnam"
+   ]
+  },
+  {
+   "name": "Wellington",
+   "place_fips": "75812",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "West Melbourne",
+   "place_fips": "76500",
+   "counties": [
+    "Brevard"
+   ]
+  },
+  {
+   "name": "West Miami",
+   "place_fips": "76525",
+   "counties": [
+    "Miami-Dade"
+   ]
+  },
+  {
+   "name": "West Palm Beach",
+   "place_fips": "76600",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "West Park",
+   "place_fips": "76658",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Westlake",
+   "place_fips": "76417",
+   "counties": [
+    "Palm Beach"
+   ]
+  },
+  {
+   "name": "Weston",
+   "place_fips": "76582",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Westville",
+   "place_fips": "76975",
+   "counties": [
+    "Holmes"
+   ]
+  },
+  {
+   "name": "Wewahitchka",
+   "place_fips": "77100",
+   "counties": [
+    "Gulf"
+   ]
+  },
+  {
+   "name": "White Springs",
+   "place_fips": "77400",
+   "counties": [
+    "Hamilton"
+   ]
+  },
+  {
+   "name": "Wildwood",
+   "place_fips": "77675",
+   "counties": [
+    "Sumter"
+   ]
+  },
+  {
+   "name": "Williston",
+   "place_fips": "77825",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Wilton Manors",
+   "place_fips": "78000",
+   "counties": [
+    "Broward"
+   ]
+  },
+  {
+   "name": "Windermere",
+   "place_fips": "78050",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Winter Garden",
+   "place_fips": "78250",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Winter Haven",
+   "place_fips": "78275",
+   "counties": [
+    "Polk"
+   ]
+  },
+  {
+   "name": "Winter Park",
+   "place_fips": "78300",
+   "counties": [
+    "Orange"
+   ]
+  },
+  {
+   "name": "Winter Springs",
+   "place_fips": "78325",
+   "counties": [
+    "Seminole"
+   ]
+  },
+  {
+   "name": "Worthington Springs",
+   "place_fips": "78775",
+   "counties": [
+    "Union"
+   ]
+  },
+  {
+   "name": "Yankeetown",
+   "place_fips": "78925",
+   "counties": [
+    "Levy"
+   ]
+  },
+  {
+   "name": "Zephyrhills",
+   "place_fips": "79225",
+   "counties": [
+    "Pasco"
+   ]
+  },
+  {
+   "name": "Zolfo Springs",
+   "place_fips": "79250",
+   "counties": [
+    "Hardee"
+   ]
+  }
+ ]
+}
