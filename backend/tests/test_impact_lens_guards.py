@@ -1,0 +1,97 @@
+"""Guards added after the first real run (H1389, 2026-10-06). Each case is a
+real entry the unguarded mapper got wrong."""
+
+from app.impact_lens import criteria as C
+from app.impact_lens import guards
+
+DATE_COND = {"text": "submitted an application, written request, or notice of intent before July 1, 2026",
+             "quote": "who submitted an application ... before July 1, 2026"}
+AIRPORT = {"text": "Sections 125.01055(7) and 166.04151(7) do not apply to any of the following, unless the respective application is approved by the governing body of the airport: (a) A proposed development near a runway within one- quarter of a mile (b) A proposed development within any airport noise zone",
+           "quote": "Sections 125.01055(7) and 166.04151(7) do not apply to\nany of the following ...\n(a) A proposed development near a runway\n(b) A proposed development within any airport noise zone"}
+
+
+def run(raw, entry, **kw):
+    return C.validate_criteria(
+        raw, entry_index=0, n_conditions=len(entry.get("conditions") or []),
+        n_exceptions=len(entry.get("exceptions") or []), entry=entry, **kw)
+
+
+def role(*roles):
+    return {"kind": "attr", "attr": "role", "any_of": list(roles)}
+
+
+def test_anyone_is_only_for_a_group_the_bill_calls_anyone():
+    oppaga = {"group": "Office of Program Policy Analysis and Government Accountability (OPPAGA)"}
+    out = run({"audience": {"kind": "anyone"}}, oppaga)
+    assert out["audience"] is None and "only for a group the bill calls Anyone" in out["unmapped"][0]["reason"]
+    assert run({"audience": {"kind": "anyone"}}, {"group": "Courts"})["audience"] is None
+    assert run({"audience": {"kind": "anyone"}}, {"group": "Anyone"})["audience"] == {"kind": "anyone"}
+    assert run({"audience": {"kind": "anyone"}}, {"group": "any person"})["audience"] == {"kind": "anyone"}
+
+
+def test_a_role_must_be_named_by_the_group():
+    county = {"group": "County"}
+    out = run({"audience": role("property_developer", "local_government")}, county)
+    assert out["audience"]["any_of"] == ["local_government"]
+    assert out["notes"] == ["audience: dropped 'property_developer' (the group 'County' does not name it)"]
+    # a county rule the model called "developer" is corrected from the group's own words
+    assert run({"audience": role("property_developer")}, {"group": "Municipality"})["audience"]["any_of"] == ["local_government"]
+    assert run({"audience": role("local_government")}, {"group": "Counties and municipalities"})["audience"]["any_of"] == ["local_government"]
+    assert run({"audience": role("landlord")}, {"group": "Landlords"})["audience"]["any_of"] == ["landlord"]
+    assert run({"audience": role("property_developer")}, {"group": "Applicants for development authorized under s. 125.01055(7)"})["audience"]
+
+
+def test_a_date_is_never_mapped_to_a_property_type():
+    entry = {"group": "Applicants", "conditions": [DATE_COND]}
+    raw = {"audience": role("property_developer"),
+           "requires": [{"attr": "property_type", "op": "in", "values": ["multifamily", "commercial"], "from": {"kind": "condition", "index": 0}}]}
+    out = run(raw, entry)
+    assert out["requires"] == []
+    assert out["unmapped"] == [{"kind": "condition", "index": 0, "reason": "it mentions a date, number or amount the vocabulary cannot test"}]
+
+
+def test_airport_exception_lists_are_not_mapped_to_a_property_type():
+    entry = {"group": "Farms and farm operations", "exceptions": [AIRPORT]}
+    raw = {"excludes": [{"attr": "property_type", "op": "in", "values": ["commercial"], "from": {"kind": "exception", "index": 0}}]}
+    out = run(raw, entry)
+    assert out["excludes"] == [] and out["unmapped"][-1]["reason"] == "it is too long or compound to map exactly"
+
+
+def test_a_value_must_appear_in_the_cited_text():
+    entry = {"group": "Landlords", "conditions": [{"text": "Applies in Duval County.", "quote": "This section applies in Duval County."}]}
+    raw = {"audience": role("landlord"),
+           "requires": [{"attr": "jurisdiction", "op": "in", "values": ["county:Duval", "county:Orange"], "from": {"kind": "condition", "index": 0}}]}
+    out = run(raw, entry)
+    assert out["requires"][0]["values"] == ["county:Duval"]
+    assert out["notes"] == ["condition 0: dropped 'county:Orange' (the condition does not state it)"]
+    nothing = run({**raw, "requires": [{**raw["requires"][0], "values": ["county:Orange"]}]}, entry)
+    assert nothing["requires"] == [] and "does not state any" in nothing["unmapped"][0]["reason"]
+
+
+def test_statute_citations_do_not_count_as_numbers():
+    ok = {"text": "Applies in Duval County under s. 125.01055(7), Florida Statutes.", "quote": "In Duval County, as provided in ss. 166.04151(7)."}
+    assert guards.too_complex(ok["text"], ok["quote"]) is None
+    assert guards.too_complex("Applies to buildings over 3 stories.", "") is not None
+    assert guards.too_complex("A 40 percent share is required", "") is not None
+
+
+def test_a_clean_entry_still_maps_fully():
+    entry = {"group": "Landlords",
+             "conditions": [{"text": "Applies in Duval and Miami-Dade counties.", "quote": "This section applies in Duval County and Miami-Dade County."}],
+             "exceptions": [{"text": "Not single-family homes rented by their owner.", "quote": "This section does not apply to a single-family home rented by its owner."}]}
+    raw = {"audience": role("landlord"),
+           "requires": [{"attr": "jurisdiction", "op": "in", "values": ["county:Duval", "county:Miami-Dade"], "from": {"kind": "condition", "index": 0}}],
+           "excludes": [{"attr": "property_type", "op": "in", "values": ["single_family"], "from": {"kind": "exception", "index": 0}}]}
+    out = run(raw, entry)
+    assert C.is_fully_mapped(out) and out["notes"] == []
+
+
+def test_a_rejected_audience_falls_back_to_the_groups_own_words():
+    out = run({"audience": {"kind": "anyone"}}, {"group": "Counties and municipalities"})
+    assert out["audience"] == {"kind": "attr", "attr": "role", "any_of": ["local_government"]}
+    assert out["notes"] == ["audience: taken from the group's own words ('Counties and municipalities'), not from the model"]
+    assert run({}, {"group": "County"})["audience"]["any_of"] == ["local_government"]
+    # no role in the group's words: stays unmapped, never guessed
+    assert run({"audience": {"kind": "anyone"}}, {"group": "Courts"})["audience"] is None
+    assert run({}, {"group": "Anyone"})["audience"] is None
+    assert run({"audience": role("property_developer")}, {"group": "Owner of a property in a multifamily project"})["audience"] is None

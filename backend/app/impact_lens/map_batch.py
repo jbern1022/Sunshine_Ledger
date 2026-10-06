@@ -69,7 +69,7 @@ def export_sheet(db: Session, pairs: list[tuple[Bill, BillLayer]]) -> str:
             ).scalars()
         }
         for i, entry in enumerate(layer.items):
-            out += [f"### Entry {i}: {entry.get('group')}", f"- **Change:** {entry.get('change')}", f"- **Quote:** {entry.get('quote')}"]
+            out += [f"### Entry {i}: {entry.get('group')}", f"- **Change:** {entry.get('text') or entry.get('change')}", f"- **Quote:** {entry.get('quote')}"]
             for kind in ("conditions", "exceptions"):
                 for j, it in enumerate(entry.get(kind) or []):
                     out.append(f"- **{kind[:-1].title()} {j}:** {it.get('text')}  _Quote:_ {it.get('quote')}")
@@ -83,6 +83,7 @@ def export_sheet(db: Session, pairs: list[tuple[Bill, BillLayer]]) -> str:
             out += [f"- **Requires:** {_fmt_test(t)}" for t in c["requires"]]
             out += [f"- **Excludes:** {_fmt_test(t)}" for t in c["excludes"]]
             out += [f"- **Unmapped:** {u['kind']} {u['index']}: {u['reason']}" for u in c["unmapped"]]
+            out += [f"- **Adjusted:** {n}" for n in c.get("notes", [])]
             if c["ambiguous"]:
                 out.append(f"- **Ambiguous:** {c['ambiguous']['question']}")
             out += [f"- **Review tier:** {review_tier(c)}", "- **Verdict:** ", "- **Note:** ", ""]

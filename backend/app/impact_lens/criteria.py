@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.impact_lens import guards
+
 from app.impact_lens.vocabulary import (
     OPS_BY_TYPE, NUMBER, REGISTRY, VOCABULARY_VERSION, Attribute, is_forbidden,
 )
@@ -76,6 +78,7 @@ def validate_criteria(
     n_conditions: int,
     n_exceptions: int,
     entry_quotes: set[str] | None = None,
+    entry: dict | None = None,
     relevance: str = "direct",
     registry: dict[str, Attribute] | None = None,
     vocabulary_version: int = VOCABULARY_VERSION,
@@ -85,6 +88,7 @@ def validate_criteria(
 
     `n_conditions` / `n_exceptions` are the entry's own counts, so pointers
     can be checked. `entry_quotes` are the verified quotes an ambiguity may cite.
+    When the entry itself is given, the deterministic guards in guards.py apply too.
     """
     registry = REGISTRY if registry is None else registry
     if relevance not in RELEVANCES:
@@ -92,6 +96,7 @@ def validate_criteria(
     raw = raw if isinstance(raw, dict) else {}
 
     unmapped: list[dict] = []
+    notes: list[str] = []
     # Why an item was unmapped; the first reason recorded for an index wins.
     reasons: dict[tuple[str, int], str] = {}
 
@@ -116,6 +121,26 @@ def validate_criteria(
             audience = {"kind": "attr", "attr": test["attr"], "any_of": test["values"]}
     else:
         audience_unmapped = "the group was not mapped"
+    if audience is not None and entry is not None:
+        group = str(entry.get("group") or "")
+        if audience["kind"] == "anyone" and not guards.is_anyone(group):
+            audience, audience_unmapped = None, f"'anyone' is only for a group the bill calls Anyone; this group is '{group}'"
+        elif audience["kind"] == "attr":
+            keep = guards.supported_roles(group, audience["any_of"])
+            for dropped in [r for r in audience["any_of"] if r not in keep]:
+                notes.append(f"audience: dropped '{dropped}' (the group '{group}' does not name it)")
+            if keep:
+                audience = {**audience, "any_of": keep}
+            else:
+                audience, audience_unmapped = None, f"the group '{group}' names none of the proposed roles"
+    if audience is None and entry is not None:
+        # The model's audience was missing or rejected; the group's own words
+        # may still name a role outright ("County", "Landlords").
+        group = str(entry.get("group") or "")
+        roles = guards.supported_roles(group, list(registry["role"].values)) if "role" in registry else []
+        if roles:
+            audience = {"kind": "attr", "attr": "role", "any_of": roles}
+            notes.append(f"audience: taken from the group's own words ('{group}'), not from the model")
     if audience is None:
         unmapped.append({"kind": "audience", "index": None, "reason": audience_unmapped})
 
@@ -130,6 +155,20 @@ def validate_criteria(
                 # A bad pointer leaves nothing to attribute the reason to.
                 note(kind, idx, why or why2 or "invalid")
                 continue
+            if entry is not None:
+                cited_item = (entry.get("conditions" if kind == "condition" else "exceptions") or [])[idx]
+                text, quote = str(cited_item.get("text") or ""), str(cited_item.get("quote") or "")
+                why3 = guards.too_complex(text, quote)
+                if why3:
+                    note(kind, idx, why3)
+                    continue
+                values = guards.evidenced_values(test["attr"], test["values"], f"{text} {quote}")
+                for dropped in [v for v in test["values"] if v not in values]:
+                    notes.append(f"{kind} {idx}: dropped '{dropped}' (the {kind} does not state it)")
+                if not values:
+                    note(kind, idx, f"the {kind} does not state any of the proposed values")
+                    continue
+                test = {**test, "values": values}
             kept.append({**test, "from": {"kind": kind, "index": idx}})
         return kept
 
@@ -178,6 +217,7 @@ def validate_criteria(
         "excludes": excludes,
         "unmapped": unmapped,
         "ambiguous": ambiguous,
+        "notes": notes,
     }
 
 

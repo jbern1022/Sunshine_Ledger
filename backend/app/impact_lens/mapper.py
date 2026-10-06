@@ -25,7 +25,7 @@ from app.impact_lens.vocabulary import (
 from app.models import BillLayer, BillLayerCriteria
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/1"
+METHOD_VERSION = "impact_lens_criteria/2"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -77,8 +77,15 @@ def names_in(text: str) -> list[str]:
     return found
 
 
+def entry_change(entry: dict) -> str:
+    """Who entries store their plain-language change under "text" (the prompt
+    asks for "change"; storage normalizes it). The first real run sent the
+    model an empty line because this read the wrong key."""
+    return str(entry.get("text") or entry.get("change") or "")
+
+
 def entry_text(entry: dict) -> str:
-    parts = [entry.get("group", ""), entry.get("change", ""), entry.get("quote", "")]
+    parts = [entry.get("group", ""), entry_change(entry), entry.get("quote", "")]
     for field in ("conditions", "exceptions"):
         for it in entry.get(field) or []:
             parts += [it.get("text", ""), it.get("quote", "")]
@@ -89,7 +96,7 @@ def build_prompt(entry: dict, registry: dict[str, Attribute] = REGISTRY) -> str:
     names = names_in(entry_text(entry))
     return PROMPT.format(
         group=entry.get("group", ""),
-        change=entry.get("change", ""),
+        change=entry_change(entry),
         quote=entry.get("quote", ""),
         conditions=_numbered(entry.get("conditions") or []),
         exceptions=_numbered(entry.get("exceptions") or []),
@@ -124,6 +131,7 @@ def map_entry(entry: dict, entry_index: int, client, *, registry: dict[str, Attr
         n_conditions=len(entry.get("conditions") or []),
         n_exceptions=len(entry.get("exceptions") or []),
         entry_quotes=entry_quotes(entry),
+        entry=entry,
         relevance="direct",
         registry=registry,
     )
