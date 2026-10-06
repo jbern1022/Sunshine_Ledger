@@ -51,6 +51,10 @@ if ! grep -qE '^NEXT_PUBLIC_API_URL=https://' "$ENV_FILE"; then
   exit 1
 fi
 
+# Sync copies ("name 2.py") in the backend code would ship in the image (see
+# the script). Skipped when the Woodpecker step deploys from a clean clone.
+"$SCRIPT_DIR/check-no-sync-copies.sh" "$REPO_ROOT"
+
 echo "==> Deploying from $REPO_ROOT"
 echo "==> compose file: $COMPOSE_FILE"
 echo "==> env file:      $ENV_FILE"
