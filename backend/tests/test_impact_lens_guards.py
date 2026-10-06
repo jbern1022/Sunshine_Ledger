@@ -95,7 +95,9 @@ def test_a_rejected_audience_falls_back_to_the_groups_own_words():
     assert run({}, {"group": "County"})["audience"]["any_of"] == ["local_government"]
     # no role in the group's words: stays unmapped, never guessed
     assert run({"audience": {"kind": "anyone"}}, {"group": "Courts"})["audience"] is None
-    assert run({}, {"group": "Anyone"})["audience"] is None
+    # a group the bill calls Anyone is set from the group, never left to the model
+    assert run({}, {"group": "Anyone"})["audience"] == {"kind": "anyone"}
+    assert run({"audience": role("renter")}, {"group": "Anyone"})["audience"] == {"kind": "anyone"}
     assert run({"audience": role("property_developer")}, {"group": "Owner of a property in a multifamily project"})["audience"] is None
 
 

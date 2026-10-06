@@ -139,6 +139,10 @@ def validate_criteria(
                 audience = {**audience, "any_of": keep}
             else:
                 audience, audience_unmapped = None, f"the group '{group}' names none of the proposed roles"
+    if audience is None and entry is not None and guards.is_anyone(str(entry.get("group") or "")):
+        # The Who layer's group is literally "Anyone": no need to ask the model.
+        audience = {"kind": "anyone"}
+        notes.append("audience: set from the group, which the bill calls Anyone")
     if audience is None and entry is not None:
         # The model's audience was missing or rejected; the group's own words
         # may still name a role outright ("County", "Landlords").
