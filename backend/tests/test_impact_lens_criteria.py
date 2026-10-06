@@ -138,3 +138,19 @@ def test_relevance_must_be_known():
     assert validate(GOOD, relevance="indirect")["relevance"] == "indirect"
     with pytest.raises(ValueError):
         validate(GOOD, relevance="maybe")
+
+
+def test_review_tier():
+    simple = validate({**GOOD, "excludes": []}, exceptions=0)
+    assert C.review_tier(simple) == "simple"
+    assert C.review_tier(validate(GOOD)) == "needs_review"  # has an exclusion
+    assert C.review_tier(validate({"audience": GOOD["audience"]}, conditions=1, exceptions=0)) == "needs_review"  # unmapped
+    assert C.review_tier(validate({**simple, "audience": {"kind": "anyone"}}, exceptions=0)) == "simple"
+    assert C.review_tier(validate({}, 0, 0)) == "needs_review"  # no audience
+    assert C.review_tier(validate({**GOOD, "excludes": []}, exceptions=0, relevance="indirect")) == "needs_review"
+    q = "The agency shall adopt rules."
+    amb = validate({**GOOD, "excludes": [], "ambiguous": {"question": "Which agency?", "quote": q}}, exceptions=0, entry_quotes={q})
+    assert C.review_tier(amb) == "needs_review"
+    reg = {**REGISTRY, "units": Attribute("units", "Units", NUMBER, "How many units?")}
+    num = validate({**GOOD, "excludes": [], "requires": [{"attr": "units", "op": "gte", "values": [70], "from": {"kind": "condition", "index": 0}}]}, exceptions=0, registry=reg)
+    assert C.review_tier(num, reg) == "needs_review"

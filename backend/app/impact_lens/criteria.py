@@ -185,3 +185,24 @@ def is_fully_mapped(criteria: dict) -> bool:
     """True when the lens can give a definite answer from these criteria
     alone: audience mapped, nothing unmapped, no ambiguity."""
     return criteria["audience"] is not None and not criteria["unmapped"] and criteria["ambiguous"] is None
+
+
+def review_tier(criteria: dict, registry: dict[str, Attribute] | None = None) -> str:
+    """"simple" or "needs_review".
+
+    Rollout (decision 4): first every mapping is shown with an "automatically
+    mapped, not yet reviewed" label (option 5). The next step is to show
+    "simple" mappings that way and hold the rest until a person approves
+    them (option 4). A mapping is simple only when a wrong reading is unlikely
+    to flip a result unnoticed: a mapped audience, only plain "is one of"
+    tests, no exclusions, no unmapped items, no ambiguity, and a direct entry.
+    """
+    registry = REGISTRY if registry is None else registry
+    if criteria["relevance"] != "direct" or criteria["ambiguous"] is not None:
+        return "needs_review"
+    if criteria["audience"] is None or criteria["unmapped"] or criteria["excludes"]:
+        return "needs_review"
+    for r in criteria["requires"]:
+        if r["op"] != "in" or registry[r["attr"]].type == NUMBER:
+            return "needs_review"
+    return "simple"
