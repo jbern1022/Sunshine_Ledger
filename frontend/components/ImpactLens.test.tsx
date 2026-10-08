@@ -54,8 +54,11 @@ describe("ImpactLens", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Can't Determine");
 
     await user.click(screen.getByRole("radio", { name: "Renter" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Can't Determine"); // choosing alone changes nothing
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     const county = await screen.findByLabelText("Which Florida county do you live in?");
     await user.selectOptions(county, "Duval");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applies to You"));
     expect(screen.getByText("Quote for Tenants.")).toBeInTheDocument();
@@ -75,6 +78,7 @@ describe("ImpactLens", () => {
     render(<ImpactLens billEntityId="b1" />);
     await user.click(screen.getByRole("button", { name: "Yes, check" }));
     await user.click(await screen.findByRole("radio", { name: "None of These" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Does Not Appear to Apply"));
     expect(screen.getByRole("status")).toHaveTextContent(/not a guarantee/);
   });
@@ -85,6 +89,7 @@ describe("ImpactLens", () => {
     render(<ImpactLens billEntityId="b1" />);
     await user.click(screen.getByRole("button", { name: "Yes, check" }));
     await user.click(await screen.findByRole("radio", { name: "None of These" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Can't Determine"));
     expect(screen.getByText(/may not be complete: The analysis lists only the first entries/)).toBeInTheDocument();
   });
@@ -131,7 +136,45 @@ describe("ImpactLens", () => {
     render(<ImpactLens billEntityId="b1" />);
     await user.click(screen.getByRole("button", { name: "Yes, check" }));
     await user.click(await screen.findByRole("radio", { name: "Renter" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Text Is Ambiguous Here"));
     expect(screen.getByText(/Does the setback or the height cap control\?/)).toBeInTheDocument();
+  });
+
+  it("Continue is disabled until something is chosen, and arrowing does not commit", async () => {
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(base);
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    const next = await screen.findByRole("button", { name: "Continue" });
+    expect(next).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "Renter" }));
+    expect(next).toBeEnabled();
+    expect(window.sessionStorage.getItem("impactLens.answers.v1")).toBeNull(); // nothing stored yet
+  });
+
+  it("keeps keyboard focus: first question after opening, then the result when the questions run out", async () => {
+    vi.mocked(api.fetchImpactLens).mockResolvedValue({
+      ...base,
+      questions: [base.questions[0]],
+      entries: [entry("Tenants", crit({ audience: { kind: "attr", attr: "role", any_of: ["renter"] } }), { conditions: [] })],
+    });
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Renter" })).toHaveFocus());
+    await user.click(screen.getByRole("radio", { name: "Renter" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    // the answered question is gone; focus is on the result, not lost to the page body
+    await waitFor(() => expect(screen.getByRole("status")).toHaveFocus());
+  });
+
+  it("with no questions to ask, opening puts focus on the result", async () => {
+    window.sessionStorage.setItem("impactLens.answers.v1", JSON.stringify({ role: "renter", county: "Duval" }));
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(base);
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveFocus());
   });
 });

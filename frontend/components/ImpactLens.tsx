@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchImpactLens } from "@/lib/api";
 import {
   cleanAnswers,
@@ -69,6 +69,8 @@ const SCOPE: Record<ResultKind, string> = {
 const input = "h-4 w-4 accent-sunshine-700";
 const field = "mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500";
 
+/** A choice is only committed by the Continue button: arrowing through radios or a
+ *  list must not change the page by itself (WCAG 3.2.2, On Input). */
 function QuestionBlock({
   q,
   value,
@@ -78,14 +80,25 @@ function QuestionBlock({
   value: string | undefined;
   onAnswer: (key: QuestionKey, v: string) => void;
 }) {
+  const [choice, setChoice] = useState(value ?? "");
+  const next = (
+    <button
+      type="button"
+      disabled={!choice}
+      onClick={() => choice && onAnswer(q.key, choice)}
+      className="mt-2 rounded-md border border-sunshine-700 px-3 py-1.5 text-sm font-medium text-sunshine-700 hover:bg-sunshine-50 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      Continue
+    </button>
+  );
   if (q.options.length > 8) {
     const id = `lens-${q.key}`;
     return (
-      <div className="mt-3">
+      <div className="mt-3" data-lens-question>
         <label htmlFor={id} className="block text-sm font-medium text-ledger-900">
           {q.question}
         </label>
-        <select id={id} className={field} value={value ?? ""} onChange={(e) => e.target.value && onAnswer(q.key, e.target.value)}>
+        <select id={id} className={field} value={choice} onChange={(e) => setChoice(e.target.value)}>
           <option value="">Choose one</option>
           {q.options.map((o) => (
             <option key={o.value} value={o.value}>
@@ -93,20 +106,22 @@ function QuestionBlock({
             </option>
           ))}
         </select>
+        {next}
       </div>
     );
   }
   return (
-    <fieldset className="mt-3">
+    <fieldset className="mt-3" data-lens-question>
       <legend className="text-sm font-medium text-ledger-900">{q.question}</legend>
       <div className="mt-1 space-y-1">
         {q.options.map((o) => (
           <label key={o.value} className="flex items-center gap-2 text-sm text-ledger-800">
-            <input type="radio" name={`lens-${q.key}`} className={input} checked={value === o.value} onChange={() => onAnswer(q.key, o.value)} />
+            <input type="radio" name={`lens-${q.key}`} className={input} checked={choice === o.value} onChange={() => setChoice(o.value)} />
             {o.label}
           </label>
         ))}
       </div>
+      {next}
     </fieldset>
   );
 }
@@ -116,6 +131,11 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   const [data, setData] = useState<ImpactLensResponse | null>(null);
   const [error, setError] = useState(false);
   const [answers, setAnswers] = useState<Answers>({});
+  // Keyboard and screen-reader users lose their place when the control they used
+  // unmounts (the button that opens the lens, an answered question). After each
+  // such step focus moves to the next question, else to the result.
+  const rootRef = useRef<HTMLElement>(null);
+  const focusPending = useRef(false);
 
   useEffect(() => {
     if (!open || data || error) return;
@@ -129,6 +149,15 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
     };
   }, [open, data, error, billEntityId]);
 
+  useEffect(() => {
+    if (!focusPending.current || !open || (!data && !error)) return;
+    focusPending.current = false;
+    const root = rootRef.current;
+    const control = root?.querySelector<HTMLElement>("[data-lens-question] input, [data-lens-question] select");
+    const target = control ?? root?.querySelector<HTMLElement>("[data-lens-result]") ?? root?.querySelector<HTMLElement>("h2");
+    target?.focus();
+  });
+
   const result = useMemo(() => (data?.available ? matchBill(toLensBill(data), answers) : null), [data, answers]);
   const byKey = useMemo(() => new Map((data?.questions ?? []).map((q) => [q.key, q])), [data]);
 
@@ -138,6 +167,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
     if (key === "county") delete next.municipality;
     setAnswers(next);
     writeAnswers(next);
+    focusPending.current = true;
   }
   function change(key: QuestionKey) {
     const next = { ...answers };
@@ -145,10 +175,12 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
     if (key === "county") delete next.municipality;
     setAnswers(next);
     writeAnswers(next);
+    focusPending.current = true;
   }
   function clearAll() {
     setAnswers({});
     forgetAnswers();
+    focusPending.current = true;
   }
 
   const answeredChips = (["role", "county", "municipality", "property_type"] as QuestionKey[]).filter((k) => answers[k] !== undefined);
@@ -161,8 +193,8 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   };
 
   return (
-    <section className="mt-4 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="impact-lens-heading">
-      <h2 id="impact-lens-heading" className="text-sm font-semibold text-ledger-900">
+    <section ref={rootRef} className="mt-4 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="impact-lens-heading">
+      <h2 id="impact-lens-heading" tabIndex={-1} className="text-sm font-semibold text-ledger-900 focus:outline-none">
         Does this affect you?
       </h2>
 
@@ -172,7 +204,10 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
           <p className="mt-1 text-xs text-slate-500">Optional. We ask only what this bill needs. Your answers stay in this browser.</p>
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              focusPending.current = true;
+              setOpen(true);
+            }}
             className="mt-2 rounded-md border border-sunshine-700 px-3 py-1.5 text-sm font-medium text-sunshine-700 hover:bg-sunshine-50"
           >
             Yes, check
@@ -209,7 +244,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
               return q ? <QuestionBlock key={key} q={q} value={answers[key]} onAnswer={answer} /> : null;
             })}
 
-          <div role="status" aria-live="polite" className={`mt-3 rounded-md border px-3 py-2 ${TONE[result.result]}`}>
+          <div role="status" aria-live="polite" tabIndex={-1} data-lens-result className={`mt-3 rounded-md border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sunshine-700 ${TONE[result.result]}`}>
             <p className="text-base font-semibold">{result.label}</p>
             <p className="mt-0.5 text-xs">{SCOPE[result.result]}</p>
             {result.ask.length > 0 && <p className="mt-0.5 text-xs">Answer the question above to narrow this down.</p>}
