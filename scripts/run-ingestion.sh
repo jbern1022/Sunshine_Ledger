@@ -91,6 +91,11 @@ step "LegiScan usage check" docker exec "$CONTAINER" python -m app.pipeline.usag
 # Legistar city is one registry entry, not an edit here.
 step "Legistar (nightly cities)" docker exec "$CONTAINER" python -m app.pipeline.legistar --nightly --limit 200
 
+# Legislation text for city/county items, newest first. Capped so a first run
+# on a new city can't run long; items with no usable attachment are re-checked
+# every 14 days, not every night. Runs before the summarizer so new text is used.
+step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_text --source legistar --limit 100
+
 step "Miami iQM2 scrape" docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2
 
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch

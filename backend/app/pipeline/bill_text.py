@@ -575,6 +575,12 @@ def _legistar_text_for(entity: Entity) -> str | None:
     return fetch_legistar_bill_text(client_name, int(matter_id))
 
 
+# A Legistar matter with no usable text attachment (a procedural motion, a
+# scan) is re-checked only after this long, so the nightly step doesn't spend
+# its limit on the same dead ends. Attachments do get added as a matter moves.
+LEGISTAR_NO_TEXT_RECHECK_DAYS = 14
+
+
 def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: bool = False) -> tuple[int, int]:
     """Populate `bills.full_text` for Legistar-sourced bills.
 
@@ -582,17 +588,32 @@ def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: b
     entirely different -- attachment list rather than a text API -- though
     both end up in the same PDF cleaner.
 
+    Newest items first. A matter where no text was found is marked
+    (`attributes.text_checked_at`) and skipped for LEGISTAR_NO_TEXT_RECHECK_DAYS;
+    a fetch that errored is not marked, so it is retried next run.
+
     Returns (fetched, skipped_or_failed).
     """
+    from datetime import date, timedelta
+
     stmt = (
         select(Entity)
         .join(Bill, Bill.entity_id == Entity.id)
         .where(Entity.entity_type == "bill", Bill.source_system == "legistar")
         .options(selectinload(Entity.bill))
+        .order_by(Bill.introduced_date.desc().nullslast(), Entity.created_at.desc())
     )
-    entities = [
-        e for e in db.execute(stmt).scalars().all() if refresh or not (e.bill and e.bill.full_text)
-    ]
+    cutoff = (date.today() - timedelta(days=LEGISTAR_NO_TEXT_RECHECK_DAYS)).isoformat()
+
+    def due(e: Entity) -> bool:
+        if refresh:
+            return True
+        if e.bill and e.bill.full_text:
+            return False
+        checked = (e.attributes or {}).get("text_checked_at")
+        return not checked or checked < cutoff
+
+    entities = [e for e in db.execute(stmt).scalars().all() if due(e)]
     if limit:
         entities = entities[:limit]
 
@@ -604,6 +625,8 @@ def backfill_legistar_texts(db: Session, *, limit: int | None = None, refresh: b
         try:
             text = _legistar_text_for(entity)
             if not text:
+                entity.attributes = {**(entity.attributes or {}), "text_checked_at": date.today().isoformat()}
+                db.commit()
                 failed += 1
                 continue
             entity.bill.full_text = text

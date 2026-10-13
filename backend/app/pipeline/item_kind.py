@@ -65,6 +65,8 @@ def backfill_item_types(db: Session) -> int:
             (by_key[(k, str(ids[k]))] for k in ("iqm2_legi_file_id", "legistar_matter_id") if k in ids and (k, str(ids[k])) in by_key),
             None,
         )
+        if (entity.attributes or {}).get("source_item_type"):
+            continue  # derived from the title at ingest (Broward); the source's own type isn't the kind
         if item_type and (entity.attributes or {}).get("item_type") != item_type:
             entity.attributes = {**(entity.attributes or {}), "item_type": item_type}
             updated += 1

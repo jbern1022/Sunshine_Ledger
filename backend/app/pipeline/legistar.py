@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 from datetime import date, datetime, timezone
 
 import httpx
@@ -51,16 +52,27 @@ CLIENT_JURISDICTIONS = {
         "label": "Jacksonville City Council (Legistar)",
         "note": "The most recent council matters. Matters without a PDF attachment have no full text.",
     },
-    # County commission, live Legistar. Not nightly yet: enabling it needs a
-    # look at how county items read on the site (Todoist 6hm2FqVh66Mmww6G).
+    # County commission, live Legistar (2 bodies; newest matter 2026-10-12). Its
+    # types are agenda categories ("Consent Item", "Regular Item") and nearly
+    # every title is "MOTION TO ...", so the kind of record comes from the title
+    # (see derived_item_type). No sponsors are listed on its matters.
     "broward": {
         "jurisdiction": "Broward County",
         "county": "Broward County",
         "level": "county",
         "publisher": "Broward County Commission (Legistar)",
-        "nightly": False,
+        "item_type_from_title": True,
+        # Exhibit names vary ("Exhibit 2 - Proposed Ordinance", "Exhibit 1 -
+        # Resolution to Publish Notice ..."); the proposed form is preferred.
+        "text_attachment": [
+            r"^\s*exhibit\s*\d+\s*[-\u2013\u2014]\s*proposed\s+(ordinance|resolution)",
+            r"^\s*exhibit\s*\d+\s*[-\u2013\u2014]\s*(ordinance|resolution)\b",
+        ],
+        "nightly": True,
         "label": "Broward County Commission (Legistar)",
-        "note": "The most recent county commission matters. Matters without a PDF attachment have no full text.",
+        "note": "The most recent county commission matters. Most are motions; the record is labelled "
+        "legislation only when the motion adopts a resolution or enacts an ordinance. "
+        "Matters without a PDF attachment have no full text.",
     },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
@@ -82,6 +94,25 @@ CLIENT_JURISDICTIONS = {
         "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
     },
 }
+
+
+_LEGISLATION_WORD = re.compile(r"\b(ordinance|resolution)\b", re.IGNORECASE)
+
+
+def derived_item_type(title: str) -> str:
+    """Kind of record for a client whose own types are agenda categories.
+
+    Broward's types are "Consent Item" / "Regular Item" and its titles are
+    nearly all "MOTION TO ...". A motion that adopts a resolution or enacts an
+    ordinance names it near the start ("MOTION TO ENACT Ordinance, the title of
+    which..."), so those read as legislation; every other motion stays a motion.
+    A heuristic, tested against Broward's 2026-10 titles.
+    """
+    head = " ".join((title or "").split())[:150]
+    match = _LEGISLATION_WORD.search(head)
+    if match:
+        return "Ordinance" if match.group(1).lower() == "ordinance" else "Resolution"
+    return "Motion"
 
 
 def client_level(client_name: str) -> str:
@@ -220,7 +251,15 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
             "legistar_matter_id": str(matter_id),
             "legistar_client": client_name,
         }
-        if matter.get("MatterTypeName"):
+        if info.get("item_type_from_title"):
+            # source_item_type marks the type as derived, so item_kind --backfill
+            # (which copies the source's own type) leaves it alone.
+            entity.attributes = {
+                **(entity.attributes or {}),
+                "item_type": derived_item_type(title),
+                "source_item_type": matter.get("MatterTypeName"),
+            }
+        elif matter.get("MatterTypeName"):
             entity.attributes = {**(entity.attributes or {}), "item_type": matter["MatterTypeName"]}  # see item_kind.py
         db.flush()
 

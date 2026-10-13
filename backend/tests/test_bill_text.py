@@ -225,3 +225,12 @@ def test_other_clients_still_match_original_bill():
     atts = _att("2026-646 - Exhibit A", "2026-646 - Original Bill")
     assert select_text_attachment("jaxcityc", atts)["MatterAttachmentName"] == "2026-646 - Original Bill"
     assert select_text_attachment("jaxcityc", _att("Exhibit A")) is None
+
+
+def test_broward_text_prefers_the_proposed_form():
+    from app.pipeline.bill_text import select_text_attachment
+
+    atts = _att("Exhibit 1 - Resolution to Publish Notice of Public Hearing", "Exhibit 2 - Proposed Ordinance",
+                "Exhibit 3 - Business Impact Estimate")
+    assert select_text_attachment("broward", atts)["MatterAttachmentName"] == "Exhibit 2 - Proposed Ordinance"
+    assert select_text_attachment("broward", _att("Exhibit 1 - FASD London Travel Memo")) is None

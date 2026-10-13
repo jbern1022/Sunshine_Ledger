@@ -115,3 +115,59 @@ def test_other_clients_keep_body_sponsors_as_before(monkeypatch, db_session):
     legistar_module.ingest_local_bills(db_session, client_name="jaxcityc", limit=1)
 
     assert _sponsors(db_session)["City Commission Regular Meeting"].attributes == {}
+
+
+def test_derived_item_type_reads_broward_titles():
+    from app.pipeline.legistar import derived_item_type
+
+    assert derived_item_type("MOTION TO ENACT Ordinance, the title of which is as follows:\n\nAN ORDINANCE OF THE BOARD") == "Ordinance"
+    assert derived_item_type("MOTION TO ADOPT Resolution directing the County Administrator to publish Notice") == "Resolution"
+    assert derived_item_type("MOTION TO APPROVE travel outside the continental United States for two County employees") == "Motion"
+    assert derived_item_type("COUNTY ADMINISTRATOR'S REPORT") == "Motion"
+    # Only the opening of the title counts: a late mention is not the motion's subject.
+    assert derived_item_type("MOTION TO DIRECT staff " + "x " * 100 + "pursuant to Resolution 5") == "Motion"
+
+
+def test_broward_items_get_a_derived_kind_and_keep_the_source_type(monkeypatch, db_session):
+    from app.pipeline.item_kind import backfill_item_types, item_kind
+
+    class Fake(FakeLegistarClient):
+        def get_matters(self, *, top):
+            return [{**super().get_matters(top=top)[0], "MatterTypeName": "Consent Item",
+                     "MatterTitle": "MOTION TO ENACT Ordinance, the title of which is as follows: AN ORDINANCE"}]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="broward", limit=1)
+
+    entity = db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalar_one()
+    assert entity.attributes["item_type"] == "Ordinance"
+    assert entity.attributes["source_item_type"] == "Consent Item"
+    assert item_kind(entity.attributes["item_type"]) == "legislation"
+    # The backfill, which copies the source's own type, must not overwrite it.
+    assert backfill_item_types(db_session) == 0
+    assert entity.attributes["item_type"] == "Ordinance"
+
+
+def test_legistar_text_backfill_marks_no_text_and_skips_it_until_recheck(monkeypatch, db_session, bill_factory):
+    from datetime import date, timedelta
+
+    import app.pipeline.bill_text as bt
+
+    e = bill_factory(bill_number="26-1")
+    e.external_ids = {"legistar_matter_id": "1", "legistar_client": "fortlauderdale"}
+    e.bill.source_system = "legistar"
+    db_session.commit()
+    calls = []
+    monkeypatch.setattr(bt, "_legistar_text_for", lambda entity: calls.append(1) or None)
+
+    assert bt.backfill_legistar_texts(db_session) == (0, 1)
+    assert e.attributes["text_checked_at"] == date.today().isoformat()
+    assert bt.backfill_legistar_texts(db_session) == (0, 0)  # not retried tonight
+    assert len(calls) == 1
+
+    e.attributes = {**e.attributes, "text_checked_at": (date.today() - timedelta(days=15)).isoformat()}
+    db_session.commit()
+    bt.backfill_legistar_texts(db_session)
+    assert len(calls) == 2  # due for a re-check

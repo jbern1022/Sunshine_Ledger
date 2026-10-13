@@ -37,7 +37,18 @@ All three, before it counts as coverage:
 },
 ```
 
-Counties add `"level": "county"` and a `"publisher"`. The nightly step,
+Counties add `"level": "county"` and a `"publisher"`. Optional settings, each
+added only when the client's data needs it (Fort Lauderdale and Broward show
+why; check a sample of its feed first):
+
+- `text_attachment`: regexes for the attachment that is the legislation
+  itself (clients name them differently; the default is Jacksonville's
+  "Original Bill").
+- `body_sponsors_as_committees`: the client's sponsors are meeting bodies, not
+  people.
+- `item_type_from_title`: the client's own types are agenda categories
+  ("Consent Item"), so the record kind comes from the title (Broward).
+ The nightly step,
 `/sources/status`, per-city counts, the bill-page freshness note and the
 methodology source list all read this registry.
 
@@ -60,6 +71,9 @@ in `backend/tests/test_legistar_tagging.py`. Then, in this order:
 3. First run by hand and spot-check:
    `docker exec sunshineledger-backend-1 python -m app.pipeline.legistar --client <token> --limit 200`
 4. The next nightly run ingests it; check `/sources/status` shows its check date.
+
+Bill text is a separate nightly step ("Legistar bill text", newest first,
+100 a night; an item with no usable attachment is re-checked after 14 days).
 
 New cities start with the most recent N matters (`--limit`), not full history.
 Historical backfill is a separate step.

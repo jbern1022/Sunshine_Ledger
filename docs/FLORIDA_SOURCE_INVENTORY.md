@@ -150,3 +150,18 @@ place that matters.
 
 The probe made roughly 10,000 requests to Legistar's public API in total.
 Run it rarely, use `--only` for spot checks, and don't loop it.
+
+## County coverage toward the 67-county gate
+
+Broward County counts: its commission is a county-level source, enabled as of
+the Broward deploy. Track it here as counties are added.
+
+| County | Source | Status |
+|---|---|---|
+| Duval | Jacksonville City Council (Legistar `jaxcityc`) | Consolidated city-county; live |
+| Broward | County Commission (Legistar `broward`) | Registered nightly; first run pending |
+| Miami-Dade | Only the City of Miami (iQM2); the county's own Legistar stale since 2018 | County commission NOT covered |
+
+The other 64 counties have no source yet. Of those, the probe found live
+Legistar clients for Brevard, DeSoto, Hernando, Hillsborough (land use only),
+Marion, Martin, Pinellas, Polk and Seminole; those are the cheapest next.

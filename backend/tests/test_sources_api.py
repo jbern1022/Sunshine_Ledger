@@ -55,7 +55,7 @@ def test_every_nightly_legistar_city_has_a_source_entry_and_miami_does_not():
     from app.pipeline.legistar import CLIENT_JURISDICTIONS, nightly_clients, source_key
 
     keys = {s.key for s in SOURCES}
-    assert "legistar_jaxcityc" in keys and "legistar_fortlauderdale" in keys
+    assert {"legistar_jaxcityc", "legistar_fortlauderdale", "legistar_broward"} <= keys
     assert "legistar_miamifl" not in keys  # Miami is collected from iQM2, not its stale Legistar client
     for name in nightly_clients():
         assert source_key(name) in keys
