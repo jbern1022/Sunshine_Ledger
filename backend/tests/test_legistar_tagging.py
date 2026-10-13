@@ -50,3 +50,18 @@ def test_ingest_local_bills_tags_via_ollama(monkeypatch, db_session):
     assert tags[0].tag_id == housing.id
     assert tags[0].tag_source == "ollama"
     assert len(fake_ollama.calls) == 1
+
+
+def test_ingest_fort_lauderdale_is_a_registry_entry_only(monkeypatch, db_session):
+    monkeypatch.setattr(legistar_module, "LegistarClient", FakeLegistarClient)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="fortlauderdale", limit=1)
+
+    entity = db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalar_one()
+    assert entity.jurisdiction_name == "Fort Lauderdale"
+    assert entity.external_ids["legistar_client"] == "fortlauderdale"
+    assert entity.bill.geo_scope_names == ["Broward County"]
+    from app.models import SourceCheck
+
+    assert db_session.execute(select(SourceCheck).where(SourceCheck.source_key == "legistar_fortlauderdale")).scalar_one()

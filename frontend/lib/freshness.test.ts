@@ -29,6 +29,18 @@ describe("freshness helpers", () => {
     expect(sourceForBill(null, "legiscan")).toBeUndefined();
   });
 
+  it("picks the Legistar source for the bill's own city and never guesses between cities", () => {
+    const statuses = [
+      status("legiscan"),
+      status("legistar_jaxcityc", { jurisdiction: "Jacksonville" }),
+      status("legistar_fortlauderdale", { jurisdiction: "Fort Lauderdale" }),
+    ];
+    expect(sourceForBill(statuses, "legistar", "Fort Lauderdale")?.key).toBe("legistar_fortlauderdale");
+    expect(sourceForBill(statuses, "legistar", "Jacksonville")?.key).toBe("legistar_jaxcityc");
+    expect(sourceForBill(statuses, "legistar", "Tampa")).toBeUndefined();
+    expect(sourceForBill(statuses, "legistar", null)).toBeUndefined();
+  });
+
   it("summarizes nightly sources by their oldest check and ignores weekly ones", () => {
     const summary = nightlySummary([
       status("legiscan", { last_checked_at: "2026-09-26T08:00:00Z" }),

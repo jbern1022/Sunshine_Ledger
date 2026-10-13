@@ -56,7 +56,7 @@ export default async function BillPage({ params, searchParams }: Props) {
   const showLens = (searchParams ? (await searchParams).lens : undefined) === "1";
   const [bill, statuses] = await Promise.all([getBill(id), getSourceStatus()]);
   if (!bill) notFound();
-  const dataSource = sourceForBill(statuses, bill.source_system);
+  const dataSource = sourceForBill(statuses, bill.source_system, bill.jurisdiction_name);
   const legislatorSponsors = bill.sponsors.filter((s) => !s.is_committee);
   const committeeSponsors = bill.sponsors.filter((s) => s.is_committee);
 

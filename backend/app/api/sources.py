@@ -14,7 +14,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Bill, SourceCheck
+from app.models import Bill, Entity, SourceCheck
+from app.pipeline.legistar import CLIENT_JURISDICTIONS, nightly_clients, source_key
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -39,9 +40,14 @@ SOURCES: tuple[SourceInfo, ...] = (
         "The 2024, 2025 and 2026 sessions, regular and special: bills, votes, amendments and "
         "action history. Bill text and staff analyses are most complete for 2026.",
     ),
-    SourceInfo(
-        "legistar_jaxcityc", "Jacksonville City Council (Legistar)", "Jacksonville", "Nightly", 36, "legistar",
-        "The most recent council matters. Matters without a PDF attachment have no full text.",
+    # One entry per nightly Legistar city, read from the adapter's registry so a
+    # new city appears here without touching this file.
+    *(
+        SourceInfo(
+            source_key(name), CLIENT_JURISDICTIONS[name]["label"], CLIENT_JURISDICTIONS[name]["jurisdiction"],
+            "Nightly", 36, "legistar", CLIENT_JURISDICTIONS[name]["note"],
+        )
+        for name in nightly_clients()
     ),
     SourceInfo(
         "iqm2_miami", "City of Miami (iQM2)", "Miami", "Nightly", 36, "iqm2",
@@ -93,9 +99,23 @@ def source_status(db: Session = Depends(get_db)) -> list[SourceStatusOut]:
             select(Bill.source_system, func.count(), func.count(Bill.full_text)).group_by(Bill.source_system)
         ).all()
     }
+    # Per-city counts: several cities can share a source system (Legistar).
+    by_city = {
+        (system, city): (total, with_text)
+        for system, city, total, with_text in db.execute(
+            select(Bill.source_system, Entity.jurisdiction_name, func.count(), func.count(Bill.full_text))
+            .join(Entity, Entity.id == Bill.entity_id)
+            .group_by(Bill.source_system, Entity.jurisdiction_name)
+        ).all()
+    }
     out = []
     for info in SOURCES:
-        total, with_text = counts.get(info.bill_source_system, (None, None)) if info.bill_source_system else (None, None)
+        if not info.bill_source_system:
+            total, with_text = None, None
+        elif (info.bill_source_system, info.jurisdiction) in by_city:
+            total, with_text = by_city[(info.bill_source_system, info.jurisdiction)]
+        else:
+            total, with_text = counts.get(info.bill_source_system, (None, None))
         out.append(
             SourceStatusOut(
                 key=info.key,

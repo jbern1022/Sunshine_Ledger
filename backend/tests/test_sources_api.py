@@ -49,3 +49,36 @@ def test_bill_list_items_carry_their_source_system(client, bill_factory):
     entity = bill_factory()
     item = next(b for b in client.get("/bills").json()["items"] if b["entity_id"] == str(entity.id))
     assert item["source_system"] == "legiscan"
+
+
+def test_every_nightly_legistar_city_has_a_source_entry_and_miami_does_not():
+    from app.pipeline.legistar import CLIENT_JURISDICTIONS, nightly_clients, source_key
+
+    keys = {s.key for s in SOURCES}
+    assert "legistar_jaxcityc" in keys and "legistar_fortlauderdale" in keys
+    assert "legistar_miamifl" not in keys  # Miami is collected from iQM2, not its stale Legistar client
+    for name in nightly_clients():
+        assert source_key(name) in keys
+        assert CLIENT_JURISDICTIONS[name]["label"] and CLIENT_JURISDICTIONS[name]["note"]
+
+
+def test_legistar_counts_are_per_city(client, db_session):
+    from datetime import date
+
+    from app.models import Bill, Entity
+
+    for city, n in (("Jacksonville", 2), ("Fort Lauderdale", 1)):
+        for i in range(n):
+            e = Entity(entity_type="bill", name=f"{city} {i}", jurisdiction_level="city", jurisdiction_name=city,
+                       external_ids={}, attributes={})
+            db_session.add(e)
+            db_session.flush()
+            db_session.add(Bill(entity_id=e.id, bill_number=f"{city[:2]}-{i}", session="2026", status="Introduced",
+                                introduced_date=date(2026, 1, 1), source_system="legistar", geo_scope_type="city",
+                                geo_scope_names=["x"]))
+    db_session.commit()
+
+    body = {s["key"]: s for s in client.get("/sources/status").json()}
+
+    assert body["legistar_jaxcityc"]["bill_count"] == 2
+    assert body["legistar_fortlauderdale"]["bill_count"] == 1

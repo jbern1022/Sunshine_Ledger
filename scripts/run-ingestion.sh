@@ -87,13 +87,9 @@ finally:
 
 step "LegiScan usage check" docker exec "$CONTAINER" python -m app.pipeline.usage_alerts
 
-step "Legistar (jaxcityc)" py "
-from app.db import SessionLocal
-from app.pipeline.legistar import ingest_local_bills
-db = SessionLocal()
-written = ingest_local_bills(db, client_name='jaxcityc', limit=200)
-print(f'Legistar (jaxcityc): {len(written)} bills upserted')
-"
+# Every client marked nightly in CLIENT_JURISDICTIONS (legistar.py): adding a
+# Legistar city is one registry entry, not an edit here.
+step "Legistar (nightly cities)" docker exec "$CONTAINER" python -m app.pipeline.legistar --nightly --limit 200
 
 step "Miami iQM2 scrape" docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2
 

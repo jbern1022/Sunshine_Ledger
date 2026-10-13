@@ -1,11 +1,15 @@
-"""Legistar ingestion for Miami and Jacksonville local legislation
+"""Legistar ingestion for city legislation
 (Roadmap Step 7: local bills, confirmed Legistar-platform cities only).
 
 Legistar exposes a public read API per client at
 https://webapi.legistar.com/v1/{client}/... with no auth required for read
-access (BRD 9 assumption). Only Miami and Jacksonville are wired up for
-MVP; other Florida cities are an explicit future research spike per the
-Charter.
+access (BRD 9 assumption).
+
+Adding a Legistar city is one entry in CLIENT_JURISDICTIONS: the nightly
+run (`python -m app.pipeline.legistar --nightly`), the data-freshness
+registry and the per-city counts all read from it. County-level clients
+(e.g. Broward) are not supported yet: local bills are stored with
+jurisdiction_level "city", which item_kind and other code assume.
 """
 
 from __future__ import annotations
@@ -32,10 +36,37 @@ LEGISTAR_BASE_URL = "https://webapi.legistar.com/v1/{client}"
 # city name -- e.g. Miami's is "miamifl", not "miami"; Jacksonville's is
 # "jaxcityc", not "jacksonville"). Also doubles as the public site subdomain
 # (https://{client}.legistar.com).
+#
+# `nightly` marks the clients the nightly job ingests. Miami stays False: its
+# Legistar client holds ~6 legacy records and the real data is scraped from
+# iQM2 (miami_iqm2.py). `label` and `note` feed the data-freshness registry
+# (app/api/sources.py).
 CLIENT_JURISDICTIONS = {
-    "miamifl": {"jurisdiction": "Miami", "county": "Miami-Dade County"},
-    "jaxcityc": {"jurisdiction": "Jacksonville", "county": "Duval County"},
+    "miamifl": {"jurisdiction": "Miami", "county": "Miami-Dade County", "nightly": False},
+    "jaxcityc": {
+        "jurisdiction": "Jacksonville",
+        "county": "Duval County",
+        "nightly": True,
+        "label": "Jacksonville City Council (Legistar)",
+        "note": "The most recent council matters. Matters without a PDF attachment have no full text.",
+    },
+    "fortlauderdale": {
+        "jurisdiction": "Fort Lauderdale",
+        "county": "Broward County",
+        "nightly": True,
+        "label": "Fort Lauderdale City Commission (Legistar)",
+        "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
+    },
 }
+
+
+def source_key(client_name: str) -> str:
+    """The source_checks / data-freshness key for one Legistar client."""
+    return f"legistar_{client_name}"
+
+
+def nightly_clients() -> list[str]:
+    return [name for name, info in CLIENT_JURISDICTIONS.items() if info.get("nightly")]
 
 
 class LegistarClient:
@@ -220,7 +251,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
     db.commit()
     logger.info("Ingested %d local matters from Legistar client=%s", len(written), client_name)
-    record_check(db, f"legistar_{client_name}", f"{len(written)} matters upserted")
+    record_check(db, source_key(client_name), f"{len(written)} matters upserted")
     return written
 
 
@@ -231,3 +262,31 @@ def _parse_date(value: str | None) -> date | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
     except ValueError:
         return None
+
+
+if __name__ == "__main__":
+    import argparse
+
+    from app.db import SessionLocal
+
+    parser = argparse.ArgumentParser(description="Ingest recent Legistar matters.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--nightly", action="store_true", help="every client marked nightly in CLIENT_JURISDICTIONS")
+    group.add_argument("--client", help="one client token, e.g. fortlauderdale")
+    parser.add_argument("--limit", type=int, default=200)
+    args = parser.parse_args()
+
+    clients = nightly_clients() if args.nightly else [args.client]
+    failed = []
+    for name in clients:
+        session = SessionLocal()
+        try:
+            written = ingest_local_bills(session, client_name=name, limit=args.limit)
+            print(f"Legistar ({name}): {len(written)} bills upserted")
+        except Exception as exc:  # one city's outage must not stop the others
+            logger.exception("Legistar ingest failed for %s", name)
+            print(f"Legistar ({name}): FAILED: {exc}")
+            failed.append(name)
+        finally:
+            session.close()
+    raise SystemExit(1 if failed else 0)
