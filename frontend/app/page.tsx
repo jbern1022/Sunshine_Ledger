@@ -2,18 +2,12 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { fetchBills, fetchSessions, fetchStatuses, fetchTags } from "@/lib/api";
-import type { BillListItem, SessionCount, StatusCount, TagCount } from "@/lib/types";
+import { fetchBills, fetchSessions, fetchSourceStatus, fetchStatuses, fetchTags } from "@/lib/api";
+import { jurisdictionOptions } from "@/lib/jurisdictions";
+import type { BillListItem, SessionCount, SourceStatus, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
 import DataFreshness from "@/components/DataFreshness";
-
-const JURISDICTIONS = [
-  { label: "All jurisdictions", value: "" },
-  { label: "Florida (state)", value: "FL" },
-  { label: "Miami", value: "Miami" },
-  { label: "Jacksonville", value: "Jacksonville" },
-];
 
 const PAGE_SIZE = 50;
 
@@ -32,6 +26,7 @@ function BrowsePageInner() {
   const [sessions, setSessions] = useState<SessionCount[]>([]);
   const [tag, setTag] = useState(() => searchParams.get("tag") ?? "");
   const [tags, setTags] = useState<TagCount[]>([]);
+  const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[] | null>(null);
   const [offset, setOffset] = useState(0);
   const [bills, setBills] = useState<BillListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -43,6 +38,18 @@ function BrowsePageInner() {
   useEffect(() => {
     setOffset(0);
   }, [q, jurisdiction, status, session, tag, geoFilter, sponsorFilter]);
+
+  // The jurisdiction dropdown lists the cities the site actually ingests; if
+  // the list can't be fetched it falls back to the known cities.
+  useEffect(() => {
+    let cancelled = false;
+    fetchSourceStatus()
+      .then((s) => !cancelled && setSourceStatuses(s))
+      .catch(() => !cancelled && setSourceStatuses(null));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Tag badges aren't jurisdiction-scoped in the API (unlike statuses), so
   // this fetches once rather than re-running when jurisdiction changes.
@@ -193,7 +200,7 @@ function BrowsePageInner() {
           }}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
-          {JURISDICTIONS.map((j) => (
+          {jurisdictionOptions(sourceStatuses).map((j) => (
             <option key={j.value} value={j.value}>
               {j.label}
             </option>

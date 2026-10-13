@@ -40,6 +40,19 @@ def test_backfill_copies_the_newest_source_type(db_session, bill_factory):
     assert backfill_item_types(db_session) == 0
 
 
+def test_backfill_covers_county_items_too(db_session, bill_factory):
+    item = bill_factory(bill_number="26-1332")
+    item.jurisdiction_level, item.jurisdiction_name = "county", "Broward County"
+    item.external_ids = {"legistar_matter_id": "5"}
+    db_session.add(Source(url="https://broward.legistar.com/x", source_type="legistar_agenda",
+                          retrieved_at=datetime(2026, 9, 1, tzinfo=timezone.utc),
+                          metadata_json={"matter_id": 5, "matter_type": "Motion"}))
+    db_session.commit()
+
+    assert backfill_item_types(db_session) == 1
+    assert item.attributes["item_type"] == "Motion"
+
+
 def test_bill_list_reports_the_kind(client, db_session, bill_factory):
     item = bill_factory(bill_number="19799")
     item.attributes = {"item_type": "Discussion Item"}

@@ -166,7 +166,7 @@ def _primary_sponsors_by_bill(db: Session, entity_ids: list[uuid.UUID]) -> dict[
 def list_bills(
     q: str | None = Query(None, description="Free-text search over bill number and title"),
     jurisdiction_name: str | None = Query(None, description="e.g. FL, Miami, Jacksonville"),
-    jurisdiction_level: str | None = Query(None, description="state | city"),
+    jurisdiction_level: str | None = Query(None, description="state | city | county"),
     status: str | None = Query(None),
     session: str | None = Query(None, description="e.g. '2025 Regular Session' (see /bills/sessions)"),
     geo_scope_name: str | None = Query(None, description="e.g. 'Miami-Dade County' -- matches Bill.geo_scope_names"),
@@ -368,7 +368,7 @@ def _bill_geography(db: Session, entity: Entity, bill: Bill) -> tuple[str, str] 
     sponsor's district instead -- same logic as the district-sponsorship
     map (app/api/map.py). Returns None when neither is resolvable (e.g. a
     state bill with no primary sponsor on file)."""
-    if entity.jurisdiction_level == "city":
+    if entity.jurisdiction_level in ("city", "county"):
         if bill.geo_scope_names:
             return "county", bill.geo_scope_names[0]
         return None

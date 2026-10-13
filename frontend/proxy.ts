@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { LOCAL_JURISDICTIONS } from "@/lib/jurisdictions";
+
 // BRD 5.6: default the homepage to the visitor's likely state/locality via
 // IP geolocation, while always letting them navigate elsewhere regardless
 // of what was detected (the browse page's jurisdiction dropdown already
@@ -13,7 +15,6 @@ import type { NextRequest } from "next/server";
 const GEO_RESOLVED_COOKIE = "sl_geo_resolved";
 const GEO_LOOKUP_TIMEOUT_MS = 1500;
 
-const CITY_JURISDICTIONS = ["Miami", "Jacksonville"];
 
 export const config = {
   matcher: "/",
@@ -45,7 +46,7 @@ async function lookupJurisdiction(ip: string): Promise<string | null> {
       return null;
     }
 
-    const city = CITY_JURISDICTIONS.find((c) => c.toLowerCase() === String(data.city).toLowerCase());
+    const city = LOCAL_JURISDICTIONS.find((c) => c.toLowerCase() === String(data.city).toLowerCase());
     return city ?? "FL";
   } catch {
     return null; // geolocation is a nice-to-have default, never block the page on it

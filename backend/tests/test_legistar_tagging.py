@@ -65,3 +65,19 @@ def test_ingest_fort_lauderdale_is_a_registry_entry_only(monkeypatch, db_session
     from app.models import SourceCheck
 
     assert db_session.execute(select(SourceCheck).where(SourceCheck.source_key == "legistar_fortlauderdale")).scalar_one()
+
+
+def test_ingest_a_county_client_stores_county_level(monkeypatch, db_session):
+    from app.models import Source
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", FakeLegistarClient)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="broward", limit=1)
+
+    entity = db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalar_one()
+    assert entity.jurisdiction_level == "county"
+    assert entity.jurisdiction_name == "Broward County"
+    assert entity.bill.geo_scope_type == "county"
+    assert entity.bill.geo_scope_names == ["Broward County"]
+    assert db_session.execute(select(Source)).scalar_one().publisher == "Broward County Commission (Legistar)"

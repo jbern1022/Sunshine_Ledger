@@ -34,7 +34,7 @@ export default function PrivacyPage() {
       <h3 className="mt-4 font-semibold text-slate-800">Location-based homepage default</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-700">
         On your first visit, the site makes a best-effort guess at your state/city
-        (Florida vs. elsewhere; Miami/Jacksonville vs. elsewhere) so the homepage can
+        (Florida vs. elsewhere, and which covered Florida city, if any) so the homepage can
         default to locally relevant bills. This works by sending your IP address to a
         third-party lookup service (ip-api.com) for a one-time location lookup — your
         IP address is not stored in our database. You can always view every

@@ -40,7 +40,7 @@ def item_kind(item_type: str | None) -> str:
 
 
 def backfill_item_types(db: Session) -> int:
-    """Copy each city item's type from its newest stored source (iQM2 `type`,
+    """Copy each city or county item's type from its newest stored source (iQM2 `type`,
     Legistar `matter_type`) onto the entity. Returns entities updated."""
     by_key: dict[tuple[str, str], str] = {}
     rows = db.execute(
@@ -56,7 +56,7 @@ def backfill_item_types(db: Session) -> int:
             by_key[("legistar_matter_id", str(meta.get("matter_id")))] = meta["matter_type"]
 
     updated = 0
-    for entity in db.execute(select(Entity).where(Entity.entity_type == "bill", Entity.jurisdiction_level == "city")).scalars():
+    for entity in db.execute(select(Entity).where(Entity.entity_type == "bill", Entity.jurisdiction_level.in_(["city", "county"]))).scalars():
         ids = entity.external_ids or {}
         item_type = next(
             (by_key[(k, str(ids[k]))] for k in ("iqm2_legi_file_id", "legistar_matter_id") if k in ids and (k, str(ids[k])) in by_key),

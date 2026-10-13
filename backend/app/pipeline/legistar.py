@@ -7,9 +7,9 @@ access (BRD 9 assumption).
 
 Adding a Legistar city is one entry in CLIENT_JURISDICTIONS: the nightly
 run (`python -m app.pipeline.legistar --nightly`), the data-freshness
-registry and the per-city counts all read from it. County-level clients
-(e.g. Broward) are not supported yet: local bills are stored with
-jurisdiction_level "city", which item_kind and other code assume.
+registry and the per-city counts all read from it. A client's `level` is
+"city" (the default) or "county" (e.g. Broward County); it sets the stored
+jurisdiction_level and geo_scope_type.
 """
 
 from __future__ import annotations
@@ -50,6 +50,17 @@ CLIENT_JURISDICTIONS = {
         "label": "Jacksonville City Council (Legistar)",
         "note": "The most recent council matters. Matters without a PDF attachment have no full text.",
     },
+    # County commission, live Legistar. Not nightly yet: enabling it needs a
+    # look at how county items read on the site (Todoist 6hm2FqVh66Mmww6G).
+    "broward": {
+        "jurisdiction": "Broward County",
+        "county": "Broward County",
+        "level": "county",
+        "publisher": "Broward County Commission (Legistar)",
+        "nightly": False,
+        "label": "Broward County Commission (Legistar)",
+        "note": "The most recent county commission matters. Matters without a PDF attachment have no full text.",
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",
@@ -58,6 +69,10 @@ CLIENT_JURISDICTIONS = {
         "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
     },
 }
+
+
+def client_level(client_name: str) -> str:
+    return CLIENT_JURISDICTIONS[client_name].get("level", "city")
 
 
 def source_key(client_name: str) -> str:
@@ -144,7 +159,7 @@ def _get_or_create_person(db: Session, *, name: str, client_name: str, jurisdict
     person = Entity(
         entity_type="person",
         name=name,
-        jurisdiction_level="city",
+        jurisdiction_level=client_level(client_name),
         jurisdiction_name=jurisdiction,
         external_ids={"legistar_client": client_name},
         attributes={},
@@ -179,7 +194,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
             db.add(entity)
 
         entity.name = title
-        entity.jurisdiction_level = "city"
+        entity.jurisdiction_level = client_level(client_name)
         entity.jurisdiction_name = jurisdiction
         entity.external_ids = {
             **entity.external_ids,
@@ -193,7 +208,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         source = Source(
             url=detail_url,
             document_reference=matter.get("MatterFile"),
-            publisher=f"{jurisdiction} City Clerk (Legistar)",
+            publisher=info.get("publisher") or f"{jurisdiction} City Clerk (Legistar)",
             source_type="legistar_agenda",
             retrieved_at=now,
             metadata_json={"matter_id": matter_id, "matter_type": matter.get("MatterTypeName")},
@@ -216,7 +231,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         bill.full_text_url = detail_url
         bill.source_system = "legistar"
         bill.description = matter.get("MatterTitle")
-        bill.geo_scope_type = "city"
+        bill.geo_scope_type = client_level(client_name)
         bill.geo_scope_names = [info["county"]]
         db.flush()
 

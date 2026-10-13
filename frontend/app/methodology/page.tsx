@@ -33,11 +33,9 @@ export default function MethodologyPage() {
             the Legislature&apos;s own records.
           </li>
           <li>
-            <span className="font-medium">Jacksonville</span> — the city&apos;s Legistar system, the
-            same records the City Council uses.
-          </li>
-          <li>
-            <span className="font-medium">Miami</span> — the city&apos;s Granicus iQM2 system.
+            <span className="font-medium">Cities</span> — each city&apos;s own public legislative
+            records system, the same records its council or commission uses. The list under
+            &ldquo;Where the data comes from&rdquo; belowldquo;Data sources and freshness&ldquo;Where the data comes from&rdquo; belowrdquo; below names each city and its system.
           </li>
         </ul>
         <p className="mt-2 text-sm text-slate-700">
