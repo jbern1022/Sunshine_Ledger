@@ -125,7 +125,10 @@ def test_derived_item_type_reads_broward_titles():
     assert derived_item_type("MOTION TO ADOPT Resolution directing the County Administrator to publish Notice") == "Resolution"
     assert derived_item_type("MOTION TO APPROVE travel outside the continental United States for two County employees") == "Motion"
     assert derived_item_type("COUNTY ADMINISTRATOR'S REPORT") == "Motion"
-    # Only the opening of the title counts: a late mention is not the motion's subject.
+    # A direction to draft one is not the instrument itself.
+    assert derived_item_type("MOTION TO DIRECT County Attorney\u2019s Office to draft an Ordinance establishing a moratorium") == "Motion"
+    assert derived_item_type("MOTION TO DIRECT County Attorney\u2019s Office to draft a Resolution amending the Code") == "Motion"
+    assert derived_item_type("A. MOTION TO ADOPT Resolution amending the Administrative Code") == "Resolution"
     assert derived_item_type("MOTION TO DIRECT staff " + "x " * 100 + "pursuant to Resolution 5") == "Motion"
 
 

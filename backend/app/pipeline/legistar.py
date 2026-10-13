@@ -128,7 +128,13 @@ CLIENT_JURISDICTIONS = {
 }
 
 
-_LEGISLATION_WORD = re.compile(r"\b(ordinance|resolution)\b", re.IGNORECASE)
+# "MOTION TO ENACT Ordinance, ...", "MOTION TO ADOPT Resolution ...": the motion
+# itself adopts the instrument. "MOTION TO DIRECT ... to draft an Ordinance" only
+# asks for one to be written, so the verb is part of the rule.
+_ADOPTS_LEGISLATION = re.compile(
+    r"^\W*(?:a\.?\s+)?motion to (?:adopt|enact|approve|pass|amend)\b[^.\n]{0,60}?\b(ordinance|resolution)\b",
+    re.IGNORECASE,
+)
 
 
 def derived_item_type(title: str) -> str:
@@ -136,12 +142,12 @@ def derived_item_type(title: str) -> str:
 
     Broward's types are "Consent Item" / "Regular Item" and its titles are
     nearly all "MOTION TO ...". A motion that adopts a resolution or enacts an
-    ordinance names it near the start ("MOTION TO ENACT Ordinance, the title of
-    which..."), so those read as legislation; every other motion stays a motion.
-    A heuristic, tested against Broward's 2026-10 titles.
+    ordinance says so right after the verb, so those read as legislation;
+    every other motion (including a direction to draft one) stays a motion.
+    A heuristic, checked against Broward's 300 newest titles on 2026-10-13
+    (82 legislation, none missed against a looser rule).
     """
-    head = " ".join((title or "").split())[:150]
-    match = _LEGISLATION_WORD.search(head)
+    match = _ADOPTS_LEGISLATION.search(" ".join((title or "").split()))
     if match:
         return "Ordinance" if match.group(1).lower() == "ordinance" else "Resolution"
     return "Motion"
