@@ -14,6 +14,7 @@ jurisdiction_level and geo_scope_type.
 
 from __future__ import annotations
 
+import html
 import logging
 from datetime import date, datetime, timezone
 
@@ -134,7 +135,9 @@ def _bill_title(matter: dict) -> str:
     nights in August 2026 -- see docs/RUNBOOK.md's "Steps are deliberately
     isolated" note. This function exists so the truncation rule has a name
     and can be tested on its own."""
-    full_title = matter.get("MatterName") or matter.get("MatterTitle") or f"Matter {matter['MatterId']}"
+    # Legistar titles carry HTML entities ("G&amp;B Oyster Bar"); the site
+    # escapes text itself, so an undecoded entity would show literally.
+    full_title = html.unescape(matter.get("MatterName") or matter.get("MatterTitle") or f"Matter {matter['MatterId']}")
     return full_title if len(full_title) <= 490 else full_title[:489] + "…"
 
 
@@ -246,7 +249,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         bill.last_action = matter.get("MatterStatusName")
         bill.full_text_url = detail_url
         bill.source_system = "legistar"
-        bill.description = matter.get("MatterTitle")
+        bill.description = html.unescape(matter["MatterTitle"]) if matter.get("MatterTitle") else None
         bill.geo_scope_type = client_level(client_name)
         bill.geo_scope_names = [info["county"]]
         db.flush()

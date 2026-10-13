@@ -129,3 +129,11 @@ def test_ingest_local_bills_rejects_an_unsupported_client_before_touching_the_ne
     # see docs/RUNBOOK.md. This should fail fast and locally instead.
     with pytest.raises(ValueError, match="Unsupported Legistar client"):
         ingest_local_bills(None, client_name="not-a-real-client", limit=1)
+
+
+def test_bill_title_decodes_html_entities():
+    from app.pipeline.legistar import _bill_title
+
+    assert _bill_title({"MatterId": 1, "MatterTitle": "Oyster Fest at G&amp;B Oyster Bar &#8211; District 2"}) == (
+        "Oyster Fest at G&B Oyster Bar – District 2"
+    )
