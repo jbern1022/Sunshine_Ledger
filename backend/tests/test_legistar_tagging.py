@@ -81,3 +81,37 @@ def test_ingest_a_county_client_stores_county_level(monkeypatch, db_session):
     assert entity.bill.geo_scope_type == "county"
     assert entity.bill.geo_scope_names == ["Broward County"]
     assert db_session.execute(select(Source)).scalar_one().publisher == "Broward County Commission (Legistar)"
+
+
+class FakeClientWithBodySponsors(FakeLegistarClient):
+    def get_sponsors(self, matter_id):
+        return [
+            {"MatterSponsorName": "City Commission Regular Meeting", "MatterSponsorBodyId": 138, "MatterSponsorNameId": None},
+            {"MatterSponsorName": "Jane Councilmember", "MatterSponsorBodyId": None, "MatterSponsorNameId": 7},
+        ]
+
+
+def _sponsors(db_session):
+    return {p.name: p for p in db_session.execute(select(Entity).where(Entity.entity_type == "person")).scalars()}
+
+
+def test_fort_lauderdale_body_sponsors_are_stored_as_committees_not_people(monkeypatch, db_session):
+    monkeypatch.setattr(legistar_module, "LegistarClient", FakeClientWithBodySponsors)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="fortlauderdale", limit=1)
+
+    people = _sponsors(db_session)
+    assert people["City Commission Regular Meeting"].attributes == {"committee": True}
+    assert people["Jane Councilmember"].attributes == {}
+
+
+def test_other_clients_keep_body_sponsors_as_before(monkeypatch, db_session):
+    # Jacksonville lists offices ("Mayor", "President") as body sponsors; those
+    # are not committees, so the option is per client.
+    monkeypatch.setattr(legistar_module, "LegistarClient", FakeClientWithBodySponsors)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="jaxcityc", limit=1)
+
+    assert _sponsors(db_session)["City Commission Regular Meeting"].attributes == {}

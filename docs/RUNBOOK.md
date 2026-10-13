@@ -444,8 +444,9 @@ host**, only the resolved container env vars are sent over the Docker API.
   If you're investigating a new city and its Legistar client returns very
   few records, check whether it's actually the city's primary system
   before concluding "not much data" -- it might be the wrong system
-  entirely (Orlando: eSCRIBE. Tampa: Municode, and Municode is a codified-law
-  repository, not a bill-tracker, so it's the wrong shape even if scraped).
+  entirely (Orlando: eSCRIBE. Tampa: its Municode is a codified-law
+  repository, the wrong shape, but its meetings are on OnBase Agenda Online).
+  See docs/NATIONWIDE_COVERAGE.md and docs/ONBOARDING_A_CITY.md.
 - **Cloudflare's free Universal SSL only covers one level of wildcard
   subdomain.** A hostname like `api.sunshineledger.example.com` (two
   labels before the root domain) fails the TLS handshake outright --

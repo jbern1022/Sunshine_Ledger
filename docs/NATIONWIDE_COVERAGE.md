@@ -75,8 +75,9 @@ like success.
 |---|---|
 | **Legistar** (Granicus) | Best case. REST API, ~13/20 top cities confirmed. No text endpoint — `/Matters/{id}/Texts` returns 405; the ordinance is an attachment named "Original Bill" among exhibits. |
 | **iQM2** (Granicus) | HTML scraping only. Miami's real source. Attachments are a privacy hazard — see below. |
-| **eSCRIBE** | Orlando. Not yet evaluated. |
-| **Municode** | Tampa. **Wrong shape entirely** — a codified-law repository, not a bill tracker. No amount of scraping makes it one. Don't spend time here. |
+| **eSCRIBE** | Orlando (`pub-orlando.escribemeetings.com`, confirmed live 2026-10-13). HTML only, no API found. Meeting-level; item extraction not yet evaluated. Check the host's terms and attachment privacy before building. |
+| **Municode** | Tampa's code of ordinances. **Wrong shape** — a codified-law repository, not a bill tracker. |
+| **OnBase Agenda Online** (Hyland) | Tampa (`tampagov.hylandcloud.com/251agendaonline`, found 2026-10-13). Meeting-level: a search returns meetings as JSON embedded in the page, each with agenda/minutes documents; the agenda is one HTML document whose numbered items (file number, title, ordinance text) must be parsed out. About 10 years of history; search is capped at 100 results. No API, no robots.txt. The city's terms for Agenda Online were not found; its separate PDF-accessibility tool bars scraping, so get a ruling before building. |
 
 ## Hazard: local attachments can contain personal data
 

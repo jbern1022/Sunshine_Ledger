@@ -8,7 +8,8 @@ Legistar matter types were ordinances and resolutions apart from one set of
 minutes. The source's own type is kept on the entity (attributes
 "item_type") and mapped to a kind the site can word honestly:
 
-- legislation: ordinances, resolutions (and every state bill)
+- legislation: ordinances (including "ordinance first/second reading"),
+  resolutions (and every state bill)
 - discussion: discussion items
 - agenda: meeting agendas, minutes, calendars
 - other: proclamations, hearings, notifications, directives, sessions
@@ -30,7 +31,9 @@ def item_kind(item_type: str | None) -> str:
     """Map a source's item type to a kind. No type (state bills, older
     records) counts as legislation."""
     t = (item_type or "").strip().lower()
-    if not t or t.endswith("resolution") or t.endswith("ordinance"):
+    # "ordinance" anywhere: Fort Lauderdale types its ordinances "ORDINANCE FIRST
+    # READING" / "ORDINANCE SECOND READING", not "Ordinance".
+    if not t or t.endswith("resolution") or "ordinance" in t:
         return "legislation"
     if "discussion" in t:
         return "discussion"

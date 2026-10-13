@@ -65,6 +65,10 @@ CLIENT_JURISDICTIONS = {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",
         "nightly": True,
+        # Every sampled sponsor (25 of 25, 2026-10-13) is a meeting body such as
+        # "City Commission Regular Meeting", never a person: store them as
+        # committees so they stay out of the legislator lists.
+        "body_sponsors_as_committees": True,
         "label": "Fort Lauderdale City Commission (Legistar)",
         "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
     },
@@ -145,7 +149,9 @@ def _get_or_create_bill_entity(db: Session, *, client_name: str, matter_id: int)
     ).scalar_one_or_none()
 
 
-def _get_or_create_person(db: Session, *, name: str, client_name: str, jurisdiction: str) -> Entity:
+def _get_or_create_person(
+    db: Session, *, name: str, client_name: str, jurisdiction: str, committee: bool = False
+) -> Entity:
     existing = db.execute(
         select(Entity).where(
             Entity.entity_type == "person",
@@ -154,6 +160,8 @@ def _get_or_create_person(db: Session, *, name: str, client_name: str, jurisdict
         )
     ).scalar_one_or_none()
     if existing:
+        if committee and not (existing.attributes or {}).get("committee"):
+            existing.attributes = {**(existing.attributes or {}), "committee": True}
         return existing
 
     person = Entity(
@@ -162,7 +170,7 @@ def _get_or_create_person(db: Session, *, name: str, client_name: str, jurisdict
         jurisdiction_level=client_level(client_name),
         jurisdiction_name=jurisdiction,
         external_ids={"legistar_client": client_name},
-        attributes={},
+        attributes={"committee": True} if committee else {},
     )
     db.add(person)
     db.flush()
@@ -240,7 +248,14 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
                 name = sponsor.get("MatterSponsorName")
                 if not name:
                     continue
-                person = _get_or_create_person(db, name=name, client_name=client_name, jurisdiction=jurisdiction)
+                is_body = bool(sponsor.get("MatterSponsorBodyId")) and not sponsor.get("MatterSponsorNameId")
+                person = _get_or_create_person(
+                    db,
+                    name=name,
+                    client_name=client_name,
+                    jurisdiction=jurisdiction,
+                    committee=is_body and bool(info.get("body_sponsors_as_committees")),
+                )
                 exists = db.execute(
                     select(Relationship).where(
                         Relationship.from_entity_id == person.id,

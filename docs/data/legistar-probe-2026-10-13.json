@@ -1,0 +1,4538 @@
+{
+ "probed_at": "2026-10-13",
+ "results": [
+  {
+   "name": "Alachua",
+   "kind": "county",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": {
+    "token": "alachua",
+    "bodies": 5,
+    "body_names": [
+     "Board of County Commissioners",
+     "Joint Water Policy Committee",
+     "Development Review Committee",
+     "Special Meeting",
+     "Joint Meeting"
+    ],
+    "newest_matter": "2025-01-15",
+    "florida_statute_matters": 2,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Baker",
+   "kind": "county",
+   "counties": [
+    "Baker"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bay",
+   "kind": "county",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bradford",
+   "kind": "county",
+   "counties": [
+    "Bradford"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Brevard",
+   "kind": "county",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": {
+    "token": "brevardfl",
+    "bodies": 12,
+    "body_names": [
+     "Brevard County Board of County Commissioners",
+     "Planning and Zoning Board / Local Planning Agency",
+     "Save Our Indian River Lagoon",
+     "North Merritt Island Dependent Special District Board",
+     "Melboune Tillman Water Control District"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 38,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Broward",
+   "kind": "county",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "broward",
+    "bodies": 2,
+    "body_names": [
+     "County Commission",
+     "Unified Direct Procurement Authority Meeting"
+    ],
+    "newest_matter": "2026-10-12",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Calhoun",
+   "kind": "county",
+   "counties": [
+    "Calhoun"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Charlotte",
+   "kind": "county",
+   "counties": [
+    "Charlotte"
+   ],
+   "legistar": {
+    "token": "charlottecountyfl",
+    "bodies": 5,
+    "body_names": [
+     "Board of County Commissioners",
+     "Parkside Community Redevelopment Agency Agenda",
+     "Murdock Village Community Redevelopment Agency",
+     "Charlotte Harbor Community Redevelopment Agency",
+     "Planning and Zoning "
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Citrus",
+   "kind": "county",
+   "counties": [
+    "Citrus"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Clay",
+   "kind": "county",
+   "counties": [
+    "Clay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Collier",
+   "kind": "county",
+   "counties": [
+    "Collier"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Columbia",
+   "kind": "county",
+   "counties": [
+    "Columbia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "DeSoto",
+   "kind": "county",
+   "counties": [
+    "DeSoto"
+   ],
+   "legistar": {
+    "token": "desotobocc",
+    "bodies": 12,
+    "body_names": [
+     "Board of County Commissioners",
+     "Planning Commission",
+     "Special Masters",
+     "Tourism Development Council",
+     "Economic Development Advisory Committee"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 2,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Dixie",
+   "kind": "county",
+   "counties": [
+    "Dixie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Duval",
+   "kind": "county",
+   "counties": [
+    "Duval"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Escambia",
+   "kind": "county",
+   "counties": [
+    "Escambia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Flagler",
+   "kind": "county",
+   "counties": [
+    "Flagler"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Franklin",
+   "kind": "county",
+   "counties": [
+    "Franklin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gadsden",
+   "kind": "county",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gilchrist",
+   "kind": "county",
+   "counties": [
+    "Gilchrist"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Glades",
+   "kind": "county",
+   "counties": [
+    "Glades"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gulf",
+   "kind": "county",
+   "counties": [
+    "Gulf"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hamilton",
+   "kind": "county",
+   "counties": [
+    "Hamilton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hardee",
+   "kind": "county",
+   "counties": [
+    "Hardee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hendry",
+   "kind": "county",
+   "counties": [
+    "Hendry"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hernando",
+   "kind": "county",
+   "counties": [
+    "Hernando"
+   ],
+   "legistar": {
+    "token": "hernandocountyfl",
+    "bodies": 12,
+    "body_names": [
+     "Board of County Commissioners",
+     "Community Redevelopment Agency",
+     "Planning & Zoning Commission",
+     "Metropolitan Planning Organization",
+     "Board of County Commissioners Budget Hearing"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 10,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Highlands",
+   "kind": "county",
+   "counties": [
+    "Highlands"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hillsborough",
+   "kind": "county",
+   "counties": [
+    "Hillsborough"
+   ],
+   "legistar": {
+    "token": "hillsboroughcounty",
+    "bodies": 7,
+    "body_names": [
+     "BOCC Land Use",
+     "Zoning Hearing Master",
+     "Land Use Hearing Officer",
+     "Land Development Code Amendments",
+     "Land Development Code Amendment Workshop"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 6,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Holmes",
+   "kind": "county",
+   "counties": [
+    "Holmes"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indian River",
+   "kind": "county",
+   "counties": [
+    "Indian River"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jackson",
+   "kind": "county",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": {
+    "token": "jacksonco",
+    "bodies": 47,
+    "body_names": [
+     "Clerk of the County Legislature",
+     "(R)Anti-Drug Committee",
+     "Finance & Audit Committee",
+     "(R)Health and Justice Committee",
+     "Inter-Governmental Affairs Committee"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Jefferson",
+   "kind": "county",
+   "counties": [
+    "Jefferson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lafayette",
+   "kind": "county",
+   "counties": [
+    "Lafayette"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake",
+   "kind": "county",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": {
+    "token": "lakecounty",
+    "bodies": 131,
+    "body_names": [
+     "Lake County Board",
+     "Law & Judicial Committee",
+     "Health and Community Services Committee",
+     "Revenue, Records, and Legislation Committee",
+     "Public Works and Transportation Committee"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Lee",
+   "kind": "county",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Leon",
+   "kind": "county",
+   "counties": [
+    "Leon"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Levy",
+   "kind": "county",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Liberty",
+   "kind": "county",
+   "counties": [
+    "Liberty"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Madison",
+   "kind": "county",
+   "counties": [
+    "Madison"
+   ],
+   "legistar": {
+    "token": "madison",
+    "bodies": 253,
+    "body_names": [
+     "COMMON COUNCIL",
+     "PLAN COMMISSION",
+     "BOARD OF ESTIMATES (ended 4/2017)",
+     "ALCOHOL LICENSE REVIEW COMMITTEE",
+     "PUBLIC HEALTH COMMISSION (prior to 4-29-2005)"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Manatee",
+   "kind": "county",
+   "counties": [
+    "Manatee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Marion",
+   "kind": "county",
+   "counties": [
+    "Marion"
+   ],
+   "legistar": {
+    "token": "marionfl",
+    "bodies": 23,
+    "body_names": [
+     "Board of County Commissioners",
+     "Planning & Zoning Commission",
+     "Board of County Commissioners Workshop",
+     "Board of County Commissioners Budget Meeting",
+     "Board of County Commissioners Public Hearing Meeting"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Martin",
+   "kind": "county",
+   "counties": [
+    "Martin"
+   ],
+   "legistar": {
+    "token": "martin",
+    "bodies": 29,
+    "body_names": [
+     "Board of County Commissioners",
+     "Community Redevelopment Agency",
+     "Golden Gate Neighborhood Advisory Committee",
+     "Jensen Beach Neighborhood Advisory Committee",
+     "Rio Neighborhood Advisory Committee"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 30,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Miami-Dade",
+   "kind": "county",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "miamidade",
+    "bodies": 12,
+    "body_names": [
+     "BOARD OF COUNTY COMMISSIONERS",
+     "Committee 1",
+     "Committee 2",
+     "TEST",
+     "Government Operations Committee"
+    ],
+    "newest_matter": "2018-07-14",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Monroe",
+   "kind": "county",
+   "counties": [
+    "Monroe"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Nassau",
+   "kind": "county",
+   "counties": [
+    "Nassau"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Okaloosa",
+   "kind": "county",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Okeechobee",
+   "kind": "county",
+   "counties": [
+    "Okeechobee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Orange",
+   "kind": "county",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Osceola",
+   "kind": "county",
+   "counties": [
+    "Osceola"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Beach",
+   "kind": "county",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pasco",
+   "kind": "county",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pinellas",
+   "kind": "county",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": {
+    "token": "pinellas",
+    "bodies": 4,
+    "body_names": [
+     "Board of County Commissioners - Budget Information Session",
+     "Board of County Commissioners - Work Session",
+     "Board of County Commissioners - Special Session",
+     "Board of County Commissioners"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Polk",
+   "kind": "county",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": {
+    "token": "polkcountyfl",
+    "bodies": 12,
+    "body_names": [
+     "Board of County Commissioners",
+     "Polk Regional Water Cooperative",
+     "Polk County Land Use Hearing Officer",
+     "Planning Commission",
+     "Board of County Commissioners (Organizational)"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 28,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Putnam",
+   "kind": "county",
+   "counties": [
+    "Putnam"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Santa Rosa",
+   "kind": "county",
+   "counties": [
+    "Santa Rosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sarasota",
+   "kind": "county",
+   "counties": [
+    "Sarasota"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Seminole",
+   "kind": "county",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": {
+    "token": "seminolecountyfl",
+    "bodies": 17,
+    "body_names": [
+     "Board of County Commissioners",
+     "Board of Adjustment",
+     "Code Enforcement Special Magistrate",
+     "Development Review Committee",
+     "Planning and Zoning Commission"
+    ],
+    "newest_matter": "2026-10-12",
+    "florida_statute_matters": 49,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "St. Johns",
+   "kind": "county",
+   "counties": [
+    "St. Johns"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Lucie",
+   "kind": "county",
+   "counties": [
+    "St. Lucie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sumter",
+   "kind": "county",
+   "counties": [
+    "Sumter"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Suwannee",
+   "kind": "county",
+   "counties": [
+    "Suwannee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Taylor",
+   "kind": "county",
+   "counties": [
+    "Taylor"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Union",
+   "kind": "county",
+   "counties": [
+    "Union"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Volusia",
+   "kind": "county",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wakulla",
+   "kind": "county",
+   "counties": [
+    "Wakulla"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Walton",
+   "kind": "county",
+   "counties": [
+    "Walton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Washington",
+   "kind": "county",
+   "counties": [
+    "Washington"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Alachua",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": {
+    "token": "alachua",
+    "bodies": 5,
+    "body_names": [
+     "Board of County Commissioners",
+     "Joint Water Policy Committee",
+     "Development Review Committee",
+     "Special Meeting",
+     "Joint Meeting"
+    ],
+    "newest_matter": "2025-01-15",
+    "florida_statute_matters": 2,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Alford",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Altamonte Springs",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Altha",
+   "kind": "city",
+   "counties": [
+    "Calhoun"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Anna Maria",
+   "kind": "city",
+   "counties": [
+    "Manatee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Apalachicola",
+   "kind": "city",
+   "counties": [
+    "Franklin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Apopka",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Arcadia",
+   "kind": "city",
+   "counties": [
+    "DeSoto"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Archer",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Astatula",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Atlantic Beach",
+   "kind": "city",
+   "counties": [
+    "Duval"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Atlantis",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Auburndale",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Aventura",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "cityofaventura",
+    "bodies": 5,
+    "body_names": [
+     "City Commission",
+     "Local Planning Agency",
+     "Budget Hearing",
+     "Community Development",
+     "ACES and DSAHS Governing Board"
+    ],
+    "newest_matter": "2026-07-14",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Avon Park",
+   "kind": "city",
+   "counties": [
+    "Highlands"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bal Harbour",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Baldwin",
+   "kind": "city",
+   "counties": [
+    "Duval"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bartow",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bascom",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bay Harbor Islands",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bay Lake",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bell",
+   "kind": "city",
+   "counties": [
+    "Gilchrist"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Belle Glade",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Belle Isle",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Belleair",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": {
+    "token": "belleairfl",
+    "bodies": 18,
+    "body_names": [
+     "Town Commission",
+     "Finance Board",
+     "Audit Committee",
+     "Special Magistrate",
+     "Historic Preservation Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Belleair Beach",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Belleair Bluffs",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Belleair Shore",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Belleview",
+   "kind": "city",
+   "counties": [
+    "Marion"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Beverly Beach",
+   "kind": "city",
+   "counties": [
+    "Flagler"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Biscayne Park",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Blountstown",
+   "kind": "city",
+   "counties": [
+    "Calhoun"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Boca Raton",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bonifay",
+   "kind": "city",
+   "counties": [
+    "Holmes"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bonita Springs",
+   "kind": "city",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bowling Green",
+   "kind": "city",
+   "counties": [
+    "Hardee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Boynton Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bradenton",
+   "kind": "city",
+   "counties": [
+    "Manatee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bradenton Beach",
+   "kind": "city",
+   "counties": [
+    "Manatee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Branford",
+   "kind": "city",
+   "counties": [
+    "Suwannee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Briny Breezes",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bristol",
+   "kind": "city",
+   "counties": [
+    "Liberty"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bronson",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Brooker",
+   "kind": "city",
+   "counties": [
+    "Bradford"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Brooksville",
+   "kind": "city",
+   "counties": [
+    "Hernando"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bunnell",
+   "kind": "city",
+   "counties": [
+    "Flagler"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Bushnell",
+   "kind": "city",
+   "counties": [
+    "Sumter"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Callahan",
+   "kind": "city",
+   "counties": [
+    "Nassau"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Callaway",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Campbellton",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cape Canaveral",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cape Coral",
+   "kind": "city",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Carrabelle",
+   "kind": "city",
+   "counties": [
+    "Franklin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Caryville",
+   "kind": "city",
+   "counties": [
+    "Washington"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Casselberry",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cedar Key",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Center Hill",
+   "kind": "city",
+   "counties": [
+    "Sumter"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Century",
+   "kind": "city",
+   "counties": [
+    "Escambia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Chattahoochee",
+   "kind": "city",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Chiefland",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Chipley",
+   "kind": "city",
+   "counties": [
+    "Washington"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cinco Bayou",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Clearwater",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": {
+    "token": "clearwater",
+    "bodies": 35,
+    "body_names": [
+     "City Council",
+     "City Manager's Office",
+     "Fire Department",
+     "Public Works",
+     "Information Technology"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 36,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Clermont",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Clewiston",
+   "kind": "city",
+   "counties": [
+    "Hendry"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cloud Lake",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cocoa",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": {
+    "token": "cocoa",
+    "bodies": 11,
+    "body_names": [
+     "City Council",
+     "Cocoa Redevelopment Agency",
+     "Diamond Square RDA",
+     "US 1 RDA",
+     "Sustainability Advisory Board"
+    ],
+    "newest_matter": "2025-03-07",
+    "florida_statute_matters": 25,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Cocoa Beach",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Coconut Creek",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "coconutcreek",
+    "bodies": 26,
+    "body_names": [
+     "City Commission",
+     "Public Works and Services Committee",
+     "Special City Commission Meeting",
+     "City Commission Workshop",
+     "Public Input Meeting"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 23,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Coleman",
+   "kind": "city",
+   "counties": [
+    "Sumter"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cooper City",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Coral Gables",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "coralgables",
+    "bodies": 57,
+    "body_names": [
+     "City Commission",
+     "Senior Citizens Advisory Board",
+     "Transportation Advisory Board",
+     "Library Advisory Board",
+     "Parking Advisory Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Coral Springs",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cottondale",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Crescent City",
+   "kind": "city",
+   "counties": [
+    "Putnam"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Crestview",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cross City",
+   "kind": "city",
+   "counties": [
+    "Dixie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Crystal River",
+   "kind": "city",
+   "counties": [
+    "Citrus"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Cutler Bay",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "cutlerbay",
+    "bodies": 6,
+    "body_names": [
+     "Town Council",
+     "Local Planning Agency",
+     "Town Council Workshop",
+     "Approvers",
+     "Proclamations/Award/Presentations"
+    ],
+    "newest_matter": "2021-01-22",
+    "florida_statute_matters": 25,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Dade City",
+   "kind": "city",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Dania Beach",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Davenport",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Davie",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Daytona Beach",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Daytona Beach Shores",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "DeBary",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "DeFuniak Springs",
+   "kind": "city",
+   "counties": [
+    "Walton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "DeLand",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Deerfield Beach",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Delray Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": {
+    "token": "delraybeach",
+    "bodies": 34,
+    "body_names": [
+     "City Commission",
+     "Finance Committee",
+     "City Commission - Workshop",
+     "City Commission - Special Meeting",
+     "Planning and Zoning Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Deltona",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": {
+    "token": "deltona",
+    "bodies": 12,
+    "body_names": [
+     "City Commission",
+     "Planning and Zoning Board",
+     "Affordable Housing Advisory Committee",
+     "Special Magistrate",
+     "William S. Harvey Deltona Scholarship Advisory Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 32,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Destin",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Doral",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "doral",
+    "bodies": 6,
+    "body_names": [
+     "Council Meeting",
+     "Special Council Meeting",
+     "Council Workshop",
+     "Council Zoning Meeting",
+     "Local Planning Agency"
+    ],
+    "newest_matter": "2026-10-06",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Dundee",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Dunedin",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Dunnellon",
+   "kind": "city",
+   "counties": [
+    "Marion"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Eagle Lake",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Eatonville",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ebro",
+   "kind": "city",
+   "counties": [
+    "Washington"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Edgewater",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": {
+    "token": "cityofedgewater",
+    "bodies": 21,
+    "body_names": [
+     "City Council",
+     "Code Enforcement/Special Magistrate",
+     "Planning and Zoning Board",
+     "Economic Development Board",
+     "Firefighters Pension Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 3,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Edgewood",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "El Portal",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Estero",
+   "kind": "city",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Esto",
+   "kind": "city",
+   "counties": [
+    "Holmes"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Eustis",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Everglades",
+   "kind": "city",
+   "counties": [
+    "Collier"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fanning Springs",
+   "kind": "city",
+   "counties": [
+    "Gilchrist",
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fellsmere",
+   "kind": "city",
+   "counties": [
+    "Indian River"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fernandina Beach",
+   "kind": "city",
+   "counties": [
+    "Nassau"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Flagler Beach",
+   "kind": "city",
+   "counties": [
+    "Flagler",
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Florida City",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fort Lauderdale",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "fortlauderdale",
+    "bodies": 17,
+    "body_names": [
+     "City Commission Regular Meeting",
+     "Finance Committee",
+     "Mayor and City Commission",
+     "COMMUNITY REDEVELOPMENT AGENCY BOARD",
+     "City Commission Conference Meeting"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Fort Meade",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fort Myers",
+   "kind": "city",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fort Myers Beach",
+   "kind": "city",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fort Pierce",
+   "kind": "city",
+   "counties": [
+    "St. Lucie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fort Walton Beach",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fort White",
+   "kind": "city",
+   "counties": [
+    "Columbia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Freeport",
+   "kind": "city",
+   "counties": [
+    "Walton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Frostproof",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Fruitland Park",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gainesville",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": {
+    "token": "gainesville",
+    "bodies": 69,
+    "body_names": [
+     "Audit and Finance Committee",
+     "Bicycle/Pedestrian Advisory Board",
+     "Board of Trustees of the Consolidated Police & Fire Retirement Plan",
+     "Gainesville/Alachua Co Cultural Affairs Bd",
+     "Citizens Advisory Committee for Community Development"
+    ],
+    "newest_matter": "2025-08-06",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Glen Ridge",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Glen St. Mary",
+   "kind": "city",
+   "counties": [
+    "Baker"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Golden Beach",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Golf",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Graceville",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Grand Ridge",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Grant-Valkaria",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Green Cove Springs",
+   "kind": "city",
+   "counties": [
+    "Clay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Greenacres",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Greensboro",
+   "kind": "city",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": {
+    "token": "greensboro",
+    "bodies": 13,
+    "body_names": [
+     "City Council",
+     "City Council Special Meeting",
+     "CRC Enhancement Committee",
+     "Economic Development Committee",
+     "East Greensboro Study Committee"
+    ],
+    "newest_matter": "2024-10-18",
+    "florida_statute_matters": 1,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Greenville",
+   "kind": "city",
+   "counties": [
+    "Madison"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Greenwood",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gretna",
+   "kind": "city",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Groveland",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gulf Breeze",
+   "kind": "city",
+   "counties": [
+    "Santa Rosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gulf Stream",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Gulfport",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Haines City",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hallandale Beach",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "hallandalebeach",
+    "bodies": 13,
+    "body_names": [
+     "City Commission",
+     "Finance Committee",
+     "HBCRA Citizen's Advisory Committee",
+     "Planning and Zoning Board",
+     "HBCRA Board of Directors"
+    ],
+    "newest_matter": "2026-10-12",
+    "florida_statute_matters": 49,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Hampton",
+   "kind": "city",
+   "counties": [
+    "Bradford"
+   ],
+   "legistar": {
+    "token": "hampton",
+    "bodies": 10,
+    "body_names": [
+     "City Council Legislative Session",
+     "Planning Commission",
+     "Police Department",
+     "Mayor's Committee on People with Disabilities",
+     "Grievance Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Havana",
+   "kind": "city",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Haverhill",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hawthorne",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hialeah",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hialeah Gardens",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "High Springs",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Highland Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Highland Park",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hillcrest Heights",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hilliard",
+   "kind": "city",
+   "counties": [
+    "Nassau"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hillsboro Beach",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Holly Hill",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hollywood",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "hollywoodfl",
+    "bodies": 20,
+    "body_names": [
+     "Regular City Commission Meeting",
+     "Regular Community Redevelopment Agency Meeting",
+     "Special City Commission Meeting",
+     "Joint/Special Commission and CRA Meeting",
+     "Workshop"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Holmes Beach",
+   "kind": "city",
+   "counties": [
+    "Manatee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Homestead",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Horseshoe Beach",
+   "kind": "city",
+   "counties": [
+    "Dixie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Howey-in-the-Hills",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Hypoluxo",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indialantic",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indian Creek",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indian Harbour Beach",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indian River Shores",
+   "kind": "city",
+   "counties": [
+    "Indian River"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indian Rocks Beach",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indian Shores",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Indiantown",
+   "kind": "city",
+   "counties": [
+    "Martin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Inglis",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Interlachen",
+   "kind": "city",
+   "counties": [
+    "Putnam"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Inverness",
+   "kind": "city",
+   "counties": [
+    "Citrus"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Islamorada, Village of Islands",
+   "kind": "city",
+   "counties": [
+    "Monroe"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jacksonville",
+   "kind": "city",
+   "counties": [
+    "Duval"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jacksonville Beach",
+   "kind": "city",
+   "counties": [
+    "Duval"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jacob City",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jasper",
+   "kind": "city",
+   "counties": [
+    "Hamilton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jay",
+   "kind": "city",
+   "counties": [
+    "Santa Rosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jennings",
+   "kind": "city",
+   "counties": [
+    "Hamilton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Juno Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jupiter",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jupiter Inlet Colony",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Jupiter Island",
+   "kind": "city",
+   "counties": [
+    "Martin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Kenneth City",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Key Biscayne",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Key Colony Beach",
+   "kind": "city",
+   "counties": [
+    "Monroe"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Key West",
+   "kind": "city",
+   "counties": [
+    "Monroe"
+   ],
+   "legistar": {
+    "token": "keywest",
+    "bodies": 25,
+    "body_names": [
+     "City Commission",
+     "Clerk",
+     "Planning Board",
+     "Citizen Review Board ",
+     "Secondary Legislative Body"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Keystone Heights",
+   "kind": "city",
+   "counties": [
+    "Clay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Kissimmee",
+   "kind": "city",
+   "counties": [
+    "Osceola"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "La Crosse",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": {
+    "token": "cityoflacrosse",
+    "bodies": 109,
+    "body_names": [
+     "Common Council",
+     "Finance & Personnel Committee",
+     "Judiciary & Administration Committee",
+     "Highways, Properties & Utilities Committee - ABOLISHED 11-8-2012",
+     "Committee of the Whole - ABOLISHED 7-10-2014"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "LaBelle",
+   "kind": "city",
+   "counties": [
+    "Hendry"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lady Lake",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Alfred",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Buena Vista",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Butler",
+   "kind": "city",
+   "counties": [
+    "Union"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake City",
+   "kind": "city",
+   "counties": [
+    "Columbia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Clarke Shores",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Hamilton",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Helen",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Mary",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Park",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Placid",
+   "kind": "city",
+   "counties": [
+    "Highlands"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Wales",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lake Worth Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lakeland",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lantana",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Largo",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lauderdale Lakes",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lauderdale-by-the-Sea",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lauderhill",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Laurel Hill",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lawtey",
+   "kind": "city",
+   "counties": [
+    "Bradford"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Layton",
+   "kind": "city",
+   "counties": [
+    "Monroe"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lazy Lake",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lee",
+   "kind": "city",
+   "counties": [
+    "Madison"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Leesburg",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lighthouse Point",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Live Oak",
+   "kind": "city",
+   "counties": [
+    "Suwannee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Longboat Key",
+   "kind": "city",
+   "counties": [
+    "Manatee",
+    "Sarasota"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Longwood",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Loxahatchee Groves",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Lynn Haven",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Macclenny",
+   "kind": "city",
+   "counties": [
+    "Baker"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Madeira Beach",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Madison",
+   "kind": "city",
+   "counties": [
+    "Madison"
+   ],
+   "legistar": {
+    "token": "madison",
+    "bodies": 253,
+    "body_names": [
+     "COMMON COUNCIL",
+     "PLAN COMMISSION",
+     "BOARD OF ESTIMATES (ended 4/2017)",
+     "ALCOHOL LICENSE REVIEW COMMITTEE",
+     "PUBLIC HEALTH COMMISSION (prior to 4-29-2005)"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Maitland",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Malabar",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Malone",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Manalapan",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mangonia Park",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Marathon",
+   "kind": "city",
+   "counties": [
+    "Monroe"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Marco Island",
+   "kind": "city",
+   "counties": [
+    "Collier"
+   ],
+   "legistar": {
+    "token": "marcoisland",
+    "bodies": 19,
+    "body_names": [
+     "City Council",
+     "Code Advisory Committee",
+     "Planning Board",
+     "Parks and Recreation Advisory Committee",
+     "Beautification Advisory Committee "
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 5,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Margate",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "margatefl",
+    "bodies": 38,
+    "body_names": [
+     "Regular City Commission Meeting",
+     "Community Redevelopment Agency",
+     "Purchasing Commission",
+     "Board of Adjustment",
+     "Planning and Zoning Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 24,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Marianna",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Marineland",
+   "kind": "city",
+   "counties": [
+    "Flagler",
+    "St. Johns"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mary Esther",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mascotte",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mayo",
+   "kind": "city",
+   "counties": [
+    "Lafayette"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "McIntosh",
+   "kind": "city",
+   "counties": [
+    "Marion"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Medley",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Melbourne",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Melbourne Beach",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Melbourne Village",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mexico Beach",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Miami",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "miamifl",
+    "bodies": 6,
+    "body_names": [
+     "City Commission",
+     "OMNI Community Redevelopment Agency",
+     "Planning, Zoning and Appeals Board ",
+     "Southeast Overtown/Park West Community Redevelopment Agency",
+     "Midtown Community Redevelopment Agency"
+    ],
+    "newest_matter": "2026-07-08",
+    "florida_statute_matters": 1,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Miami Beach",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Miami Gardens",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Miami Lakes",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Miami Shores",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Miami Springs",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Micanopy",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Midway",
+   "kind": "city",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Milton",
+   "kind": "city",
+   "counties": [
+    "Santa Rosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Minneola",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Miramar",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "miramar",
+    "bodies": 4,
+    "body_names": [
+     "CITY COMMISSION REGULAR MEETING",
+     "FIRE PROTECTION ASSESSMENT & BUDGET PUBLIC HEARING",
+     "BUDGET PUBLIC HEARING",
+     "CITY COMMISSION SPECIAL MEETING"
+    ],
+    "newest_matter": "2026-10-08",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Monticello",
+   "kind": "city",
+   "counties": [
+    "Jefferson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Montverde",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Moore Haven",
+   "kind": "city",
+   "counties": [
+    "Glades"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mount Dora",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Mulberry",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Naples",
+   "kind": "city",
+   "counties": [
+    "Collier"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Neptune Beach",
+   "kind": "city",
+   "counties": [
+    "Duval"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "New Port Richey",
+   "kind": "city",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "New Smyrna Beach",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Newberry",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Niceville",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Noma",
+   "kind": "city",
+   "counties": [
+    "Holmes"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "North Bay Village",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "North Lauderdale",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "North Miami",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "North Miami Beach",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "North Palm Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "North Port",
+   "kind": "city",
+   "counties": [
+    "Sarasota"
+   ],
+   "legistar": {
+    "token": "cityofnorthport",
+    "bodies": 28,
+    "body_names": [
+     "City Commission Regular Meeting",
+     "Art Advisory Board",
+     "Auditor Selection Committee",
+     "Charter Review Advisory Board",
+     "Citizens Tax Oversight Committee"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "North Redington Beach",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Oak Hill",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Oakland",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": {
+    "token": "oakland",
+    "bodies": 151,
+    "body_names": [
+     "Meeting of the Oakland City Council",
+     "Office Of The Mayor",
+     "Oakland Fire Department",
+     "Office Of The City Clerk",
+     "Office Of The City Administrator"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 1,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Oakland Park",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ocala",
+   "kind": "city",
+   "counties": [
+    "Marion"
+   ],
+   "legistar": {
+    "token": "ocala",
+    "bodies": 36,
+    "body_names": [
+     "City Council",
+     "OLD - Airport Advisory Board",
+     "Audit Committee",
+     "Municipal Arts Commission",
+     "Board of Adjustment"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 29,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Ocean Breeze",
+   "kind": "city",
+   "counties": [
+    "Martin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ocean Ridge",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ocoee",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Okeechobee",
+   "kind": "city",
+   "counties": [
+    "Okeechobee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Oldsmar",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Opa-locka",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Orange City",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Orange Park",
+   "kind": "city",
+   "counties": [
+    "Clay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Orchid",
+   "kind": "city",
+   "counties": [
+    "Indian River"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Orlando",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ormond Beach",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Otter Creek",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Oviedo",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pahokee",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palatka",
+   "kind": "city",
+   "counties": [
+    "Putnam"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Bay",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Beach Gardens",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Beach Shores",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Coast",
+   "kind": "city",
+   "counties": [
+    "Flagler"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Shores",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palm Springs",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": {
+    "token": "palmsprings",
+    "bodies": 7,
+    "body_names": [
+     "City Council",
+     "Finance Committee",
+     "Public Works and Services Committee",
+     "Police Department",
+     "Fire Department"
+    ],
+    "newest_matter": null,
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Palmetto",
+   "kind": "city",
+   "counties": [
+    "Manatee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Palmetto Bay",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Panama City",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Panama City Beach",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Parker",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Parkland",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": {
+    "token": "parkland",
+    "bodies": 7,
+    "body_names": [
+     "Council",
+     "Agricultural Service Board",
+     "Subdivision and Development Appeal Board",
+     "Governance and Priorities Committee",
+     "Community Sustainability Committee"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Paxton",
+   "kind": "city",
+   "counties": [
+    "Walton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pembroke Park",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pembroke Pines",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Penney Farms",
+   "kind": "city",
+   "counties": [
+    "Clay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pensacola",
+   "kind": "city",
+   "counties": [
+    "Escambia"
+   ],
+   "legistar": {
+    "token": "pensacola",
+    "bodies": 41,
+    "body_names": [
+     "City Council",
+     "CMPA Operations and Audit Committee ",
+     "Architectural Review Board",
+     "Construction Board of Adjustment and Appeals",
+     "Agenda Conference"
+    ],
+    "newest_matter": "2025-02-21",
+    "florida_statute_matters": 5,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Perry",
+   "kind": "city",
+   "counties": [
+    "Taylor"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pierson",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pinecrest",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "pinecrest",
+    "bodies": 6,
+    "body_names": [
+     "Village Council",
+     "Police Department",
+     "Fire Department",
+     "Committee of the Whole",
+     "Village Council - Special"
+    ],
+    "newest_matter": "2026-10-12",
+    "florida_statute_matters": 38,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Pinellas Park",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": {
+    "token": "pinellaspark",
+    "bodies": 10,
+    "body_names": [
+     "City Council",
+     "City Council Workshop",
+     "Community Redevelopment Agency",
+     "Planning and Zoning Commission",
+     "Board of Adjustment"
+    ],
+    "newest_matter": "2026-09-01",
+    "florida_statute_matters": 10,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Plant City",
+   "kind": "city",
+   "counties": [
+    "Hillsborough"
+   ],
+   "legistar": {
+    "token": "plantcity",
+    "bodies": 11,
+    "body_names": [
+     "City Commission",
+     "Planning Board",
+     "Community Redevelopment Agency ",
+     "INACTIVE Community Redevelopment Agency  (CRA)",
+     "Code Enforcement Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 3,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Plantation",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Polk City",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pomona Park",
+   "kind": "city",
+   "counties": [
+    "Putnam"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Pompano Beach",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ponce Inlet",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Ponce de Leon",
+   "kind": "city",
+   "counties": [
+    "Holmes"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Port Orange",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Port Richey",
+   "kind": "city",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Port St. Joe",
+   "kind": "city",
+   "counties": [
+    "Gulf"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Port St. Lucie",
+   "kind": "city",
+   "counties": [
+    "St. Lucie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Punta Gorda",
+   "kind": "city",
+   "counties": [
+    "Charlotte"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Quincy",
+   "kind": "city",
+   "counties": [
+    "Gadsden"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Raiford",
+   "kind": "city",
+   "counties": [
+    "Union"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Reddick",
+   "kind": "city",
+   "counties": [
+    "Marion"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Redington Beach",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Redington Shores",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Riviera Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Rockledge",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Royal Palm Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Safety Harbor",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "San Antonio",
+   "kind": "city",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": {
+    "token": "sanantonio",
+    "bodies": 166,
+    "body_names": [
+     "City Council A Session",
+     "City Council B Session",
+     "Governance Committee",
+     "Planning Commission",
+     "Zoning Commission"
+    ],
+    "newest_matter": "2026-04-02",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Sanford",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sanibel",
+   "kind": "city",
+   "counties": [
+    "Lee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sarasota",
+   "kind": "city",
+   "counties": [
+    "Sarasota"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Satellite Beach",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sea Ranch Lakes",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sebastian",
+   "kind": "city",
+   "counties": [
+    "Indian River"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sebring",
+   "kind": "city",
+   "counties": [
+    "Highlands"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Seminole",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sewall's Point",
+   "kind": "city",
+   "counties": [
+    "Martin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Shalimar",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sneads",
+   "kind": "city",
+   "counties": [
+    "Jackson"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sopchoppy",
+   "kind": "city",
+   "counties": [
+    "Wakulla"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "South Bay",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "South Daytona",
+   "kind": "city",
+   "counties": [
+    "Volusia"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "South Miami",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "South Palm Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "South Pasadena",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Southwest Ranches",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Springfield",
+   "kind": "city",
+   "counties": [
+    "Bay"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Augustine",
+   "kind": "city",
+   "counties": [
+    "St. Johns"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Augustine Beach",
+   "kind": "city",
+   "counties": [
+    "St. Johns"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Cloud",
+   "kind": "city",
+   "counties": [
+    "Osceola"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Leo",
+   "kind": "city",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Lucie Village",
+   "kind": "city",
+   "counties": [
+    "St. Lucie"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Marks",
+   "kind": "city",
+   "counties": [
+    "Wakulla"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Pete Beach",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "St. Petersburg",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Starke",
+   "kind": "city",
+   "counties": [
+    "Bradford"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Stuart",
+   "kind": "city",
+   "counties": [
+    "Martin"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sunny Isles Beach",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sunrise",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Surfside",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Sweetwater",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": {
+    "token": "cityofsweetwater",
+    "bodies": 6,
+    "body_names": [
+     "City Commission",
+     "Beautification Board",
+     "Public Works and Services Committee",
+     "Planning & Zoning Board",
+     "Elected Officials Pension Board"
+    ],
+    "newest_matter": "2016-06-11",
+    "florida_statute_matters": 0,
+    "likely_florida": false
+   }
+  },
+  {
+   "name": "Tallahassee",
+   "kind": "city",
+   "counties": [
+    "Leon"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Tamarac",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Tampa",
+   "kind": "city",
+   "counties": [
+    "Hillsborough"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Tarpon Springs",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Tavares",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Temple Terrace",
+   "kind": "city",
+   "counties": [
+    "Hillsborough"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Tequesta",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Titusville",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Treasure Island",
+   "kind": "city",
+   "counties": [
+    "Pinellas"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Trenton",
+   "kind": "city",
+   "counties": [
+    "Gilchrist"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Umatilla",
+   "kind": "city",
+   "counties": [
+    "Lake"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Valparaiso",
+   "kind": "city",
+   "counties": [
+    "Okaloosa"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Venice",
+   "kind": "city",
+   "counties": [
+    "Sarasota"
+   ],
+   "legistar": {
+    "token": "venice",
+    "bodies": 29,
+    "body_names": [
+     "City Council",
+     "Code Enforcement Board",
+     "Planning Commission",
+     "Historic Preservation Board",
+     "Economic Development Advisory Board"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 20,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "Vernon",
+   "kind": "city",
+   "counties": [
+    "Washington"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Vero Beach",
+   "kind": "city",
+   "counties": [
+    "Indian River"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Virginia Gardens",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Waldo",
+   "kind": "city",
+   "counties": [
+    "Alachua"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wauchula",
+   "kind": "city",
+   "counties": [
+    "Hardee"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wausau",
+   "kind": "city",
+   "counties": [
+    "Washington"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Webster",
+   "kind": "city",
+   "counties": [
+    "Sumter"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Weeki Wachee",
+   "kind": "city",
+   "counties": [
+    "Hernando"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Welaka",
+   "kind": "city",
+   "counties": [
+    "Putnam"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wellington",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": {
+    "token": "wellington",
+    "bodies": 23,
+    "body_names": [
+     "Village Council ",
+     "Police Department",
+     "Fire Department",
+     "Architectural Review Board",
+     "Village Council Workshop"
+    ],
+    "newest_matter": "2026-10-13",
+    "florida_statute_matters": 50,
+    "likely_florida": true
+   }
+  },
+  {
+   "name": "West Melbourne",
+   "kind": "city",
+   "counties": [
+    "Brevard"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "West Miami",
+   "kind": "city",
+   "counties": [
+    "Miami-Dade"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "West Palm Beach",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "West Park",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Westlake",
+   "kind": "city",
+   "counties": [
+    "Palm Beach"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Weston",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Westville",
+   "kind": "city",
+   "counties": [
+    "Holmes"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wewahitchka",
+   "kind": "city",
+   "counties": [
+    "Gulf"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "White Springs",
+   "kind": "city",
+   "counties": [
+    "Hamilton"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wildwood",
+   "kind": "city",
+   "counties": [
+    "Sumter"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Williston",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Wilton Manors",
+   "kind": "city",
+   "counties": [
+    "Broward"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Windermere",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Winter Garden",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Winter Haven",
+   "kind": "city",
+   "counties": [
+    "Polk"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Winter Park",
+   "kind": "city",
+   "counties": [
+    "Orange"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Winter Springs",
+   "kind": "city",
+   "counties": [
+    "Seminole"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Worthington Springs",
+   "kind": "city",
+   "counties": [
+    "Union"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Yankeetown",
+   "kind": "city",
+   "counties": [
+    "Levy"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Zephyrhills",
+   "kind": "city",
+   "counties": [
+    "Pasco"
+   ],
+   "legistar": null
+  },
+  {
+   "name": "Zolfo Springs",
+   "kind": "city",
+   "counties": [
+    "Hardee"
+   ],
+   "legistar": null
+  }
+ ]
+}
