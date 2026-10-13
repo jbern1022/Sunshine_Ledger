@@ -53,6 +53,9 @@ class ElectionCalendar:
 # RE-VERIFICATION LOG (append a line each time; don't overwrite):
 #   2026-09-02 -- all ten dates re-checked against the source URL below and
 #     confirmed unchanged, character for character.
+#   2026-10-13 -- all ten dates re-checked against the source URL below and
+#     confirmed unchanged. The page (last updated 2025-08-22) shows no
+#     emergency orders or amendment notices.
 #
 # `verify_by` is deliberately set to fall between events rather than at a
 # round interval. It now lands after the General registration deadline
