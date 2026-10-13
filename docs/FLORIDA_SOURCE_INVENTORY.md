@@ -138,8 +138,15 @@ and each non-Legistar platform (OnBase, eSCRIBE, iQM2, others) needs its own
 adapter. The next inventory step is a manual platform sweep of the 67
 counties and the ~50 largest municipalities.
 
-## Politeness
+## Reproducing, and how reliable the data is
 
-The probe made about 15,000 requests over three runs from one IP, after which
-Legistar stopped answering from that IP (it recovered or not is not recorded
-here). Run it rarely, with `--only` for spot checks, and not in a loop.
+Three runs were made on 2026-10-13. Runs 1 and 2 each found 54 Legistar
+hits (run 2, which added the Florida check, is the one recorded in
+`docs/data/`). Run 3 found none because the machine's DNS resolver started
+failing partway through (a long run of failed hostname lookups for the
+eSCRIBE check); its results were discarded. A lookup failure is reported as
+a miss, so a flaky network under-counts: re-run with `--only` to confirm any
+place that matters.
+
+The probe made roughly 10,000 requests to Legistar's public API in total.
+Run it rarely, use `--only` for spot checks, and don't loop it.
