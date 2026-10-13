@@ -234,3 +234,19 @@ def test_broward_text_prefers_the_proposed_form():
                 "Exhibit 3 - Business Impact Estimate")
     assert select_text_attachment("broward", atts)["MatterAttachmentName"] == "Exhibit 2 - Proposed Ordinance"
     assert select_text_attachment("broward", _att("Exhibit 1 - FASD London Travel Memo")) is None
+
+
+def test_coral_gables_key_west_and_delray_text_attachments():
+    from app.pipeline.bill_text import select_text_attachment
+
+    cg = _att("Bid Waiver COVER", "R-2025-465 Signed", "Bid Waiver Authorization Form")
+    assert select_text_attachment("coralgables", cg)["MatterAttachmentName"] == "R-2025-465 Signed"
+    assert select_text_attachment("coralgables", _att("09 16 26 PZB Staff Report", "10 13 26 Exhibit A _ Draft Ordinance"))["MatterAttachmentName"].endswith("Draft Ordinance")
+
+    kw = _att("Quotes", "Executive Summary", "Resolution")
+    assert select_text_attachment("keywest", kw)["MatterAttachmentName"] == "Resolution"
+    assert select_text_attachment("keywest", _att("BOCC Approval 10.16.24", "Resolution 24-137"))["MatterAttachmentName"] == "Resolution 24-137"
+
+    dr = _att("PZB Staff Report", "Legal Review, Ordinance No. 40-26", "Exhibit A, Ordinance No. 40-26", "Ordinance No. 40-26")
+    assert select_text_attachment("delraybeach", dr)["MatterAttachmentName"] == "Ordinance No. 40-26"
+    assert select_text_attachment("delraybeach", _att("Agenda Cover Report", "Legal Review of Harbor Court")) is None

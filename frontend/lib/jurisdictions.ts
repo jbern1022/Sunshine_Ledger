@@ -5,7 +5,7 @@ import type { SourceStatus } from "./types";
  *  unreachable. Keep in step with CLIENT_JURISDICTIONS (backend/app/pipeline/
  *  legistar.py) and the Miami iQM2 source; the homepage filter itself reads the
  *  live source list, so a city missing here still appears there. */
-export const LOCAL_JURISDICTIONS = ["Miami", "Jacksonville", "Fort Lauderdale"] as const;
+export const LOCAL_JURISDICTIONS = ["Miami", "Jacksonville", "Fort Lauderdale", "Coral Gables", "Key West", "Delray Beach"] as const;
 
 export interface JurisdictionOption {
   label: string;

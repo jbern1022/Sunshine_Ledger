@@ -74,6 +74,38 @@ CLIENT_JURISDICTIONS = {
         "legislation only when the motion adopts a resolution or enacts an ordinance. "
         "Matters without a PDF attachment have no full text.",
     },
+    # Coral Gables, Key West, Delray Beach: sampled 2026-10-13 (200 newest
+    # matters, sponsors on 12, attachments on 5 ordinances/resolutions each).
+    "coralgables": {
+        "jurisdiction": "Coral Gables",
+        "county": "Miami-Dade County",
+        "nightly": True,
+        "label": "Coral Gables City Commission (Legistar)",
+        "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
+        # "R-2025-465 Signed" (the adopted resolution), "Draft Ordinance".
+        "text_attachment": [r"^\s*r-\d{4}-\d+", r"draft\s+ordinance", r"^\s*\d{4}\s+.*resolution\b"],
+    },
+    "keywest": {
+        "jurisdiction": "Key West",
+        "county": "Monroe County",
+        "nightly": True,
+        "label": "Key West City Commission (Legistar)",
+        "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
+        # The attachment is simply named "Resolution" / "Resolution 24-137".
+        "text_attachment": [r"^\s*resolution\s*$", r"^\s*(resolution|ordinance)\s+\d", r"^\s*ordinance\s*$"],
+    },
+    "delraybeach": {
+        "jurisdiction": "Delray Beach",
+        "county": "Palm Beach County",
+        "nightly": True,
+        # Sponsors are city departments ("Development Services Department"), not people.
+        "body_sponsors_as_committees": True,
+        "label": "Delray Beach City Commission (Legistar)",
+        "note": "The most recent commission matters. Many are development requests, which are labelled "
+        "as such rather than as legislation. Matters without a PDF attachment have no full text.",
+        # "Ordinance No. 40-26" (anchored: "Legal Review, Ordinance No. 40-26" is not it).
+        "text_attachment": [r"^\s*(ordinance|resolution)\s+no\.", r"^\s*resolution\b"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",

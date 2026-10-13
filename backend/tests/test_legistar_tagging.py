@@ -2,6 +2,7 @@
 app.pipeline.legistar.ingest_local_bills. DB-backed, network stubbed via a
 fake LegistarClient and a fake Ollama client."""
 
+import pytest
 from sqlalchemy import select
 
 from app.models import BillTag, Entity, Tag
@@ -171,3 +172,24 @@ def test_legistar_text_backfill_marks_no_text_and_skips_it_until_recheck(monkeyp
     db_session.commit()
     bt.backfill_legistar_texts(db_session)
     assert len(calls) == 2  # due for a re-check
+
+
+@pytest.mark.parametrize(
+    ("client", "jurisdiction", "county", "committee_sponsors"),
+    [
+        ("coralgables", "Coral Gables", "Miami-Dade County", False),
+        ("keywest", "Key West", "Monroe County", False),
+        ("delraybeach", "Delray Beach", "Palm Beach County", True),
+    ],
+)
+def test_city_registry_entries_ingest(monkeypatch, db_session, client, jurisdiction, county, committee_sponsors):
+    monkeypatch.setattr(legistar_module, "LegistarClient", FakeClientWithBodySponsors)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name=client, limit=1)
+
+    entity = db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalar_one()
+    assert (entity.jurisdiction_name, entity.jurisdiction_level) == (jurisdiction, "city")
+    assert entity.bill.geo_scope_names == [county]
+    body = _sponsors(db_session)["City Commission Regular Meeting"]
+    assert bool(body.attributes.get("committee")) is committee_sponsors
