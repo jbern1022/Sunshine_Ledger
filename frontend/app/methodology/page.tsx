@@ -35,7 +35,7 @@ export default function MethodologyPage() {
           <li>
             <span className="font-medium">Cities</span> — each city&apos;s own public legislative
             records system, the same records its council or commission uses. The list under
-            &ldquo;Where the data comes from&rdquo; belowldquo;Data sources and freshness&ldquo;Where the data comes from&rdquo; belowrdquo; below names each city and its system.
+            &ldquo;Data sources and freshness&rdquo; below names each city and its system.
           </li>
         </ul>
         <p className="mt-2 text-sm text-slate-700">
