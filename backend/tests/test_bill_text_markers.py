@@ -258,6 +258,48 @@ def test_legistar_text_uses_pypdf_path_without_markers(monkeypatch):
     assert headings == ["1", "2", "3", "4", "5", "6"]
 
 
+class _FakeFortLauderdaleClient:
+    """Adopted instrument is a scan (no text layer); the proposed-form exhibit has text."""
+
+    def __init__(self, scanned_pdf, text_pdf):
+        self._by_url = {"https://x/scan.pdf": scanned_pdf, "https://x/ex.pdf": text_pdf}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def get(self, url):
+        if url.endswith("/Attachments"):
+            return _FakeResponse(
+                json_data=[
+                    {"MatterAttachmentName": "Commission Agenda Memo 26-0844", "MatterAttachmentHyperlink": "https://x/memo.docx"},
+                    {"MatterAttachmentName": "Exhibit 2 - Ordinance", "MatterAttachmentHyperlink": "https://x/ex.pdf"},
+                    {"MatterAttachmentName": "ORDINANCE NO. C-26-40", "MatterAttachmentHyperlink": "https://x/scan.pdf"},
+                ]
+            )
+        return _FakeResponse(content=self._by_url[url])
+
+
+def test_fort_lauderdale_text_falls_back_from_a_scanned_instrument_to_the_proposed_form(monkeypatch):
+    import io
+
+    import httpx
+    from pypdf import PdfWriter
+
+    blank = PdfWriter()
+    blank.add_blank_page(width=612, height=792)
+    buf = io.BytesIO()
+    blank.write(buf)
+    text_pdf = (FIXTURES / "jax_2026_ordinance_8800.pdf").read_bytes()
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: _FakeFortLauderdaleClient(buf.getvalue(), text_pdf))
+
+    text = fetch_legistar_bill_text("fortlauderdale", 1)
+
+    assert text and "shall not be construed" in " ".join(text.split())
+
+
 # --- mark_words: pure geometry over synthetic words/segments -------------
 
 

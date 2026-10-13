@@ -198,3 +198,30 @@ def test_returns_nothing_when_only_exhibits_exist():
 
 def test_tolerates_missing_attachment_name():
     assert _pick([{"MatterAttachmentFileName": "x.pdf"}, {"MatterAttachmentName": None}]) is None
+
+
+def _att(*names):
+    return [{"MatterAttachmentName": n} for n in names]
+
+
+def test_fort_lauderdale_text_is_the_numbered_instrument_then_the_proposed_form():
+    from app.pipeline.bill_text import select_text_attachment
+
+    adopted = _att("Exhibit 1 - Ordinance No. C-95-41", "Commission Agenda Memo 26-0844",
+                   "Exhibit 2 - Ordinance", "Exhibit 3 - Business Impact Estimate", "ORDINANCE NO. C-26-40")
+    assert select_text_attachment("fortlauderdale", adopted)["MatterAttachmentName"] == "ORDINANCE NO. C-26-40"
+
+    # Not yet adopted: the proposed form, never the staff memo or other exhibits.
+    pending = _att("Exhibit 1 - Proposed New Classification", "Commission Agenda Memo 26-0945",
+                   "Exhibit 3 – Ordinance", "Exhibit 2 - Business Impact Statement")
+    assert select_text_attachment("fortlauderdale", pending)["MatterAttachmentName"] == "Exhibit 3 – Ordinance"
+
+    assert select_text_attachment("fortlauderdale", _att("Commission Agenda Memo 26-0897", "Exhibit 1 - Aerials")) is None
+
+
+def test_other_clients_still_match_original_bill():
+    from app.pipeline.bill_text import select_text_attachment
+
+    atts = _att("2026-646 - Exhibit A", "2026-646 - Original Bill")
+    assert select_text_attachment("jaxcityc", atts)["MatterAttachmentName"] == "2026-646 - Original Bill"
+    assert select_text_attachment("jaxcityc", _att("Exhibit A")) is None

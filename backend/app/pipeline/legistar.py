@@ -69,6 +69,14 @@ CLIENT_JURISDICTIONS = {
         # "City Commission Regular Meeting", never a person: store them as
         # committees so they stay out of the legislator lists.
         "body_sponsors_as_committees": True,
+        # Attachment names that are the legislation itself, best first: the
+        # adopted instrument ("ORDINANCE NO. C-26-40", "RESOLUTION NO. 26-84"),
+        # then the proposed form ("Exhibit 4 - Resolution"). Not the
+        # "Commission Agenda Memo", which is staff commentary.
+        "text_attachment": [
+            r"^\s*(ordinance|resolution)\s+no\.",
+            r"^\s*exhibit\s*\d+\s*[-\u2013\u2014]\s*(ordinance|resolution)\s*$",
+        ],
         "label": "Fort Lauderdale City Commission (Legistar)",
         "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
     },

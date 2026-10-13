@@ -489,8 +489,39 @@ def fetch_bill_text(client: LegiScanClient, doc_id: int) -> str | None:
 _ORIGINAL_BILL = re.compile(r"original\s+bill", re.IGNORECASE)
 
 
+def text_attachment_candidates(client_name: str, attachments: list[dict]) -> list[dict]:
+    """Attachments that may be the legislation itself, best first.
+
+    Each Legistar client names its documents differently, so the patterns come
+    from the client's registry entry (`text_attachment`, tried in order; the
+    default is Jacksonville's "Original Bill"). Fort Lauderdale, for example,
+    has "ORDINANCE NO. C-26-40" (the adopted instrument, but often a scan with
+    no text layer) and "Exhibit 4 - Resolution" (the proposed form), and a
+    "Commission Agenda Memo" that is staff commentary, not the legislation.
+    """
+    from app.pipeline.legistar import CLIENT_JURISDICTIONS
+
+    patterns = CLIENT_JURISDICTIONS.get(client_name, {}).get("text_attachment") or [_ORIGINAL_BILL.pattern]
+    out: list[dict] = []
+    for pattern in patterns:
+        rx = re.compile(pattern, re.IGNORECASE)
+        out.extend(a for a in attachments if rx.search(a.get("MatterAttachmentName") or "") and a not in out)
+    return out
+
+
+def select_text_attachment(client_name: str, attachments: list[dict]) -> dict | None:
+    candidates = text_attachment_candidates(client_name, attachments)
+    return candidates[0] if candidates else None
+
+
+# A scanned attachment yields a few stray characters, not text. Below this the
+# next candidate is tried; the last candidate's text is used whatever its size.
+_MIN_USABLE_TEXT_CHARS = 200
+
+
 def fetch_legistar_bill_text(client_name: str, matter_id: int, *, timeout: float = 90.0) -> str | None:
-    """Cleaned text of a Legistar matter's "Original Bill" attachment.
+    """Cleaned text of a Legistar matter's legislation attachment ("Original
+    Bill" for Jacksonville; see `text_attachment_candidates` for other clients).
 
     Legistar has no text endpoint (`/Matters/{id}/Texts` returns 405), so the
     bill itself has to be pulled from the attachment list. Exhibits are
@@ -498,41 +529,41 @@ def fetch_legistar_bill_text(client_name: str, matter_id: int, *, timeout: float
     budget tables) rather than the legislation, and folding them in would
     dilute the summarization input rather than enrich it.
 
-    Returns None when no Original Bill attachment exists, which is normal --
-    some matters are procedural and carry only exhibits.
+    Returns None when no such attachment exists, which is normal -- some
+    matters are procedural and carry only exhibits. Candidates are tried in
+    order until one has a text layer; scanned PDFs yield no usable text.
     """
     import httpx
 
     base = f"https://webapi.legistar.com/v1/{client_name}"
     with httpx.Client(timeout=timeout, follow_redirects=True) as client:
         attachments = client.get(f"{base}/Matters/{matter_id}/Attachments").json()
-        original = next(
-            (a for a in attachments if _ORIGINAL_BILL.search(a.get("MatterAttachmentName") or "")),
-            None,
-        )
-        if original is None:
-            return None
+        candidates = text_attachment_candidates(client_name, attachments)
+        best: str | None = None
+        for original in candidates:
+            link = original.get("MatterAttachmentHyperlink")
+            if not link:
+                continue
+            resp = client.get(link)
+            resp.raise_for_status()
+            if not resp.content.startswith(b"%PDF"):
+                logger.warning("Legistar attachment for matter %s is not a PDF -- skipping", matter_id)
+                continue
 
-        link = original.get("MatterAttachmentHyperlink")
-        if not link:
-            return None
-
-        resp = client.get(link)
-        resp.raise_for_status()
-
-    if not resp.content.startswith(b"%PDF"):
-        logger.warning("Legistar attachment for matter %s is not a PDF -- skipping", matter_id)
-        return None
-
-    # Deliberately the pypdf path (no change markers), not extract_pdf_text.
-    # Jacksonville ordinances are laid out unlike Florida House bills:
-    # italic/bold runs sit in boxes shifted a point or two off the baseline,
-    # so pdfplumber's top-based line grouping scrambles and splits lines;
-    # underlines are read as strike-throughs (e.g. "shall not be construed"
-    # came back as [deleted: ...]); and the signature-block rules mark whole
-    # lines. Switching Legistar to the marker extractor needs a
-    # baseline-aware line grouping first, tested against Legistar fixtures.
-    return _extract_pdf_text_pypdf(resp.content)
+            # Deliberately the pypdf path (no change markers), not extract_pdf_text.
+            # Jacksonville ordinances are laid out unlike Florida House bills:
+            # italic/bold runs sit in boxes shifted a point or two off the baseline,
+            # so pdfplumber's top-based line grouping scrambles and splits lines;
+            # underlines are read as strike-throughs (e.g. "shall not be construed"
+            # came back as [deleted: ...]); and the signature-block rules mark whole
+            # lines. Switching Legistar to the marker extractor needs a
+            # baseline-aware line grouping first, tested against Legistar fixtures.
+            text = _extract_pdf_text_pypdf(resp.content)
+            if len((text or "").strip()) >= _MIN_USABLE_TEXT_CHARS:
+                return text
+            if best is None or len(text or "") > len(best):
+                best = text
+    return best
 
 
 def _legistar_text_for(entity: Entity) -> str | None:
