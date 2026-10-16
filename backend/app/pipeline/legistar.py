@@ -257,6 +257,13 @@ def _bill_title(matter: dict) -> str:
     return full_title if len(full_title) <= 490 else full_title[:489] + "…"
 
 
+def _bill_number(matter: dict) -> str:
+    """The clerk's file number. Hollywood's planning-board items carry
+    "MatterFile": null (a present-but-null key, so dict.get's default does not
+    apply), which violated bills.bill_number NOT NULL on the 2026-10-16 seed run."""
+    return matter.get("MatterFile") or str(matter["MatterId"])
+
+
 def _bill_session(matter: dict) -> str:
     """Legistar has no real 'session' concept (that's a state-legislature
     idea) -- we derive a year label from the agenda date so bills group
@@ -363,7 +370,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
         source = Source(
             url=detail_url,
-            document_reference=matter.get("MatterFile"),
+            document_reference=_bill_number(matter),
             publisher=info.get("publisher") or f"{jurisdiction} City Clerk (Legistar)",
             source_type="legistar_agenda",
             retrieved_at=now,
@@ -374,10 +381,10 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
         bill = entity.bill
         if bill is None:
-            bill = Bill(entity_id=entity.id, bill_number=matter.get("MatterFile", str(matter_id)), session="")
+            bill = Bill(entity_id=entity.id, bill_number=_bill_number(matter), session="")
             db.add(bill)
 
-        bill.bill_number = matter.get("MatterFile", str(matter_id))
+        bill.bill_number = _bill_number(matter)
         bill.session = _bill_session(matter)
         bill.chamber = fit(matter.get("MatterBodyName"), CHAMBER_MAX_LENGTH)
         bill.status = normalize_status(matter.get("MatterStatusName")) or "Introduced"

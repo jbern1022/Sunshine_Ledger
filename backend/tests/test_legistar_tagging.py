@@ -280,3 +280,17 @@ def test_a_duplicated_sponsor_relationship_does_not_stop_the_nightly(monkeypatch
     db_session.commit()
 
     legistar_module.ingest_local_bills(db_session, client_name="keywest", limit=1)  # must not raise
+
+
+def test_a_matter_with_a_null_file_number_falls_back_to_its_id(monkeypatch, db_session):
+    """Hollywood's planning-board items have MatterFile null; the seed run of
+    2026-10-16 died on bills.bill_number NOT NULL."""
+
+    class Fake(FakeLegistarClient):
+        def get_matters(self, *, top):
+            return [{**super().get_matters(top=top)[0], "MatterId": 21301, "MatterFile": None, "MatterTypeName": "Planning - HPB"}]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+    written = legistar_module.ingest_local_bills(db_session, client_name="hollywoodfl", limit=1)
+    assert written[0].bill.bill_number == "21301"
