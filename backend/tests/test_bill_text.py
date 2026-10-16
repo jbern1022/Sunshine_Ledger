@@ -250,3 +250,18 @@ def test_coral_gables_key_west_and_delray_text_attachments():
     dr = _att("PZB Staff Report", "Legal Review, Ordinance No. 40-26", "Exhibit A, Ordinance No. 40-26", "Ordinance No. 40-26")
     assert select_text_attachment("delraybeach", dr)["MatterAttachmentName"] == "Ordinance No. 40-26"
     assert select_text_attachment("delraybeach", _att("Agenda Cover Report", "Legal Review of Harbor Court")) is None
+
+
+def test_hollywood_and_clearwater_text_attachments():
+    from app.pipeline.bill_text import select_text_attachment
+
+    hw = _att("Exhibit 1", "Business Impact Statement for Ordinance Correcting Scrivener Error", "Ordinance To Correct Scrivener Errors in Chapter 33.025, Clear Version")
+    assert select_text_attachment("hollywoodfl", hw)["MatterAttachmentName"].startswith("Ordinance To Correct")
+    assert select_text_attachment("hollywoodfl", _att("Term Sheet", "Resolution - Settlement of JAHA Lawsuit.doc"))["MatterAttachmentName"].startswith("Resolution")
+    assert select_text_attachment("hollywoodfl", _att("COI - Workers Comp", "Certificate of Insurance")) is None
+
+    cw = _att("RevExp_ChangesFromPrelimFY27", "9937-26_FY27OpExhibitA", "9937-26_Operating_Ordinance_27")
+    assert select_text_attachment("clearwater", cw)["MatterAttachmentName"] == "9937-26_Operating_Ordinance_27"
+    assert select_text_attachment("clearwater", _att("MH LHAP 2024-25 to 2026-27", "Resolution 26-17"))["MatterAttachmentName"] == "Resolution 26-17"
+    assert select_text_attachment("clearwater", _att("DDB_FY27_Proposed Budget.pdf", "BUDGET RESOLUTION-26-02.pdf"))["MatterAttachmentName"] == "BUDGET RESOLUTION-26-02.pdf"
+    assert select_text_attachment("clearwater", _att("Nagano Lanterns", "FY27 Final Budget.pptx")) is None

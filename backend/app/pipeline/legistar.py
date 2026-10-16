@@ -106,6 +106,34 @@ CLIENT_JURISDICTIONS = {
         # "Ordinance No. 40-26" (anchored: "Legal Review, Ordinance No. 40-26" is not it).
         "text_attachment": [r"^\s*(ordinance|resolution)\s+no\.", r"^\s*resolution\b"],
     },
+    # Hollywood and Clearwater: sampled 2026-10-13 (200 newest matters each, no
+    # sponsors). Hollywood's own types ("Resolution", "Ordinance", "Planning - PDB",
+    # "Presentation") already map to the right kinds. Clearwater types 166 of 200
+    # as "Action Item", so those read the kind from the title.
+    "hollywoodfl": {
+        "jurisdiction": "Hollywood",
+        "county": "Broward County",
+        "nightly": True,
+        "label": "Hollywood City Commission (Legistar)",
+        "note": "The most recent commission matters. Planning board items, presentations and proclamations "
+        "are labelled as such rather than as legislation. Matters without a PDF attachment have no full text.",
+        # "Ordinance", "Resolution - Settlement of ...", "Reso - CRA Meeting Time Change",
+        # "1 - FY27 Gen Fund SS Grants Resolution". Not "Business Impact Statement for Ordinance ...".
+        "text_attachment": [r"^\s*(ordinance|resolution)\b", r"^\s*reso\b", r"\bresolution\b"],
+    },
+    "clearwater": {
+        "jurisdiction": "Clearwater",
+        "county": "Pinellas County",
+        "nightly": True,
+        "adopted_instrument_from_title": ["Action Item"],
+        "label": "Clearwater City Council (Legistar)",
+        "note": "The most recent council matters. Most are agenda actions (contracts, code-enforcement cases, "
+        "presentations); an item is labelled legislation only when it adopts an ordinance or resolution. "
+        "Matters without a PDF attachment have no full text.",
+        # "9937-26_Operating_Ordinance_27", "Ordinance_9939-26.pdf", "26-09-01_Ordinance 9889-26.docx",
+        # then "Resolution 26-17", "MILLAGE RESOLUTION-26-01.pdf". Exhibits carry neither word.
+        "text_attachment": [r"(?<![a-z])ordinance", r"resolution[\s_-]*\d{2}-\d+"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",
@@ -151,6 +179,24 @@ def derived_item_type(title: str) -> str:
     if match:
         return "Ordinance" if match.group(1).lower() == "ordinance" else "Resolution"
     return "Motion"
+
+
+# "Adopt Ordinance 9931-26 on second reading", "... and adopt Resolution 26-02".
+_ADOPTS_INSTRUMENT = re.compile(r"\badopt(?:ing)?\s+(?:the\s+)?(?:[\w-]+\s+){0,3}?(ordinance|resolution)\b", re.IGNORECASE)
+
+# Titles that stand in for a title: the clerk's template text, never a real name.
+_PLACEHOLDER_TITLE = re.compile(r"^\W*(?:enter\s+(?:title|text)(?:\s+here)?|title\s+to\s+come|tbd|n/?a)\W*$", re.IGNORECASE)
+
+
+def adopted_instrument(title: str) -> str | None:
+    """"Ordinance" or "Resolution" when an agenda action's title says it adopts
+    one, else None. For clients (Clearwater) that type most items "Action Item"."""
+    match = _ADOPTS_INSTRUMENT.search(" ".join((title or "").split()))
+    return match.group(1).capitalize() if match else None
+
+
+def is_placeholder_title(text: str | None) -> bool:
+    return bool(text) and bool(_PLACEHOLDER_TITLE.match(" ".join(text.split())))
 
 
 def client_level(client_name: str) -> str:
@@ -206,7 +252,8 @@ def _bill_title(matter: dict) -> str:
     and can be tested on its own."""
     # Legistar titles carry HTML entities ("G&amp;B Oyster Bar"); the site
     # escapes text itself, so an undecoded entity would show literally.
-    full_title = html.unescape(matter.get("MatterName") or matter.get("MatterTitle") or f"Matter {matter['MatterId']}")
+    candidates = [t for t in (matter.get("MatterName"), matter.get("MatterTitle")) if t and not is_placeholder_title(t)]
+    full_title = html.unescape(candidates[0] if candidates else f"Matter {matter['MatterId']}")
     return full_title if len(full_title) <= 490 else full_title[:489] + "…"
 
 
@@ -238,7 +285,7 @@ def _get_or_create_person(
             Entity.name == name,
             Entity.jurisdiction_name == jurisdiction,
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
     if existing:
         if committee and not (existing.attributes or {}).get("committee"):
             existing.attributes = {**(existing.attributes or {}), "committee": True}
@@ -272,6 +319,11 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
 
     for matter in matters:
         matter_id = matter["MatterId"]
+        if all(is_placeholder_title(t) for t in (matter.get("MatterName"), matter.get("MatterTitle")) if t) and (
+            matter.get("MatterName") or matter.get("MatterTitle")
+        ):
+            logger.info("Skipping Legistar matter %s (%s): placeholder title", matter_id, client_name)
+            continue
         detail_url = f"https://{client_name}.legistar.com/LegislationDetail.aspx?ID={matter_id}"
 
         title = _bill_title(matter)
@@ -296,6 +348,14 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
                 **(entity.attributes or {}),
                 "item_type": derived_item_type(title),
                 "source_item_type": matter.get("MatterTypeName"),
+            }
+        elif matter.get("MatterTypeName") in info.get("adopted_instrument_from_title", ()) and adopted_instrument(title):
+            # Only the items whose title adopts an instrument; the rest keep the
+            # source's own type ("Action Item") like every other client.
+            entity.attributes = {
+                **(entity.attributes or {}),
+                "item_type": adopted_instrument(title),
+                "source_item_type": matter["MatterTypeName"],
             }
         elif matter.get("MatterTypeName"):
             entity.attributes = {**(entity.attributes or {}), "item_type": matter["MatterTypeName"]}  # see item_kind.py
@@ -350,7 +410,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
                         Relationship.to_entity_id == entity.id,
                         Relationship.relationship_type == "sponsor",
                     )
-                ).scalar_one_or_none()
+                ).scalars().first()  # not scalar_one_or_none: a duplicated row once stopped Key West nightly (2026-10-14)
                 if not exists:
                     db.add(
                         Relationship(

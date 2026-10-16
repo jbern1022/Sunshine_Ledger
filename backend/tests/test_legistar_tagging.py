@@ -196,3 +196,87 @@ def test_city_registry_entries_ingest(monkeypatch, db_session, client, jurisdict
     assert entity.bill.geo_scope_names == [county]
     body = _sponsors(db_session)["City Commission Regular Meeting"]
     assert bool(body.attributes.get("committee")) is committee_sponsors
+
+
+def test_adopted_instrument_reads_clearwater_action_item_titles():
+    from app.pipeline.legistar import adopted_instrument
+
+    assert adopted_instrument("Adopt Ordinance 9931-26 on second reading, amending Clearwater Code of Ordinances") == "Ordinance"
+    assert adopted_instrument("Approve the DDB annual operating budget for Fiscal Year 2026-27 and adopt Resolution 26-02.") == "Resolution"
+    # Mentioning one is not adopting one.
+    assert adopted_instrument("Provide direction on Referendum Petition 26-01 which is a citizens petition to repeal Ordinance 9907-26.") is None
+    assert adopted_instrument("Case 225-26 - Accept the Nuisance Abatement Lien for respondent(s) Randy Rainbolt") is None
+    assert adopted_instrument("") is None
+
+
+def test_clearwater_action_items_read_their_kind_from_the_title(monkeypatch, db_session):
+    from app.pipeline.item_kind import backfill_item_types, item_kind
+
+    class Fake(FakeLegistarClient):
+        def get_matters(self, *, top):
+            base = {**super().get_matters(top=top)[0], "MatterTypeName": "Action Item"}
+            return [
+                {**base, "MatterId": 1, "MatterFile": "ID#26-1100", "MatterTitle": "Adopt Ordinance 9931-26 on second reading, amending the Code"},
+                {**base, "MatterId": 2, "MatterFile": "ID#26-1122", "MatterTitle": "Approve payment of $130,529.41 to settle claim 25000218"},
+            ]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="clearwater", limit=2)
+
+    by_file = {e.bill.bill_number: e for e in db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalars()}
+    adopted, other = by_file["ID#26-1100"], by_file["ID#26-1122"]
+    assert adopted.attributes["item_type"] == "Ordinance" and item_kind(adopted.attributes["item_type"]) == "legislation"
+    assert adopted.attributes["source_item_type"] == "Action Item"
+    assert other.attributes["item_type"] == "Action Item" and item_kind(other.attributes["item_type"]) == "other"
+    assert backfill_item_types(db_session) == 0
+    assert adopted.attributes["item_type"] == "Ordinance"
+
+
+def test_placeholder_titles_are_never_shown_and_all_placeholder_matters_are_skipped(monkeypatch, db_session):
+    from app.pipeline.legistar import _bill_title, is_placeholder_title
+
+    assert is_placeholder_title("[Enter Text Here]") and is_placeholder_title("  Enter title here. ")
+    assert not is_placeholder_title("Enter into an agreement with Acme") and not is_placeholder_title(None)
+    # A placeholder name yields to a real title; with nothing real left it is "Matter N".
+    assert _bill_title({"MatterId": 7, "MatterName": "[Enter Text Here]", "MatterTitle": "Approve the lease"}) == "Approve the lease"
+    assert _bill_title({"MatterId": 7, "MatterName": "[Enter Text Here]", "MatterTitle": None}) == "Matter 7"
+
+    class Fake(FakeLegistarClient):
+        def get_matters(self, *, top):
+            base = super().get_matters(top=top)[0]
+            return [
+                {**base, "MatterId": 1, "MatterName": "[Enter Text Here]", "MatterTitle": "[Enter Text Here]", "MatterFile": "26-1"},
+                {**base, "MatterId": 2, "MatterName": None, "MatterTitle": "Approve the lease", "MatterFile": "26-2"},
+            ]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+    written = legistar_module.ingest_local_bills(db_session, client_name="keywest", limit=2)
+    assert [e.bill.bill_number for e in written] == ["26-2"]
+
+
+def test_a_duplicated_sponsor_relationship_does_not_stop_the_nightly(monkeypatch, db_session):
+    """Key West's nightly died on 2026-10-14 with 'Multiple rows were found' when a
+    person already had two sponsor rows on one matter. Re-ingest must go on."""
+    from app.models import Relationship
+
+    class Fake(FakeLegistarClient):
+        def get_sponsors(self, matter_id):
+            return [{"MatterSponsorName": "Mayor Jane Doe", "MatterSponsorNameId": 5}]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="keywest", limit=1)
+    rel = db_session.execute(select(Relationship).where(Relationship.relationship_type == "sponsor")).scalar_one()
+    db_session.add(Relationship(from_entity_id=rel.from_entity_id, to_entity_id=rel.to_entity_id,
+                                relationship_type="sponsor", source_id=rel.source_id))
+    # A second same-name person (e.g. from an earlier overlapping seed run) must not break it either.
+    person = db_session.get(Entity, rel.from_entity_id)
+    db_session.add(Entity(entity_type="person", name=person.name, jurisdiction_level="city",
+                          jurisdiction_name=person.jurisdiction_name, external_ids={}, attributes={}))
+    db_session.commit()
+
+    legistar_module.ingest_local_bills(db_session, client_name="keywest", limit=1)  # must not raise
