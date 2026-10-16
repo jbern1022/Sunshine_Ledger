@@ -183,6 +183,13 @@ def test_legistar_text_backfill_marks_no_text_and_skips_it_until_recheck(monkeyp
         ("coralgables", "Coral Gables", "Miami-Dade County", False),
         ("keywest", "Key West", "Monroe County", False),
         ("delraybeach", "Delray Beach", "Palm Beach County", True),
+        ("hollywoodfl", "Hollywood", "Broward County", False),
+        ("clearwater", "Clearwater", "Pinellas County", False),
+        ("miramar", "Miramar", "Broward County", False),
+        ("doral", "Doral", "Miami-Dade County", True),
+        ("hallandalebeach", "Hallandale Beach", "Broward County", False),
+        ("coconutcreek", "Coconut Creek", "Broward County", True),
+        ("pinecrest", "Pinecrest", "Miami-Dade County", False),
     ],
 )
 def test_city_registry_entries_ingest(monkeypatch, db_session, client, jurisdiction, county, committee_sponsors):

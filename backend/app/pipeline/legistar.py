@@ -134,6 +134,63 @@ CLIENT_JURISDICTIONS = {
         # then "Resolution 26-17", "MILLAGE RESOLUTION-26-01.pdf". Exhibits carry neither word.
         "text_attachment": [r"(?<![a-z])ordinance", r"resolution[\s_-]*\d{2}-\d+"],
     },
+    # Miramar, Doral, Hallandale Beach, Coconut Creek, Pinecrest: sampled 2026-10-15
+    # (200 newest matters each). Their own types (Resolution / Ordinance / Discussion /
+    # Presentation / Minutes ...) already map to the right kinds; only the attachment
+    # that is the instrument itself needed a pattern.
+    "miramar": {
+        "jurisdiction": "Miramar",
+        "county": "Broward County",
+        "nightly": True,
+        "label": "Miramar City Commission (Legistar)",
+        "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
+        # "O1871 2nd Reading Millage" (the adopted reading, preferred), "TO1867 FIRST READING ...",
+        # "R8832 Fire Station 84 ...", "TR8835 ...", "TR#8816 - ...".
+        "text_attachment": [
+            r"^\s*t?o\s?#?\d{3,}.*(2nd|second)\s+reading",
+            r"^\s*t?[or]\s?#?\d{3,}",
+        ],
+    },
+    "doral": {
+        "jurisdiction": "Doral",
+        "county": "Miami-Dade County",
+        "nightly": True,
+        # Sponsors mix council members and bodies ("Planning and Zoning").
+        "body_sponsors_as_committees": True,
+        "label": "Doral City Council (Legistar)",
+        "note": "The most recent council matters. Matters without a PDF attachment have no full text.",
+        # "Ord. No. 2026-26 Amendment to Micromobility Devices", "Res. No. 26-Special Event Permit ...".
+        "text_attachment": [r"^\s*(res|ord)\.?\s*no\.?"],
+    },
+    "hallandalebeach": {
+        "jurisdiction": "Hallandale Beach",
+        "county": "Broward County",
+        "nightly": True,
+        "label": "Hallandale Beach City Commission (Legistar)",
+        "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
+        # "Exhibit 1 - Ordinance" / "Exhibit 1 \u2013 Resolution" (hyphen or en dash).
+        "text_attachment": [r"^\s*exhibit\s*1\s*[-\u2013\u2014]\s*(ordinance|resolution)\s*$"],
+    },
+    "coconutcreek": {
+        "jurisdiction": "Coconut Creek",
+        "county": "Broward County",
+        "nightly": True,
+        # Sponsors are partly departments ("City Clerk", "Resilient Design and Development").
+        "body_sponsors_as_committees": True,
+        "label": "Coconut Creek City Commission (Legistar)",
+        "note": "The most recent commission matters. Matters without a PDF attachment have no full text.",
+        # "ORDINANCE 2026-045-Code Amdmt-... (2nd Reading)" and "RESOLUTION 2026-155-1-...", not "BACKUP-Resolution ...".
+        "text_attachment": [r"^\s*(ordinance|resolution)\s+\d{4}-"],
+    },
+    "pinecrest": {
+        "jurisdiction": "Pinecrest",
+        "county": "Miami-Dade County",
+        "nightly": True,
+        "label": "Pinecrest Village Council (Legistar)",
+        "note": "The most recent council matters. Matters without a PDF attachment have no full text.",
+        # "TAB 7-Ordinance - First Reading - ...", "TAB 2-Consent - Resolution - Bid Award ...".
+        "text_attachment": [r"^\s*tab\s*\d+\s*-\s*(consent\s*-\s*)?(resolutions?|ordinance)\b"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",

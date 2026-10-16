@@ -265,3 +265,32 @@ def test_hollywood_and_clearwater_text_attachments():
     assert select_text_attachment("clearwater", _att("MH LHAP 2024-25 to 2026-27", "Resolution 26-17"))["MatterAttachmentName"] == "Resolution 26-17"
     assert select_text_attachment("clearwater", _att("DDB_FY27_Proposed Budget.pdf", "BUDGET RESOLUTION-26-02.pdf"))["MatterAttachmentName"] == "BUDGET RESOLUTION-26-02.pdf"
     assert select_text_attachment("clearwater", _att("Nagano Lanterns", "FY27 Final Budget.pptx")) is None
+
+
+def test_miramar_doral_hallandale_coconut_creek_and_pinecrest_text_attachments():
+    from app.pipeline.bill_text import select_text_attachment
+
+    pick = lambda client, *names: (select_text_attachment(client, _att(*names)) or {}).get("MatterAttachmentName")
+
+    # Miramar: the adopted (2nd) reading wins over the 1st; resolutions are "R8832 ..." / "TR#8816 - ...".
+    assert pick("miramar", "O1871 Millage-1st Reading", "O1871 2nd Reading Millage") == "O1871 2nd Reading Millage"
+    assert pick("miramar", "TO1867 FIRST READING Parking RVs") == "TO1867 FIRST READING Parking RVs"
+    assert pick("miramar", "R8832 Fire Station 84 Replacement Generator w-backup") == "R8832 Fire Station 84 Replacement Generator w-backup"
+    assert pick("miramar", "TR#8816 - FY2027 Comprehensive Pay Plan (CPP)") == "TR#8816 - FY2027 Comprehensive Pay Plan (CPP)"
+    assert pick("miramar", "1869 Continuance") is None
+
+    assert pick("doral", "Memo", "Ord. No. 2026-26 Business Impact Estimate") == "Ord. No. 2026-26 Business Impact Estimate"
+    assert pick("doral", "Memo", "Res. No. 26-Special Event Permit Customers Appreciation Luncheon").startswith("Res. No. 26")
+    assert pick("doral", "Memo", "Exhibit A - Application") is None
+
+    assert pick("hallandalebeach", "Agenda Cover Memo", "Exhibit 1 \u2013 Ordinance") == "Exhibit 1 \u2013 Ordinance"
+    assert pick("hallandalebeach", "Exhibit 2 - Resolution 2026-067 Initial Assessment Resolution", "Exhibit 1 - Resolution") == "Exhibit 1 - Resolution"
+    assert pick("hallandalebeach", "Exhibit 1A - Mediated Settlement Agreement") is None
+
+    cc = ("BACKUP-Resolution 2025-013-SHIP 25-28 ILA", "RESOLUTION 2026-162-Amended 25-28 SHIP Local Housing Assistance Plan")
+    assert pick("coconutcreek", *cc) == cc[1]
+    assert pick("coconutcreek", "BACKUP-Business Impact Estimate-Off-duty Fire Details") is None
+
+    assert pick("pinecrest", "TAB 7-Ordinance - First Reading - Amending Ch 36") .startswith("TAB 7-Ordinance")
+    assert pick("pinecrest", "TAB 2-Consent - Resolution - Bid Award of US1 Median Landsacape Improvements").startswith("TAB 2-Consent")
+    assert pick("pinecrest", "TAB 8-Deferral Requested") is None

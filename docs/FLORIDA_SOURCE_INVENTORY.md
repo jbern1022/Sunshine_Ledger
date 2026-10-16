@@ -165,3 +165,36 @@ the Broward deploy. Track it here as counties are added.
 The other 64 counties have no source yet. Of those, the probe found live
 Legistar clients for Brevard, DeSoto, Hernando, Hillsborough (land use only),
 Marion, Martin, Pinellas, Polk and Seminole; those are the cheapest next.
+
+## Onboarding status (2026-10-15)
+
+Registered in `CLIENT_JURISDICTIONS` and read by the nightly: Jacksonville,
+Fort Lauderdale, Coral Gables, Key West, Delray Beach, Hollywood, Clearwater,
+Broward County (county level), plus, on commit after this note, Miramar, Doral,
+Hallandale Beach, Coconut Creek and Pinecrest. Each was sampled (200 newest
+matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
+before its patterns were written.
+
+Sampled and **deliberately not onboarded yet**, with what each needs:
+
+| Place | Token | Why it waits |
+|---|---|---|
+| Plant City | `plantcity` | Every sampled sponsor is the literal name "Granicus User" (not a person); legislation-typed matters had no attachments. Needs a sponsor exclusion, and text may not exist. |
+| Wellington | `wellington` | No Resolution/Ordinance types in the newest 200 (Purchasing/Contract, code-hearing cases, ARB). Needs a type-to-kind map, and a check that its legislation is on this system at all. |
+| North Port | `cityofnorthport` | 126 of 200 typed "1st Hearing Case"; 4 null titles. Needs a kind rule for hearing cases. |
+| Venice | `venice` | 70 typed "Agreement", 6 "Rezoning"; attachments are generically named ("Ordinance", "Resolution"). Needs a kind map. |
+| Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
+| Marco Island | `marcoisland` | Code cases and generic "New Business" / "City Council Item"; attachments are staff reports, not the instrument. |
+| Pinellas Park | `pinellaspark` | 118 of 200 typed "Other"; 20 null titles; sponsors are departments. Needs rules first. |
+| Edgewater | `cityofedgewater` | 78 "Informational Report"; no sponsors; 4 null titles. Feasible, lower value. |
+| Deltona | `deltona` | 82 "Code Violation"; needs those marked as other. Feasible. |
+| Margate | `margatefl` | "Consent - Resolution" and "Ordinance - 1st Reading" types; the resolution attachment is just "RESOLUTION". Feasible; needs `item_kind` to read "consent - resolution" (it already does: ends with "resolution"). |
+
+Counties (Brevard, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
+Polk, Seminole) are not onboarded; they need the `jurisdiction_level`
+audit first (ticket 6hm2FqVh66Mmww6G).
+
+Capacity: each new city adds up to 200 items on its first run, all of which the
+nightly summarizes. Seven cities in one week (Hollywood, Clearwater and the five
+above) is roughly 1,400 items, so expect a longer first run and watch Kuma
+monitor 29.
