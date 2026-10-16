@@ -56,20 +56,24 @@ class ElectionCalendar:
 #   2026-10-13 -- all ten dates re-checked against the source URL below and
 #     confirmed unchanged. The page (last updated 2025-08-22) shows no
 #     emergency orders or amendment notices.
+#   2026-10-15 -- verify_by (Oct 15) passed and /health/data went 503; moved
+#     to Oct 23, the day before early voting, for one last check of the dates
+#     still ahead (vote-by-mail request Oct 22, early voting Oct 24-31,
+#     General Nov 3) for post-storm emergency orders.
 #
 # `verify_by` is deliberately set to fall between events rather than at a
-# round interval. It now lands after the General registration deadline
-# (Oct 5) has passed but a week before the vote-by-mail deadline (Oct 22)
-# and early voting (Oct 24), so a late amendment to the dates still ahead
-# of us gets caught while it can still be acted on. Florida amends election
-# dates by emergency order after hurricanes, which is not hypothetical in
-# October.
+# round interval. It lands after the vote-by-mail request deadline (Oct 22)
+# but before early voting (Oct 24), so a late amendment to the dates still
+# ahead of us gets caught while it can still be acted on. Florida amends
+# election dates by emergency order after hurricanes, which is not
+# hypothetical in October. After the General Election (Nov 3) the 2026
+# calendar has no dates left; the next calendar replaces it.
 FLORIDA_2026 = ElectionCalendar(
     state="FL",
     year=2026,
     source_name="Florida Department of State, Division of Elections",
     source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
-    verify_by=dt.date(2026, 10, 15),
+    verify_by=dt.date(2026, 10, 23),
     events=(
         ElectionEvent(dt.date(2026, 7, 20), "Voter registration deadline (Primary)", "registration"),
         ElectionEvent(dt.date(2026, 8, 6), "Vote-by-mail request deadline (Primary)", "vote_by_mail"),
