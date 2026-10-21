@@ -71,6 +71,11 @@ EARLY_VOTING_NOTE = (
 #   2026-10-20 -- early voting was already open in at least one county on
 #     Oct 19 (a voter reported it), five days before the Oct 24 listed here.
 #     Oct 24-31 is the required statewide window, not every county's window.
+#     s. 101.657(1)(d): early voting must begin the 10th day before and end
+#     the 3rd day before the election; a supervisor may also offer the 15th
+#     through 11th and the 2nd day before (Oct 19-23 and Nov 1 this year).
+#     Press reports show Palm Beach, St. Lucie, Indian River and Monroe
+#     opening Oct 19, Martin Oct 21, Franklin Oct 24 (county sites unchecked).
 #     Dates unchanged; labels now say "required" and each early-voting row
 #     carries a note. Per-county dates are not modeled. The Oct 23 re-check
 #     is no longer "the day before early voting".
