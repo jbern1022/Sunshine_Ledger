@@ -79,6 +79,14 @@ EARLY_VOTING_NOTE = (
 #     Dates unchanged; labels now say "required" and each early-voting row
 #     carries a note. Per-county dates are not modeled. The Oct 23 re-check
 #     is no longer "the day before early voting".
+#   2026-10-21 -- all ten dates re-checked against the source URL below and
+#     confirmed unchanged. The page (still "last updated August 22, 2025")
+#     mentions no storm, extension or amended dates and points voters to
+#     their county Supervisor of Elections for optional early-voting days.
+#     Partial: its "Emergency and Disaster - Election Resources" page, the
+#     Governor's executive orders and county sites were not checked, and a
+#     web search found no 2026 emergency order (nothing found, not proof
+#     that none exists).
 #
 # `verify_by` is deliberately set to fall between events rather than at a
 # round interval. It lands after the vote-by-mail request deadline (Oct 22)
