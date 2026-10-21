@@ -223,6 +223,26 @@ CLIENT_JURISDICTIONS = {
         # "2026-R-42 Budget Adjustments Final FY26 with Exhibit A", "2026-R-41 Veteran Organization of the Year".
         "text_attachment": [r"^\s*\d{4}-r-\d+"],
     },
+    "cityofnorthport": {
+        "jurisdiction": "North Port",
+        "county": "Sarasota County",
+        "nightly": True,
+        "label": "North Port City Commission (Legistar)",
+        "note": "The most recent commission matters. About three quarters are zoning and code hearing cases, which are not labelled "
+        "legislation. Matters without a PDF attachment have no full text.",
+        # "Ordinance - First Reading", "Resolution 2026-R-68"; the other attachments are staff reports and minutes.
+        "text_attachment": [r"^\s*(ordinance|resolution)\b"],
+    },
+    "venice": {
+        "jurisdiction": "Venice",
+        "county": "Sarasota County",
+        "nightly": True,
+        "label": "Venice City Council (Legistar)",
+        "note": "The most recent council matters. Many are agreements, recognitions and presentations, which are not labelled "
+        "legislation. Matters without a PDF attachment have no full text.",
+        # The instrument is the attachment named just "Ordinance" or "Resolution"; the others are memoranda and exhibits.
+        "text_attachment": [r"^\s*(ordinance|resolution)\s*$"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",

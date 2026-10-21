@@ -178,7 +178,10 @@ named just "RESOLUTION". Deltona (`deltona`) and Edgewater (`cityofedgewater`) a
 registered on branch `feat/onboard-deltona-edgewater` (2026-10-20), not yet merged. About half
 of Deltona's items are code-enforcement cases (kind "other"), and some resolutions typed
 Contract/Report/Discussion are not labelled legislation; Edgewater's are mostly informational
-reports and consent awards. Each was sampled (200 newest
+reports and consent awards. North Port (`cityofnorthport`) and Venice (`venice`) are registered on branch
+`feat/onboard-north-port-venice` (2026-10-21): their own Ordinance/Resolution types already
+map to kinds, so hearing cases (North Port) and agreements/recognitions (Venice) show as
+"other". Each was sampled (200 newest
 matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
 before its patterns were written.
 
@@ -188,8 +191,6 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 |---|---|---|
 | Plant City | `plantcity` | Every sampled sponsor is the literal name "Granicus User" (not a person); legislation-typed matters had no attachments. Needs a sponsor exclusion, and text may not exist. |
 | Wellington | `wellington` | No Resolution/Ordinance types in the newest 200 (Purchasing/Contract, code-hearing cases, ARB). Needs a type-to-kind map, and a check that its legislation is on this system at all. |
-| North Port | `cityofnorthport` | 126 of 200 typed "1st Hearing Case"; 4 null titles. Needs a kind rule for hearing cases. |
-| Venice | `venice` | 70 typed "Agreement", 6 "Rezoning"; attachments are generically named ("Ordinance", "Resolution"). Needs a kind map. |
 | Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
 | Marco Island | `marcoisland` | Code cases and generic "New Business" / "City Council Item"; attachments are staff reports, not the instrument. |
 | Pinellas Park | `pinellaspark` | 118 of 200 typed "Other"; 20 null titles; sponsors are departments. Needs rules first. |
