@@ -322,6 +322,8 @@ export interface ElectionEvent {
   date: string;
   label: string;
   kind: string;
+  /** Caveat shown with the date, e.g. that counties may differ. Empty when none. */
+  note: string;
   is_past: boolean;
   days_away: number;
 }

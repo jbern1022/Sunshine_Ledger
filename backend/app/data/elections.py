@@ -45,10 +45,18 @@ class ElectionCalendar:
     events: tuple[ElectionEvent, ...]
 
 
+EARLY_VOTING_NOTE = (
+    "Statewide required window. Counties may start earlier or run later; "
+    "confirm your county's dates with its Supervisor of Elections."
+)
+
+
 # Florida 2026, from the Division of Elections' published calendar.
 # Cross-checked on entry: both elections fall on a Tuesday, registration
-# deadlines on the Monday 29 days prior, and early voting runs Saturday to
-# Saturday -- the shape Florida law requires.
+# deadlines on the Monday 29 days prior, and the required early-voting
+# window runs Saturday to Saturday -- the shape Florida law requires. That
+# window is the statutory minimum, not when every county operates: counties
+# may open earlier and run later, so these rows say so in their note.
 #
 # RE-VERIFICATION LOG (append a line each time; don't overwrite):
 #   2026-09-02 -- all ten dates re-checked against the source URL below and
@@ -60,10 +68,16 @@ class ElectionCalendar:
 #     to Oct 23, the day before early voting, for one last check of the dates
 #     still ahead (vote-by-mail request Oct 22, early voting Oct 24-31,
 #     General Nov 3) for post-storm emergency orders.
+#   2026-10-20 -- early voting was already open in at least one county on
+#     Oct 19 (a voter reported it), five days before the Oct 24 listed here.
+#     Oct 24-31 is the required statewide window, not every county's window.
+#     Dates unchanged; labels now say "required" and each early-voting row
+#     carries a note. Per-county dates are not modeled. The Oct 23 re-check
+#     is no longer "the day before early voting".
 #
 # `verify_by` is deliberately set to fall between events rather than at a
 # round interval. It lands after the vote-by-mail request deadline (Oct 22)
-# but before early voting (Oct 24), so a late amendment to the dates still
+# but before the required early-voting start (Oct 24), so a late amendment to the dates still
 # ahead of us gets caught while it can still be acted on. Florida amends
 # election dates by emergency order after hurricanes, which is not
 # hypothetical in October. After the General Election (Nov 3) the 2026
@@ -77,13 +91,13 @@ FLORIDA_2026 = ElectionCalendar(
     events=(
         ElectionEvent(dt.date(2026, 7, 20), "Voter registration deadline (Primary)", "registration"),
         ElectionEvent(dt.date(2026, 8, 6), "Vote-by-mail request deadline (Primary)", "vote_by_mail"),
-        ElectionEvent(dt.date(2026, 8, 8), "Early voting begins (Primary)", "early_voting"),
-        ElectionEvent(dt.date(2026, 8, 15), "Early voting ends (Primary)", "early_voting"),
+        ElectionEvent(dt.date(2026, 8, 8), "Early voting: required start (Primary)", "early_voting", EARLY_VOTING_NOTE),
+        ElectionEvent(dt.date(2026, 8, 15), "Early voting: required end (Primary)", "early_voting", EARLY_VOTING_NOTE),
         ElectionEvent(dt.date(2026, 8, 18), "Primary Election", "election"),
         ElectionEvent(dt.date(2026, 10, 5), "Voter registration deadline (General)", "registration"),
         ElectionEvent(dt.date(2026, 10, 22), "Vote-by-mail request deadline (General)", "vote_by_mail"),
-        ElectionEvent(dt.date(2026, 10, 24), "Early voting begins (General)", "early_voting"),
-        ElectionEvent(dt.date(2026, 10, 31), "Early voting ends (General)", "early_voting"),
+        ElectionEvent(dt.date(2026, 10, 24), "Early voting: required start (General)", "early_voting", EARLY_VOTING_NOTE),
+        ElectionEvent(dt.date(2026, 10, 31), "Early voting: required end (General)", "early_voting", EARLY_VOTING_NOTE),
         ElectionEvent(dt.date(2026, 11, 3), "General Election", "election"),
     ),
 )

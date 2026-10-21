@@ -62,6 +62,7 @@ export default function ElectionContext() {
           </span>
         )}
       </div>
+      {next?.note && <p className="mt-1 text-[11px] text-slate-500">{next.note}</p>}
       <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
         Dates published by the{" "}
         <a

@@ -19,19 +19,21 @@ const calendar: ElectionCalendar = {
     date: "2026-10-05",
     label: "Voter registration deadline (General)",
     kind: "registration",
+    note: "",
     is_past: false,
     days_away: 43,
   },
   events: [
-    { date: "2026-08-18", label: "Primary Election", kind: "election", is_past: true, days_away: -5 },
+    { date: "2026-08-18", label: "Primary Election", kind: "election", note: "", is_past: true, days_away: -5 },
     {
       date: "2026-10-05",
       label: "Voter registration deadline (General)",
       kind: "registration",
+      note: "",
       is_past: false,
       days_away: 43,
     },
-    { date: "2026-11-03", label: "General Election", kind: "election", is_past: false, days_away: 72 },
+    { date: "2026-11-03", label: "General Election", kind: "election", note: "", is_past: false, days_away: 72 },
   ],
 };
 
@@ -79,5 +81,21 @@ describe("ElectionContext", () => {
     // The primary already happened; only the general should be surfaced.
     expect(screen.queryByText(/Primary Election/)).not.toBeInTheDocument();
     expect(screen.getByText(/General Election/)).toBeInTheDocument();
+  });
+  it("shows the note when the next event carries one", async () => {
+    vi.mocked(api.fetchElections).mockResolvedValueOnce({
+      ...calendar,
+      next_event: {
+        date: "2026-10-24",
+        label: "Early voting: required start (General)",
+        kind: "early_voting",
+        note: "Statewide required window. Counties may start earlier or run later.",
+        is_past: false,
+        days_away: 4,
+      },
+    });
+    render(<ElectionContext />);
+
+    expect(await screen.findByText(/Counties may start earlier or run later/)).toBeInTheDocument();
   });
 });
