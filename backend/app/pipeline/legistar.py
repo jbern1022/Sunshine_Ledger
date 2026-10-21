@@ -191,6 +191,15 @@ CLIENT_JURISDICTIONS = {
         # "TAB 7-Ordinance - First Reading - ...", "TAB 2-Consent - Resolution - Bid Award ...".
         "text_attachment": [r"^\s*tab\s*\d+\s*-\s*(consent\s*-\s*)?(resolutions?|ordinance)\b"],
     },
+    "margatefl": {
+        "jurisdiction": "Margate",
+        "county": "Broward County",
+        "nightly": True,
+        "label": "Margate City Commission (Legistar)",
+        "note": "The most recent commission matters, including Community Redevelopment Agency items. Matters without a PDF attachment have no full text.",
+        # The instrument is the attachment named just "RESOLUTION" or "ORDINANCE"; the others are agreements, exhibits and backup.
+        "text_attachment": [r"^\s*(resolution|ordinance)\s*$"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",

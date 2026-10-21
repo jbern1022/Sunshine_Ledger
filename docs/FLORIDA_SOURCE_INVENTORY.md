@@ -171,7 +171,10 @@ Marion, Martin, Pinellas, Polk and Seminole; those are the cheapest next.
 Registered in `CLIENT_JURISDICTIONS` and read by the nightly: Jacksonville,
 Fort Lauderdale, Coral Gables, Key West, Delray Beach, Hollywood, Clearwater,
 Broward County (county level), plus, on commit after this note, Miramar, Doral,
-Hallandale Beach, Coconut Creek and Pinecrest. Each was sampled (200 newest
+Hallandale Beach, Coconut Creek and Pinecrest. Margate (`margatefl`) is registered on
+branch `feat/onboard-margate` (2026-10-20), not yet merged: its types already map to
+kinds, sponsors are empty on the two matters checked, and the resolution attachment is
+named just "RESOLUTION". Each was sampled (200 newest
 matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
 before its patterns were written.
 
@@ -188,7 +191,6 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 | Pinellas Park | `pinellaspark` | 118 of 200 typed "Other"; 20 null titles; sponsors are departments. Needs rules first. |
 | Edgewater | `cityofedgewater` | 78 "Informational Report"; no sponsors; 4 null titles. Feasible, lower value. |
 | Deltona | `deltona` | 82 "Code Violation"; needs those marked as other. Feasible. |
-| Margate | `margatefl` | "Consent - Resolution" and "Ordinance - 1st Reading" types; the resolution attachment is just "RESOLUTION". Feasible; needs `item_kind` to read "consent - resolution" (it already does: ends with "resolution"). |
 
 Counties (Brevard, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
 Polk, Seminole) are not onboarded; they need the `jurisdiction_level`
