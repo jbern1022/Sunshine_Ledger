@@ -267,6 +267,28 @@ CLIENT_JURISDICTIONS = {
         # "1. Resolution No. R2026-55- ...", "1. Ordinance 2026-20 CPA", "Ord 2026-18- ..."; exhibits are skipped.
         "text_attachment": [r"^\s*(?:\d+\.\s*)?(?:ord(?:inance)?|resolution)\b(?!.*exhibit)"],
     },
+    "marcoisland": {
+        "jurisdiction": "Marco Island",
+        "county": "Collier County",
+        "nightly": True,
+        "label": "Marco Island City Council (Legistar)",
+        "note": "The most recent council matters. About a third are code enforcement cases and many are staff reports and updates, "
+        "which are not labelled legislation. Matters without a PDF attachment have no full text.",
+        # "RESOLUTION 26-70"; most other attachments are staff reports, not the instrument.
+        "text_attachment": [r"^\s*(ordinance|resolution)\s+\d"],
+    },
+    "pinellaspark": {
+        "jurisdiction": "Pinellas Park",
+        "county": "Pinellas County",
+        "nightly": True,
+        # Sponsors are departments ("Community Development", "Police", "City Clerk").
+        "body_sponsors_as_committees": True,
+        # Most items are typed "Other"; the instruments among them open "ORDINANCE NO. 2026-26." / "RESOLUTION NO. 2026-14.".
+        "numbered_instrument_from_title": True,
+        "label": "Pinellas Park City Council (Legistar)",
+        "note": "The most recent council matters. Most are typed \"Other\" by the city; an item is labelled legislation when its own type "
+        "says so or its title begins with a numbered resolution or ordinance. Matters without a PDF attachment have no full text.",
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",

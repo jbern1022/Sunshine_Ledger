@@ -183,7 +183,10 @@ reports and consent awards. North Port (`cityofnorthport`) and Venice (`venice`)
 map to kinds, so hearing cases (North Port) and agreements/recognitions (Venice) show as
 "other". Plant City (`plantcity`, new `ignore_sponsors` option for the clerk login "Granicus User") and
 Wellington (`wellington`, new `numbered_instrument_from_title` option) are registered on branch
-`feat/onboard-plant-city-wellington` (2026-10-21). Each was sampled (200 newest
+`feat/onboard-plant-city-wellington` (2026-10-21). Marco Island (`marcoisland`) and Pinellas Park (`pinellaspark`, reads its "Other"-typed ordinances and
+resolutions from the title) are registered on branch `feat/onboard-marco-pinellas-park` (2026-10-21).
+Ocala (`ocala`) is the only sampled city left: its ordinance attachments are plan documents, not the
+instrument, and its real business is typed "Agenda Item". Each was sampled (200 newest
 matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
 before its patterns were written.
 
@@ -192,8 +195,6 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 | Place | Token | Why it waits |
 |---|---|---|
 | Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
-| Marco Island | `marcoisland` | Code cases and generic "New Business" / "City Council Item"; attachments are staff reports, not the instrument. |
-| Pinellas Park | `pinellaspark` | 118 of 200 typed "Other"; 20 null titles; sponsors are departments. Needs rules first. |
 
 Counties (Brevard, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
 Polk, Seminole) are not onboarded; they need the `jurisdiction_level`
