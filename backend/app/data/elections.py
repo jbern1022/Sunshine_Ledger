@@ -90,20 +90,15 @@ EARLY_VOTING_NOTE = (
 #     counties, expiring after 60 days. Neither mentions elections, voting
 #     or any election deadline. In past storms (2018, 2022, 2024) election
 #     changes came in separate orders for the affected counties, so a later
-<<<<<<< HEAD
-#     one could still change dates there. Still unchecked: county sites and
-#     the Division's emergency-resources page (its link 404ed when guessed).
+#     one could still change dates there. The Division's emergency-resources
+#     page (dos.fl.gov/elections/for-voters/emergency-and-disaster-election-
+#     resources/) lists no 2026 orders but was last updated Oct 25, 2024.
+#     Still unchecked: county sites.
 #   2026-10-21 -- verify_by Oct 23 -> Nov 4 so /health/data does not go 503 on
 #     Oct 24, with the dates unchanged and no order found affecting them.
 #     The staleness alarm no longer covers the weeks before the election, so
 #     the remaining emergency-order check (county sites) is tracked as a
 #     to-do, not by this date.
-=======
-#     one could still change dates there. The Division's emergency-resources
-#     page (dos.fl.gov/elections/for-voters/emergency-and-disaster-election-
-#     resources/) lists no 2026 orders but was last updated Oct 25, 2024.
-#     Still unchecked: county sites.
->>>>>>> docs/elections-log-2026-10-21
 #
 # `verify_by` is set to fall between events rather than at a round interval,
 # so a late amendment to the dates still ahead of us gets caught while it can
