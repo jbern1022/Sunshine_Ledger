@@ -39,5 +39,5 @@ infra)". Roadmap Phase 2.
    (Counsel review is already a gate for the other Bernal Labs product.)
 5. **Abuse and cost:** registration rate limits, email verification or not, and whether
    to cap watchlist sizes.
-6. **Where the secret lives:** session signing and any pepper in the same SOPS/secret
-   flow as the other keys, or a new one?
+6. **Where the secret lives:** session signing and any pepper need a secret; confirm it
+   goes wherever the backend's other secrets are kept on the host.

@@ -30,9 +30,8 @@ Source: <https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/> and
 ## Options
 
 1. **Aggregate tone only (smallest).** For each bill, call `TimelineTone` / `ToneChart`
-   for the same query and store the coverage-level distribution. No per-article claim, no
-   model, and it stays inside "a thin, unscored news layer"... but it is still a score
-   attached to a bill, so see "Doctrine" below.
+   for the same query and store the coverage-level distribution. No per-article claim and
+   no model, but it is still a score attached to a bill, so see "Doctrine" below.
 2. **Per-article tone from the GKG.** Match our stored article URLs to GKG rows and keep
    the tone GDELT already computed. Needs either the 15-minute files (a lot of data to
    scan) or BigQuery (a Google account and costs). Not rate-limited like the DOC API.
