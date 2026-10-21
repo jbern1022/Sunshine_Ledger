@@ -189,3 +189,58 @@ def test_an_unaddressed_long_item_gets_the_real_reason():
     entry = {**ENTRY, "exceptions": [{"text": LONG, "quote": LONG}]}
     out = mapper.map_entry(entry, 0, FakeClient({"audience": {"kind": "attr", "attr": "role", "any_of": ["landlord"]}}))
     assert {"kind": "exception", "index": 0, "reason": "It is too long or compound to map exactly"} in out["unmapped"]
+
+
+def test_pending_layers_are_supported_uncapped_and_not_fully_mapped(db_session, bill_factory):
+    from app.impact_lens.map_batch import pending_who_layers
+
+    needs, done, unsupported, capped = bill_factory(), bill_factory(), bill_factory(), bill_factory()
+    layers = [
+        _who_layer(needs, [ENTRY, ENTRY]),
+        _who_layer(done, [ENTRY]),
+        _who_layer(unsupported, [ENTRY]),
+        _who_layer(capped, [ENTRY]),
+    ]
+    layers[2].evidence_state = "partial"
+    layers[3].scope_note = "Bill text · first 20 of 31 entries"
+    db_session.add_all(layers)
+    db_session.commit()
+    mapper.map_layer(db_session, layers[1], FakeClient(GOOD_ANSWER), generated_by="llm:test")  # fully mapped already
+    mapper.map_layer(db_session, layers[0], FakeClient(GOOD_ANSWER), generated_by="llm:test")
+    # Remove one stored entry so layer 0 is partially mapped.
+    db_session.query(BillLayerCriteria).filter_by(bill_layer_id=layers[0].id, entry_index=1).delete()
+    db_session.commit()
+
+    pending = pending_who_layers(db_session)
+    assert [l.id for _, l in pending] == [layers[0].id]
+
+
+def test_process_pending_respects_the_bill_limit_and_the_time_budget(db_session, bill_factory):
+    from app.impact_lens.map_batch import process_pending
+
+    layers = [_who_layer(bill_factory(), [ENTRY]) for _ in range(3)]
+    db_session.add_all(layers)
+    db_session.commit()
+
+    client = FakeClient(GOOD_ANSWER)
+    assert process_pending(db_session, client, generated_by="llm:test", limit=2) == (2, 0, 2)
+    assert len(client.prompts) == 2
+
+    # A zero-minute budget starts no bill at all.
+    assert process_pending(db_session, client, generated_by="llm:test", max_minutes=0) == (0, 0, 0)
+
+    # The rest gets done on the next run, and a run with nothing pending makes no model calls.
+    assert process_pending(db_session, client, generated_by="llm:test") == (1, 0, 1)
+    calls = len(client.prompts)
+    assert process_pending(db_session, client, generated_by="llm:test") == (0, 0, 0)
+    assert len(client.prompts) == calls
+
+
+def test_process_pending_counts_failed_entries_and_keeps_going(db_session, bill_factory):
+    from app.impact_lens.map_batch import process_pending
+
+    db_session.add_all([_who_layer(bill_factory(), [ENTRY]), _who_layer(bill_factory(), [ENTRY])])
+    db_session.commit()
+
+    stored, failed, bills = process_pending(db_session, FakeClient("not json"), generated_by="llm:test")
+    assert (stored, bills) == (0, 2) and failed == 2
