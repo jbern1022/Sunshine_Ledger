@@ -41,6 +41,7 @@ def election_calendar(
                 "date": event.date.isoformat(),
                 "label": event.label,
                 "kind": event.kind,
+                "note": event.note,
                 "is_past": event.date < now,
                 "days_away": days_away,
             }

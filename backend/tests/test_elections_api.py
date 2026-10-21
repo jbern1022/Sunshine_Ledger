@@ -95,3 +95,19 @@ def test_verify_by_is_set_so_stale_data_is_visible():
     """No machine-readable feed backs this, so the re-check date has to be
     part of the payload rather than tribal knowledge."""
     assert isinstance(FLORIDA_2026.verify_by, dt.date)
+
+
+def test_early_voting_rows_say_counties_may_differ():
+    """Oct 24-31 is the required statewide window, not every county's. A bare
+    "begins Oct 24" misled a voter whose county opened on Oct 19."""
+    early = [e for e in FLORIDA_2026.events if e.kind == "early_voting"]
+    assert early
+    for event in early:
+        assert "required" in event.label.lower()
+        assert "county" in event.note.lower() or "counties" in event.note.lower()
+
+
+def test_event_note_is_in_the_payload(client):
+    body = client.get("/elections", params={"state": "FL"}).json()
+    early = [e for e in body["events"] if e["kind"] == "early_voting"]
+    assert early and all(e["note"] for e in early)
