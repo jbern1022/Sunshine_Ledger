@@ -201,7 +201,7 @@ def test_pending_layers_are_supported_uncapped_and_not_fully_mapped(db_session, 
         _who_layer(unsupported, [ENTRY]),
         _who_layer(capped, [ENTRY]),
     ]
-    layers[2].evidence_state = "partial"
+    layers[2].evidence_state = "insufficient_evidence"
     layers[3].scope_note = "Bill text · first 20 of 31 entries"
     db_session.add_all(layers)
     db_session.commit()
