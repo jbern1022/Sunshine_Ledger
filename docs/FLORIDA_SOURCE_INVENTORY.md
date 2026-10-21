@@ -174,7 +174,11 @@ Broward County (county level), plus, on commit after this note, Miramar, Doral,
 Hallandale Beach, Coconut Creek and Pinecrest. Margate (`margatefl`) is registered on
 branch `feat/onboard-margate` (2026-10-20), not yet merged: its types already map to
 kinds, sponsors are empty on the two matters checked, and the resolution attachment is
-named just "RESOLUTION". Each was sampled (200 newest
+named just "RESOLUTION". Deltona (`deltona`) and Edgewater (`cityofedgewater`) are
+registered on branch `feat/onboard-deltona-edgewater` (2026-10-20), not yet merged. About half
+of Deltona's items are code-enforcement cases (kind "other"), and some resolutions typed
+Contract/Report/Discussion are not labelled legislation; Edgewater's are mostly informational
+reports and consent awards. Each was sampled (200 newest
 matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
 before its patterns were written.
 
@@ -189,8 +193,6 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 | Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
 | Marco Island | `marcoisland` | Code cases and generic "New Business" / "City Council Item"; attachments are staff reports, not the instrument. |
 | Pinellas Park | `pinellaspark` | 118 of 200 typed "Other"; 20 null titles; sponsors are departments. Needs rules first. |
-| Edgewater | `cityofedgewater` | 78 "Informational Report"; no sponsors; 4 null titles. Feasible, lower value. |
-| Deltona | `deltona` | 82 "Code Violation"; needs those marked as other. Feasible. |
 
 Counties (Brevard, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
 Polk, Seminole) are not onboarded; they need the `jurisdiction_level`
