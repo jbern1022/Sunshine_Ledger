@@ -306,3 +306,57 @@ def test_a_matter_with_a_null_file_number_falls_back_to_its_id(monkeypatch, db_s
     monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
     written = legistar_module.ingest_local_bills(db_session, client_name="hollywoodfl", limit=1)
     assert written[0].bill.bill_number == "21301"
+
+
+def test_numbered_instrument_reads_titles_that_open_with_one():
+    from app.pipeline.legistar import numbered_instrument
+
+    assert numbered_instrument("RESOLUTION NO. R2026-55 (FPL NON-EXCLUSIVE EASEMENT AT BOOSTER)") == "Resolution"
+    assert numbered_instrument("ORDINANCE NO. 2026-18 (Rustic Ranches Overlay Zoning District)") == "Ordinance"
+    assert numbered_instrument("Resolution #225-2026 approving minutes") == "Resolution"
+    assert numbered_instrument("  Ordinance 19-2026\n amending") == "Ordinance"
+    # A title that only mentions one, or has no number, is not the instrument.
+    assert numbered_instrument("AUTHORIZATION TO RENEW CROWDSTRIKE CYBERSECURITY SERVICES") is None
+    assert numbered_instrument("Public hearing on Ordinance No. 2026-18") is None
+    assert numbered_instrument("Resolution approving the lease") is None
+    assert numbered_instrument("") is None
+
+
+def test_wellington_reads_kind_from_numbered_titles_not_from_its_categories(monkeypatch, db_session):
+    from app.pipeline.item_kind import item_kind
+
+    class Fake(FakeLegistarClient):
+        def get_matters(self, *, top):
+            base = super().get_matters(top=top)[0]
+            return [
+                {**base, "MatterId": 1, "MatterFile": "26-1", "MatterTypeName": "Easement", "MatterTitle": "RESOLUTION NO. R2026-55 (FPL EASEMENT)"},
+                {**base, "MatterId": 2, "MatterFile": "26-2", "MatterTypeName": "PZ-Zoning Text Amendment", "MatterTitle": "ORDINANCE NO. 2026-18 (Rustic Ranches)"},
+                {**base, "MatterId": 3, "MatterFile": "26-3", "MatterTypeName": "Purchasing/Contract", "MatterTitle": "AUTHORIZATION TO RENEW CROWDSTRIKE"},
+                {**base, "MatterId": 4, "MatterFile": "26-4", "MatterTypeName": "Resolution", "MatterTitle": "Plain resolution typed by the city"},
+            ]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="wellington", limit=4)
+
+    by_file = {e.bill.bill_number: e for e in db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalars()}
+    assert by_file["26-1"].attributes["item_type"] == "Resolution" and by_file["26-1"].attributes["source_item_type"] == "Easement"
+    assert by_file["26-2"].attributes["item_type"] == "Ordinance"
+    assert item_kind(by_file["26-3"].attributes["item_type"]) == "other"
+    # Already legislation by its own type: left as the city typed it.
+    assert by_file["26-4"].attributes["item_type"] == "Resolution" and "source_item_type" not in by_file["26-4"].attributes
+
+
+def test_plant_city_ignores_the_clerks_login_as_a_sponsor(monkeypatch, db_session):
+    class Fake(FakeLegistarClient):
+        def get_sponsors(self, matter_id):
+            return [{"MatterSponsorName": "Granicus User", "MatterSponsorNameId": 9}, {"MatterSponsorName": "Real Commissioner", "MatterSponsorNameId": 10}]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="plantcity", limit=1)
+
+    names = set(_sponsors(db_session))
+    assert "Real Commissioner" in names and "Granicus User" not in names

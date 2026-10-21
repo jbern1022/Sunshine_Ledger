@@ -27,6 +27,7 @@ from app.models import Bill, Entity, Relationship, Source
 from app.pipeline._retry import with_retry
 from app.pipeline._status import normalize_status
 from app.pipeline._text_limits import CHAMBER_MAX_LENGTH, fit
+from app.pipeline.item_kind import item_kind
 from app.pipeline.source_checks import record_check
 from app.pipeline.topic_tagging_ollama import tag_local_bill
 
@@ -243,6 +244,29 @@ CLIENT_JURISDICTIONS = {
         # The instrument is the attachment named just "Ordinance" or "Resolution"; the others are memoranda and exhibits.
         "text_attachment": [r"^\s*(ordinance|resolution)\s*$"],
     },
+    "plantcity": {
+        "jurisdiction": "Plant City",
+        "county": "Hillsborough County",
+        "nightly": True,
+        # Every sampled sponsor (3 of 3) is the clerk's login name, not a person.
+        "ignore_sponsors": ["Granicus User"],
+        "label": "Plant City Commission (Legistar)",
+        "note": "The most recent commission matters. The sampled legislation-typed matters had no attachments, so most have no full text.",
+    },
+    "wellington": {
+        "jurisdiction": "Wellington",
+        "county": "Palm Beach County",
+        "nightly": True,
+        # Resolutions and ordinances sit under many types ("Easement", "Discussion Item", "PZ-Zoning Text Amendment"),
+        # so the kind comes from a title that starts "RESOLUTION NO. R2026-55" / "ORDINANCE NO. 2026-18".
+        "numbered_instrument_from_title": True,
+        "label": "Wellington Village Council (Legistar)",
+        "note": "The most recent council matters. Many are presentations, purchasing items and code hearing cases; an item is labelled "
+        "legislation when its own type says so or its title begins with a numbered resolution or ordinance. "
+        "Matters without a PDF attachment have no full text.",
+        # "1. Resolution No. R2026-55- ...", "1. Ordinance 2026-20 CPA", "Ord 2026-18- ..."; exhibits are skipped.
+        "text_attachment": [r"^\s*(?:\d+\.\s*)?(?:ord(?:inance)?|resolution)\b(?!.*exhibit)"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",
@@ -301,6 +325,17 @@ def adopted_instrument(title: str) -> str | None:
     """"Ordinance" or "Resolution" when an agenda action's title says it adopts
     one, else None. For clients (Clearwater) that type most items "Action Item"."""
     match = _ADOPTS_INSTRUMENT.search(" ".join((title or "").split()))
+    return match.group(1).capitalize() if match else None
+
+
+# "RESOLUTION NO. R2026-55 (FPL NON-EXCLUSIVE EASEMENT ...)", "ORDINANCE NO. 2026-18 (...)", "Resolution #225-2026 ...".
+_NUMBERED_INSTRUMENT = re.compile(r"^\s*(ordinance|resolution)\s+(?:no\.?\s*)?#?\s*[A-Za-z]{0,2}\d", re.IGNORECASE)
+
+
+def numbered_instrument(title: str) -> str | None:
+    """"Ordinance" or "Resolution" when a title opens with a numbered one, else None.
+    For clients (Wellington) whose own types are agenda or zoning categories."""
+    match = _NUMBERED_INSTRUMENT.search(" ".join((title or "").split()))
     return match.group(1).capitalize() if match else None
 
 
@@ -473,6 +508,17 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
                 "item_type": adopted_instrument(title),
                 "source_item_type": matter["MatterTypeName"],
             }
+        elif (
+            info.get("numbered_instrument_from_title")
+            and item_kind(matter.get("MatterTypeName")) != "legislation"
+            and numbered_instrument(title)
+        ):
+            # The client's own type is a category; the title says what the record is.
+            entity.attributes = {
+                **(entity.attributes or {}),
+                "item_type": numbered_instrument(title),
+                "source_item_type": matter.get("MatterTypeName"),
+            }
         elif matter.get("MatterTypeName"):
             entity.attributes = {**(entity.attributes or {}), "item_type": matter["MatterTypeName"]}  # see item_kind.py
         db.flush()
@@ -510,7 +556,7 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
         try:
             for sponsor in client.get_sponsors(matter_id):
                 name = sponsor.get("MatterSponsorName")
-                if not name:
+                if not name or name in info.get("ignore_sponsors", ()):
                     continue
                 is_body = bool(sponsor.get("MatterSponsorBodyId")) and not sponsor.get("MatterSponsorNameId")
                 person = _get_or_create_person(

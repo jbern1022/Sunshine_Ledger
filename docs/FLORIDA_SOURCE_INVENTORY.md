@@ -181,7 +181,9 @@ Contract/Report/Discussion are not labelled legislation; Edgewater's are mostly 
 reports and consent awards. North Port (`cityofnorthport`) and Venice (`venice`) are registered on branch
 `feat/onboard-north-port-venice` (2026-10-21): their own Ordinance/Resolution types already
 map to kinds, so hearing cases (North Port) and agreements/recognitions (Venice) show as
-"other". Each was sampled (200 newest
+"other". Plant City (`plantcity`, new `ignore_sponsors` option for the clerk login "Granicus User") and
+Wellington (`wellington`, new `numbered_instrument_from_title` option) are registered on branch
+`feat/onboard-plant-city-wellington` (2026-10-21). Each was sampled (200 newest
 matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
 before its patterns were written.
 
@@ -189,8 +191,6 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 
 | Place | Token | Why it waits |
 |---|---|---|
-| Plant City | `plantcity` | Every sampled sponsor is the literal name "Granicus User" (not a person); legislation-typed matters had no attachments. Needs a sponsor exclusion, and text may not exist. |
-| Wellington | `wellington` | No Resolution/Ordinance types in the newest 200 (Purchasing/Contract, code-hearing cases, ARB). Needs a type-to-kind map, and a check that its legislation is on this system at all. |
 | Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
 | Marco Island | `marcoisland` | Code cases and generic "New Business" / "City Council Item"; attachments are staff reports, not the instrument. |
 | Pinellas Park | `pinellaspark` | 118 of 200 typed "Other"; 20 null titles; sponsors are departments. Needs rules first. |
