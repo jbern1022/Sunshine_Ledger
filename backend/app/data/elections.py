@@ -86,7 +86,14 @@ EARLY_VOTING_NOTE = (
 #     Partial: its "Emergency and Disaster - Election Resources" page, the
 #     Governor's executive orders and county sites were not checked, and a
 #     web search found no 2026 emergency order (nothing found, not proof
-#     that none exists).
+#     that none exists). Governor's orders read: EO 26-202 (Oct 6, Tropical
+#     Depression Nine) and 26-211 (Oct 7, amends it as Tropical Storm Isaias):
+#     a state of emergency in 27 Panhandle, Big Bend, Citrus and Levy
+#     counties, expiring after 60 days. Neither mentions elections, voting
+#     or any election deadline. In past storms (2018, 2022, 2024) election
+#     changes came in separate orders for the affected counties, so a later
+#     one could still change dates there. Still unchecked: county sites and
+#     the Division's emergency-resources page (its link 404ed when guessed).
 #
 # `verify_by` is deliberately set to fall between events rather than at a
 # round interval. It lands after the vote-by-mail request deadline (Oct 22)
