@@ -3,6 +3,7 @@ hand-labeling.
 
     python -m app.impact_lens.map_batch --bill "HB 1389" [--bill "SB 2" ...] [--dry-run]
     python -m app.impact_lens.map_batch --bill "HB 1389" --export sheet.md
+    python -m app.impact_lens.map_batch --pending [--limit N] [--max-minutes M]
 
 Maps the CURRENT who_it_affects layer of each bill (all sessions if the number
 repeats). Already-mapped entries at this vocabulary + method version are
@@ -10,6 +11,13 @@ skipped, so a rerun makes no model calls. --export writes what is stored
 (never calls the model) as a Markdown sheet with a verdict line per entry.
 This is the phase 2 baseline: a person fills the verdicts, and the counts
 decide when the review-by-risk step can start.
+
+--pending is the batch form meant for a nightly step: it maps every current,
+supported, uncapped Who layer that still has unmapped entries (the same
+completeness rule the read endpoint uses), newest bill activity first, and
+stops starting new bills once --limit bills or --max-minutes have been used.
+It is not wired into run-ingestion.sh: turning it on publishes automatic
+mappings on every bill, which waits on the hand-labeled baseline.
 """
 
 from __future__ import annotations
@@ -17,11 +25,13 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.api.impact_lens import _CAPPED  # the read endpoint's "first N of M entries" rule, one source of truth
 from app.config import settings
 from app.impact_lens.criteria import review_tier
 from app.impact_lens.mapper import METHOD_VERSION, map_layer
@@ -41,6 +51,70 @@ def current_who_layers(db: Session, bill_numbers: list[str]) -> list[tuple[Bill,
         .order_by(Bill.bill_number, Bill.session)
     ).all()
     return [(b, l) for b, l in rows]
+
+
+logger = logging.getLogger(__name__)
+
+
+def pending_who_layers(db: Session) -> list[tuple[Bill, BillLayer]]:
+    """Current Who layers the lens would show (supported, not capped) that
+    still have entries without criteria at this vocabulary and method version.
+    Newest bill activity first."""
+    mapped = dict(db.execute(
+        select(BillLayerCriteria.bill_layer_id, func.count(func.distinct(BillLayerCriteria.entry_index)))
+        .where(
+            BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION,
+            BillLayerCriteria.method_version == METHOD_VERSION,
+        )
+        .group_by(BillLayerCriteria.bill_layer_id)
+    ).all())
+    rows = db.execute(
+        select(Bill, BillLayer)
+        .join(BillLayer, BillLayer.bill_entity_id == Bill.entity_id)
+        .where(
+            BillLayer.layer == "who_it_affects",
+            BillLayer.superseded_at.is_(None),
+            BillLayer.evidence_state == "supported",
+        )
+        .order_by(Bill.last_action_date.desc().nulls_last(), Bill.bill_number)
+    ).all()
+    return [
+        (b, l) for b, l in rows
+        if not _CAPPED.search(l.scope_note or "") and mapped.get(l.id, 0) < len(l.items)
+    ]
+
+
+def process_pending(
+    db: Session,
+    client,
+    *,
+    generated_by: str,
+    limit: int | None = None,
+    max_minutes: float | None = None,
+    clock=time.monotonic,
+) -> tuple[int, int, int]:
+    """Map pending layers. Returns (entries stored, entries failed, bills
+    processed). `limit` caps bills, `max_minutes` is a wall-clock budget: once
+    elapsed (measured with `clock`, injectable for tests) no new bill starts,
+    though one already started finishes. `max_minutes=0` starts none."""
+    stored = failed = bills = 0
+    start = clock()
+    for bill, layer in pending_who_layers(db):
+        if limit is not None and bills >= limit:
+            break
+        if max_minutes is not None and (clock() - start) >= max_minutes * 60:
+            break
+        bills += 1
+        try:
+            s, _skipped, f = map_layer(db, layer, client, generated_by=generated_by)
+        except Exception as exc:  # noqa: BLE001 -- one bad bill shouldn't stop the batch
+            db.rollback()
+            failed += len(layer.items)
+            logger.warning("FAIL %s: %s", bill.bill_number, exc)
+            continue
+        stored += s
+        failed += f
+    return stored, failed, bills
 
 
 def _fmt_test(t: dict) -> str:
@@ -101,13 +175,29 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     quiet_http_logging()
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--bill", action="append", required=True, help='e.g. "HB 1389" (repeatable)')
+    parser.add_argument("--bill", action="append", default=[], help='e.g. "HB 1389" (repeatable)')
+    parser.add_argument("--pending", action="store_true", help="Map every supported, uncapped Who layer that still has unmapped entries.")
+    parser.add_argument("--limit", type=int, default=None, help="With --pending: max bills to process.")
+    parser.add_argument("--max-minutes", type=float, default=120, help="With --pending: wall-clock budget; no new bill starts once elapsed.")
     parser.add_argument("--dry-run", action="store_true", help="Say what would be mapped; no model calls, no writes.")
     parser.add_argument("--export", metavar="PATH", help="Write the hand-labeling sheet for what is stored; no model calls.")
     args = parser.parse_args()
+    if bool(args.bill) == args.pending:
+        parser.error("give --bill (one or more) or --pending, not both and not neither")
 
     db = SessionLocal()
     try:
+        if args.pending:
+            if args.dry_run:
+                pending = pending_who_layers(db)
+                print(f"{len(pending)} bills with unmapped entries; first: {[b.bill_number for b, _ in pending[:10]]}")
+                sys.exit(0)
+            client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=2048)
+            stored, failed, bills = process_pending(
+                db, client, generated_by=f"llm:{settings.ollama_layers_model}", limit=args.limit, max_minutes=args.max_minutes
+            )
+            print(f"{bills} bills: stored {stored}, failed {failed}")
+            sys.exit(1 if failed and not stored else 0)
         pairs = current_who_layers(db, args.bill)
         missing = set(args.bill) - {b.bill_number for b, _ in pairs}
         if missing:
