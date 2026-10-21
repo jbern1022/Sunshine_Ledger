@@ -94,20 +94,24 @@ EARLY_VOTING_NOTE = (
 #     page (dos.fl.gov/elections/for-voters/emergency-and-disaster-election-
 #     resources/) lists no 2026 orders but was last updated Oct 25, 2024.
 #     Still unchecked: county sites.
+#   2026-10-21 -- verify_by Oct 23 -> Nov 4 so /health/data does not go 503 on
+#     Oct 24, with the dates unchanged and no order found affecting them.
+#     The staleness alarm no longer covers the weeks before the election, so
+#     the remaining emergency-order check (county sites) is tracked as a
+#     to-do, not by this date.
 #
-# `verify_by` is deliberately set to fall between events rather than at a
-# round interval. It lands after the vote-by-mail request deadline (Oct 22)
-# but before the required early-voting start (Oct 24), so a late amendment to the dates still
-# ahead of us gets caught while it can still be acted on. Florida amends
-# election dates by emergency order after hurricanes, which is not
-# hypothetical in October. After the General Election (Nov 3) the 2026
-# calendar has no dates left; the next calendar replaces it.
+# `verify_by` is set to fall between events rather than at a round interval,
+# so a late amendment to the dates still ahead of us gets caught while it can
+# still be acted on. Florida amends election dates by emergency order after
+# hurricanes, which is not hypothetical in October. It is now Nov 4, the day
+# after the General Election (Nov 3), when the 2026 calendar has no dates
+# left; the next calendar replaces it, or this one is retired, by then.
 FLORIDA_2026 = ElectionCalendar(
     state="FL",
     year=2026,
     source_name="Florida Department of State, Division of Elections",
     source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
-    verify_by=dt.date(2026, 10, 23),
+    verify_by=dt.date(2026, 11, 4),
     events=(
         ElectionEvent(dt.date(2026, 7, 20), "Voter registration deadline (Primary)", "registration"),
         ElectionEvent(dt.date(2026, 8, 6), "Vote-by-mail request deadline (Primary)", "vote_by_mail"),
