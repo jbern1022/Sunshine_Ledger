@@ -193,6 +193,8 @@ def test_legistar_text_backfill_marks_no_text_and_skips_it_until_recheck(monkeyp
         ("margatefl", "Margate", "Broward County", False),
         ("deltona", "Deltona", "Volusia County", True),
         ("cityofedgewater", "Edgewater", "Volusia County", False),
+        ("cityofnorthport", "North Port", "Sarasota County", False),
+        ("venice", "Venice", "Sarasota County", False),
     ],
 )
 def test_city_registry_entries_ingest(monkeypatch, db_session, client, jurisdiction, county, committee_sponsors):
