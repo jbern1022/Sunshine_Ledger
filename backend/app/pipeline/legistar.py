@@ -200,6 +200,29 @@ CLIENT_JURISDICTIONS = {
         # The instrument is the attachment named just "RESOLUTION" or "ORDINANCE"; the others are agreements, exhibits and backup.
         "text_attachment": [r"^\s*(resolution|ordinance)\s*$"],
     },
+    "deltona": {
+        "jurisdiction": "Deltona",
+        "county": "Volusia County",
+        "nightly": True,
+        # Sponsors mix people with departments and boards ("Planning Department").
+        "body_sponsors_as_committees": True,
+        "label": "Deltona City Commission (Legistar)",
+        "note": "The most recent commission matters. About half are code-enforcement cases, and some resolutions are filed "
+        "under contract, report or discussion types, so they are not labelled legislation. "
+        "Matters without a PDF attachment have no full text.",
+        # "Resolution No. 2026-97", "Ordinance 19-2026", "Ordinance No. 16-2026_Live Local Update".
+        "text_attachment": [r"^\s*(ordinance|resolution)\s+(no\.?\s*)?\d{1,4}-\d{2,4}"],
+    },
+    "cityofedgewater": {
+        "jurisdiction": "Edgewater",
+        "county": "Volusia County",
+        "nightly": True,
+        "label": "Edgewater City Council (Legistar)",
+        "note": "The most recent council matters. Most are informational reports, consent awards and planning items. "
+        "Matters without a PDF attachment have no full text.",
+        # "2026-R-42 Budget Adjustments Final FY26 with Exhibit A", "2026-R-41 Veteran Organization of the Year".
+        "text_attachment": [r"^\s*\d{4}-r-\d+"],
+    },
     "fortlauderdale": {
         "jurisdiction": "Fort Lauderdale",
         "county": "Broward County",
