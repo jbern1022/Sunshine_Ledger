@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import CoverageSummary from "@/components/CoverageSummary";
 import DataSourcesList from "@/components/DataSourcesList";
 import { SECURITY_POLICY_URL } from "@/lib/links";
 
@@ -131,8 +132,7 @@ export default function MethodologyPage() {
             so a summary may not reflect later sections of a lengthy bill.
           </li>
           <li>
-            <span className="font-medium">Coverage is partial.</span> Florida state bills plus two
-            cities. A bill not appearing here does not mean it does not exist.
+            <CoverageSummary />
           </li>
           <li>
             <span className="font-medium">Maps are approximate.</span> Shading is at county or
