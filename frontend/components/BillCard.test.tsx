@@ -86,6 +86,25 @@ describe("BillCard", () => {
     expect(screen.getByRole("button", { name: /hide sources/i })).toBeInTheDocument();
   });
 
+  it("shows the who-it-affects summary only for legislation", async () => {
+    const user = userEvent.setup();
+    // Legislation (and an older record with no kind): shown.
+    vi.mocked(api.fetchBill).mockResolvedValueOnce(baseDetail);
+    const { unmount } = render(<BillCard bill={{ ...baseBill, item_kind: "legislation" }} />);
+    await user.click(screen.getByRole("button", { name: /sources \(2\)/i }));
+    expect(await screen.findByText(/Residents of Example County\./)).toBeInTheDocument();
+    unmount();
+
+    // An agenda item with a leftover who_it_affects claim: the site shows it only for legislation.
+    vi.mocked(api.fetchBill).mockResolvedValueOnce({ ...baseDetail, item_kind: "agenda" });
+    render(<BillCard bill={{ ...baseBill, item_kind: "agenda", item_type: "Consent Agenda" }} />);
+    await user.click(screen.getByRole("button", { name: /sources \(2\)/i }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /hide sources/i })).toBeInTheDocument());
+    expect(screen.getByText(/Example Times/)).toBeInTheDocument(); // the sources still show
+    expect(screen.queryByText(/Residents of Example County\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Who it affects/)).not.toBeInTheDocument();
+  });
+
   it("submits a flag report", async () => {
     vi.mocked(api.submitFlag).mockResolvedValueOnce(undefined);
     const user = userEvent.setup();

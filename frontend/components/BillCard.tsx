@@ -45,7 +45,10 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
   const uniqueSources: SourceOut[] = detail
     ? Array.from(new Map(detail.claims.flatMap((c) => c.sources).map((s) => [s.id, s])).values())
     : [];
-  const whoItAffects = detail?.claims.find((c) => c.claim_type === "who_it_affects")?.claim_text ?? null;
+  // Written for legislation and shown only for it (the bill page does the same);
+  // an agenda item or hearing case can carry a leftover claim from an earlier run.
+  const isLegislation = (bill.item_kind ?? "legislation") === "legislation";
+  const whoItAffects = isLegislation ? (detail?.claims.find((c) => c.claim_type === "who_it_affects")?.claim_text ?? null) : null;
 
   // Which model wrote the summaries on this card. Stored per claim, so the
   // fields can legitimately differ once cheaper-model routing is enabled
