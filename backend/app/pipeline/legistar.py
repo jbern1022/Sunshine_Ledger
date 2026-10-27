@@ -75,6 +75,34 @@ CLIENT_JURISDICTIONS = {
         "legislation only when the motion adopts a resolution or enacts an ordinance. "
         "Matters without a PDF attachment have no full text.",
     },
+    # Hernando and DeSoto counties: sampled 2026-10-27 (200 newest matters each,
+    # newest 2026-10-26, no sponsors on the matters checked). Their own types
+    # ("Resolution", "Ordinance", "Agenda Item", "Presentation", ...) already map to
+    # kinds. The instrument is the attachment named just "Resolution" / "Ordinance"
+    # (optionally with its number); "Budget Resolution" and exhibits are not it.
+    "hernandocountyfl": {
+        "jurisdiction": "Hernando County",
+        "county": "Hernando County",
+        "level": "county",
+        "publisher": "Hernando County Board of County Commissioners (Legistar)",
+        "nightly": True,
+        "label": "Hernando County Commission (Legistar)",
+        "note": "The most recent county commission matters. About half are resolutions and ordinances; "
+        "the rest are agenda items, presentations and correspondence. Matters without a PDF attachment have no full text.",
+        "text_attachment": [r"^\s*(resolution|ordinance)\s*$", r"^\s*(resolution|ordinance)\s+[\w-]+\s*$"],
+    },
+    "desotobocc": {
+        "jurisdiction": "DeSoto County",
+        "county": "DeSoto County",
+        "level": "county",
+        "publisher": "DeSoto County Board of County Commissioners (Legistar)",
+        "nightly": True,
+        "label": "DeSoto County Commission (Legistar)",
+        "note": "The most recent county commission matters. About a quarter are resolutions and ordinances; "
+        "many others are typed just \"Other\" (rezonings, agreements) and are not labelled legislation. "
+        "Matters without a PDF attachment have no full text.",
+        "text_attachment": [r"^\s*(resolution|ordinance)\s*$", r"^\s*(resolution|ordinance)\s+[\w-]+\s*$"],
+    },
     # Coral Gables, Key West, Delray Beach: sampled 2026-10-13 (200 newest
     # matters, sponsors on 12, attachments on 5 ordinances/resolutions each).
     "coralgables": {

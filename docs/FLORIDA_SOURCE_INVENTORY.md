@@ -196,9 +196,30 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 |---|---|---|
 | Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
 
-Counties (Brevard, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
-Polk, Seminole) are not onboarded; they need the `jurisdiction_level`
-audit first (ticket 6hm2FqVh66Mmww6G).
+Counties: Hernando and DeSoto are registered (2026-10-27, branch
+`feat/county-legistar-hernando-desoto`, not yet deployed). Both use real
+"Resolution" / "Ordinance" types and list no sponsors, so no title rule is needed. The other
+county clients were sampled the same day (200 newest matters; every one is current, newest
+2026-10-26) and are **deliberately not registered yet**: their types are agenda categories, so
+without a per-county title rule almost nothing would read as legislation.
+
+| County | Token | Own types that map to "legislation" | What the types are | What it needs |
+|---|---|---|---|---|
+| Hernando | `hernandocountyfl` | 86 of 200 | Resolution, Agenda Item, Presentation, P&Z | Registered |
+| DeSoto | `desotobocc` | 55 of 200 | Other (70), Resolution, Agreement, Case | Registered; rezonings typed "Other" ("Ordinance / DCIP ...") stay "other" |
+| Pinellas | `pinellas` | 11 of 200 | Delegated Item, Contract/Agreement | Title rule: "Resolution adopting ..." sits under Contract/Agreement |
+| Brevard | `brevardfl` | 0 | Public Hearing, Consent, Resolution/Award/Presentation | Title rule; ~32 titles say ordinance/resolution but are typed otherwise |
+| Marion | `marionfl` | 0 | Consent, Budget Amendment, New Business | Title rule ("Request Adoption of a Resolution ...") |
+| Martin | `martin` | 0 | Consent, Departmental, Public Hearing | Title rule (titles are upper case: "ADOPTION OF A RESOLUTION ...") |
+| Polk | `polkcountyfl` | 0 | Consent Agenda (131) | Types end in "Agenda", so they read as agendas; needs a title rule |
+| Seminole | `seminolecountyfl` | 0 | Consent Item, Variances, Public Hearing Items | Title rule ("Approve and authorize the Chairman to execute a Resolution ...") |
+
+Hillsborough is still land-use bodies only. Before any of the title-rule counties go
+nightly, also check what `jurisdiction_level = "county"` touches. Audit of the code
+(2026-10-27): `item_kind.backfill_item_types` already includes counties; the geo label and
+filter use `geo_scope_type`/`geo_scope_names`; `review_bill_layers` treats everything but
+"state" alike; GDELT keys on the jurisdiction name. Nothing found that breaks. The Impact Lens vocabulary already lists all 67 counties
+(`county:Hernando`), so no vocabulary change is needed for county items.
 
 Capacity: each new city adds up to 200 items on its first run, all of which the
 nightly summarizes. Seven cities in one week (Hollywood, Clearwater and the five

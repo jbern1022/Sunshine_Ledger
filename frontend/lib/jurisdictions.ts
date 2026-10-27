@@ -9,6 +9,7 @@ export const LOCAL_JURISDICTIONS = [
   "Miami", "Jacksonville", "Broward County", "Fort Lauderdale", "Coral Gables", "Key West", "Delray Beach",
   "Hollywood", "Clearwater", "Miramar", "Doral", "Hallandale Beach", "Coconut Creek", "Pinecrest", "Margate",
   "Deltona", "Edgewater", "North Port", "Venice", "Plant City", "Wellington", "Marco Island", "Pinellas Park",
+  "Hernando County", "DeSoto County",
 ] as const;
 
 export interface JurisdictionOption {
