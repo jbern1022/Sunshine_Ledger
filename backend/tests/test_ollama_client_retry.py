@@ -170,3 +170,41 @@ def test_num_predict_caps_output_when_set(monkeypatch):
     monkeypatch.setattr(client._client, "post", post)
     client.generate("p", json_mode=True)
     assert bodies[0]["options"] == {"temperature": 0, "num_predict": 3072}
+
+
+# 2026-10-27: HB 1389's Who-it-affects layer came out 23, 24 and 26 entries on
+# three runs of identical code, input and temperature 0, so the airport
+# exception came and went. With a fixed seed two runs were identical.
+def test_seed_is_sent_only_when_set(monkeypatch):
+    bodies = []
+
+    def post(url, json=None):
+        bodies.append(json)
+        return _FakeResponse(200, {"response": "ok"})
+
+    plain, seeded = OllamaClient(temperature=0), OllamaClient(temperature=0, seed=42)
+    monkeypatch.setattr(plain._client, "post", post)
+    monkeypatch.setattr(seeded._client, "post", post)
+    plain.generate("p")
+    seeded.generate("p")
+    assert "seed" not in bodies[0]["options"]
+    assert bodies[1]["options"] == {"temperature": 0, "seed": 42}
+
+
+def test_a_seed_of_zero_is_still_sent(monkeypatch):
+    bodies = []
+    client = OllamaClient(temperature=0, seed=0)
+    monkeypatch.setattr(client._client, "post", lambda url, json=None: (bodies.append(json), _FakeResponse(200, {"response": "ok"}))[1])
+    client.generate("p")
+    assert bodies[0]["options"] == {"temperature": 0, "seed": 0}
+
+
+def test_layer_and_lens_clients_share_one_seed_constant():
+    import inspect
+
+    from app.impact_lens import map_batch
+    from app.pipeline import bill_layers_batch, review_bill_layers
+
+    assert isinstance(summarize.LAYERS_SEED, int)
+    for module in (bill_layers_batch, review_bill_layers, map_batch):
+        assert "seed=LAYERS_SEED" in inspect.getsource(module), module.__name__
