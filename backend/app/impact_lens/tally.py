@@ -27,6 +27,14 @@ _ENTRY = re.compile(r"^### Entry (\d+): (.*)$")
 _VERDICT = re.compile(r"^- \*\*Verdict:\*\*\s*(.*)$")
 _NOTE = re.compile(r"^- \*\*Note:\*\*\s*(.*)$")
 _NOT_MAPPED = "- **Not mapped yet.**"
+_PART = re.compile(r"^- \*\*(Requires|Excludes|Affected party|Ambiguous|Unmapped):\*\*")
+
+# What an entry's mapping contains beyond its audience. A verdict on an entry
+# is a verdict on every part it has, so these are the denominators for "how
+# well was this part tested": an entry with no Requires line says nothing
+# about requirement accuracy, however many were labeled correct.
+PARTS = ("requires", "excludes", "affected", "ambiguous", "unmapped")
+_PART_KEY = {"Requires": "requires", "Excludes": "excludes", "Affected party": "affected", "Ambiguous": "ambiguous", "Unmapped": "unmapped"}
 
 
 @dataclass
@@ -37,6 +45,7 @@ class Entry:
     mapped: bool = True
     verdict: str = ""
     note: str = ""
+    parts: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -55,6 +64,18 @@ class Tally:
             else:
                 c["no verdict yet"] += 1
         return c
+
+    def part_coverage(self) -> dict[str, Counter]:
+        """Per part, how many mapped entries have it and what the labels say."""
+        out: dict[str, Counter] = {p: Counter() for p in PARTS}
+        for e in self.entries:
+            if not e.mapped:
+                continue
+            for p in e.parts:
+                out[p]["entries"] += 1
+                if e.verdict in VERDICTS:
+                    out[p][e.verdict] += 1
+        return out
 
     def wrong(self) -> list[Entry]:
         return [e for e in self.entries if e.mapped and e.verdict == "wrong"]
@@ -77,6 +98,8 @@ def parse_sheet(text: str) -> Tally:
             continue
         elif line.strip() == _NOT_MAPPED:
             current.mapped = False
+        elif m := _PART.match(line):
+            current.parts.add(_PART_KEY[m.group(1)])
         elif m := _VERDICT.match(line):
             words = m.group(1).strip().lower().replace("`", "").split()
             current.verdict = words[0].strip(".,:;") if words else ""
@@ -94,6 +117,15 @@ def format_report(name: str, tally: Tally) -> str:
     labeled = sum(counts[v] for v in VERDICTS)
     if labeled:
         out.append(f"  wrong-mapping rate: {counts['wrong']} of {labeled} labeled ({counts['wrong'] / labeled:.0%})")
+    for part, c in tally.part_coverage().items():
+        if part in ("requires", "excludes"):
+            labeled = sum(c[v] for v in VERDICTS)
+            if not c["entries"]:
+                out.append(f"  {part}: NOT TESTED (no mapped entry has one)")
+            else:
+                out.append(f"  {part}: {c['entries']} entries, {labeled} labeled, {c['wrong']} wrong")
+        elif c["entries"]:
+            out.append(f"  {part}: {c['entries']} entries, {c['wrong']} wrong")
     for e in tally.wrong():
         out.append(f"  WRONG  {e.bill} entry {e.index} ({e.group}): {e.note or 'no note'}")
     return "\n".join(out)
