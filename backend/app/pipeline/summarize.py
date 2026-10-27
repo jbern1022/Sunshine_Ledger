@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import time
 
 import httpx
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Claim, ClaimSource, Entity, Source
+from app.pipeline.item_kind import item_kind
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,21 @@ MAX_BILL_TEXT_CHARS = 12_000  # keep prompts cheap; most bill summaries/digests 
 # re-summarize everything on its next run -- which is the intended effect,
 # but it is not free at scale. Don't bump for typo fixes.
 PROMPT_VERSION = "2"
+
+# City and county records that are not legislation (agenda items, hearing cases,
+# discussion items) get their own prompt, so their summaries are stored under a
+# scoped version: bumping it re-summarizes only those records on the next run,
+# never the state bills or ordinances. See WHAT_IT_DOES_ITEM_PROMPT.
+ITEM_PROMPT_SUFFIX = "item1"
+
+
+def prompt_version_for(kind: str) -> str:
+    return PROMPT_VERSION if kind == "legislation" else f"{PROMPT_VERSION}+{ITEM_PROMPT_SUFFIX}"
+
+
+# generated_by for a plain restatement of an item's title, written by a rule
+# when the model twice broke the wording rules. Not an AI summary.
+ITEM_FALLBACK_GENERATED_BY = "rule:item_title"
 
 # Summary fields a cheaper model may write when one is configured.
 # "who_it_affects" is deliberately absent: on a 3B model it fell back to
@@ -138,6 +155,81 @@ In the text, [deleted: …] marks wording the bill removes and [added: …] mark
 Answer:"""
 
 
+WHAT_IT_DOES_ITEM_PROMPT = """You are summarizing one item from a Florida city or county government's public meeting records, for a general public audience with no legal background. It is a record of the kind "{item_type}". It is not a bill, and it is not necessarily legislation.
+
+Item: {bill_number} — {title}
+Record type: {item_type}
+
+Text published for this item (it may be only a title):
+\"\"\"
+{bill_text}
+\"\"\"
+
+Write a 1-3 sentence plain-language description of what this item is and what it asks the board or council to do. Rules:
+- Call it "this item" or "this request". Never call it a bill, legislation or an act.
+- Name the kind of record when the text shows it (a public hearing, a contract, a settlement, a presentation, a proclamation).
+- Only state what is in the text above. If the text is only a title, restate the title in plain words and say the published record gives no further detail.
+- Do not guess at purpose, intent or effects. Do not use words such as "likely", "probably", "presumably", "appears to" or "seems".
+- Do not use adjectives that imply a value judgment (e.g. "harmful", "beneficial", "important").
+- Output only the description, no preamble.
+"""
+
+ITEM_RETRY_NOTE = (
+    "\n\nYour previous answer broke a rule: it called the item a bill or legislation, or it guessed. "
+    "Write it again, following every rule exactly."
+)
+
+# "the bill" / "this legislation" on a record that is neither; "bill of sale" and
+# "billing" are ordinary words and pass.
+_BILL_WORDING = re.compile(r"\b(?:this|the|a)\s+(?:bill(?!\s+of\b)|legislation|piece of legislation)\b|^\s*bill\b", re.IGNORECASE)
+_HEDGE_WORDING = re.compile(r"\b(?:likely|probably|presumably|appears?\s+to|seems?\s+to)\b", re.IGNORECASE)
+
+
+def violates_item_wording(text: str) -> bool:
+    """True when a description of a non-legislation item calls it a bill or
+    legislation, or guesses ("likely", "appears to")."""
+    return bool(_BILL_WORDING.search(text) or _HEDGE_WORDING.search(text))
+
+
+# A record whose whole content is a date, a clerk's matter number or "minutes":
+# nothing to summarize, and a model asked to will invent a meaning for it.
+_BARE_TITLE = re.compile(
+    r"^\s*(?:matter\s+\d+|[a-z]+\.?\s+\d{1,2},\s+\d{4}|\d{1,2}-\d{1,2}(?:-\d{2,4})?\s+minutes?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def has_no_substance(item_type: str | None, title: str | None) -> bool:
+    return (item_type or "").strip().lower() == "minutes" or bool(_BARE_TITLE.match(title or ""))
+
+
+def generate_item_description(
+    bill_number: str,
+    title: str,
+    bill_text: str,
+    *,
+    item_type: str | None,
+    client: "OllamaClient",
+) -> tuple[str, bool]:
+    """Describe a non-legislation record. Returns (text, is_fallback).
+
+    The answer is checked for bill wording and guesses; one retry restates the
+    rule; if the second answer still breaks it, the description is a plain
+    restatement of the title (is_fallback True), which says nothing untrue.
+    """
+    label = (item_type or "").strip() or "Agenda item"
+    prompt = WHAT_IT_DOES_ITEM_PROMPT.format(
+        bill_number=bill_number, title=title, item_type=label, bill_text=bill_text[:MAX_BILL_TEXT_CHARS]
+    )
+    answer = client.generate(prompt)
+    if violates_item_wording(answer):
+        answer = client.generate(prompt + ITEM_RETRY_NOTE)
+    if not violates_item_wording(answer):
+        return answer, False
+    plain_title = " ".join((title or "").split())[:300].rstrip(" .")
+    return f"{label}: {plain_title}. The published record gives no further detail here.", True
+
+
 class OllamaError(RuntimeError):
     pass
 
@@ -241,6 +333,11 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
     """Generate summaries for an already-ingested Bill entity and store them
     as Claims, each attached to the source the bill text came from.
 
+    Legislation gets "what it does" and "who it affects". City and county
+    records that are not legislation get a "what it does" description from
+    their own prompt and no "who it affects" (the site shows that only for
+    legislation).
+
     Only call this after Roadmap Step 2 (manual quality gate) has passed.
     """
     if entity.bill is None:
@@ -250,18 +347,34 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
     fast_model = settings.ollama_model_fast
     fast_client = OllamaClient(model=fast_model) if fast_model else None
 
-    summaries = generate_bill_summaries(
-        entity.bill.bill_number, entity.name, bill_text, client=client, fast_client=fast_client
-    )
-    input_hash = summary_input_hash(bill_text, model=client.model, fast_model=fast_model)
+    item_type = (entity.attributes or {}).get("item_type")
+    kind = item_kind(item_type)
+    version = prompt_version_for(kind)
+    fallback_fields: set[str] = set()
+    if kind == "legislation":
+        summaries = generate_bill_summaries(
+            entity.bill.bill_number, entity.name, bill_text, client=client, fast_client=fast_client
+        )
+    else:
+        # "What it does" is a fast-model field, so the cheaper model writes it when configured.
+        writer = fast_client or client
+        text, is_fallback = generate_item_description(
+            entity.bill.bill_number, entity.name, bill_text, item_type=item_type, client=writer
+        )
+        summaries = {"what_it_does": text}
+        if is_fallback:
+            fallback_fields.add("what_it_does")
+    input_hash = summary_input_hash(bill_text, model=client.model, fast_model=fast_model, prompt_version=version)
 
     claims = []
     for claim_type, text in summaries.items():
         # Attribute each claim to the model that actually wrote it -- with
         # routing on, the two fields can come from different models, and
         # "which model said this" matters when reviewing a flagged claim.
-        generated_by = "llm:" + model_for_claim_type(
-            claim_type, quality_model=client.model, fast_model=fast_model
+        generated_by = (
+            ITEM_FALLBACK_GENERATED_BY
+            if claim_type in fallback_fields
+            else "llm:" + model_for_claim_type(claim_type, quality_model=client.model, fast_model=fast_model)
         )
 
         # Update the existing claim in place rather than replacing it.
@@ -272,7 +385,7 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
             select(Claim).where(
                 Claim.bill_entity_id == entity.id,
                 Claim.claim_type == claim_type,
-                Claim.generated_by.like("llm:%"),
+                (Claim.generated_by.like("llm:%")) | (Claim.generated_by == ITEM_FALLBACK_GENERATED_BY),
             )
         ).scalars().first()
 

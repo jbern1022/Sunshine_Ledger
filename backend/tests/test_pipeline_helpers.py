@@ -137,3 +137,33 @@ def test_bill_title_decodes_html_entities():
     assert _bill_title({"MatterId": 1, "MatterTitle": "Oyster Fest at G&amp;B Oyster Bar &#8211; District 2"}) == (
         "Oyster Fest at G&B Oyster Bar – District 2"
     )
+
+
+def test_legistar_title_drops_a_trailing_history_line_and_flattens_line_breaks():
+    title = "RESO Conf the Mayor's Reappt of Jamaal Brown to the Jax Human Rights Commission (Smith) (Req of Mayor)\r\n10/27/26 CO Introduced: R"
+    assert _bill_title({"MatterId": 1, "MatterTitle": title}) == (
+        "RESO Conf the Mayor's Reappt of Jamaal Brown to the Jax Human Rights Commission (Smith) (Req of Mayor)"
+    )
+
+
+def test_legistar_title_keeps_real_second_lines_as_one_line():
+    title = "Case # LUP-26-02-020\r\n\r\nMichael Mansour, Gotha Subdivision Planned Development; District 1"
+    assert _bill_title({"MatterId": 2, "MatterTitle": title}) == (
+        "Case # LUP-26-02-020 Michael Mansour, Gotha Subdivision Planned Development; District 1"
+    )
+
+
+def test_legistar_title_keeps_a_date_that_is_part_of_the_title():
+    title = "Public Hearing Pursuant to Ch 166, F.S. - 11/24/26 & 12/8/26"
+    assert _bill_title({"MatterId": 3, "MatterTitle": title}) == title
+
+
+def test_legistar_title_drops_a_history_line_in_the_middle_and_keeps_the_hearing_lines():
+    title = (
+        "ORD-Q Rezoning at 10491 Normandy Blvd (Small-Scale 2026-839) \r\n10/27/26 CO Introduced: LUZ, JWC \r\n"
+        "LUZ PH - 12/1/26 \r\nPublic Hearing Pursuant to Ch 166, F.S. & C.R. 3.601 - 11/24/26 & 12/8/26"
+    )
+    assert _bill_title({"MatterId": 4, "MatterTitle": title}) == (
+        "ORD-Q Rezoning at 10491 Normandy Blvd (Small-Scale 2026-839) "
+        "LUZ PH - 12/1/26 Public Hearing Pursuant to Ch 166, F.S. & C.R. 3.601 - 11/24/26 & 12/8/26"
+    )

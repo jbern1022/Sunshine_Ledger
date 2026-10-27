@@ -34,8 +34,15 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
-from app.models import Bill, Entity, Source
-from app.pipeline.summarize import summarize_and_store, summary_input_hash
+from app.models import Bill, Entity, Flag, Source
+from app.pipeline.item_kind import item_kind
+from app.pipeline.summarize import (
+    ITEM_FALLBACK_GENERATED_BY,
+    has_no_substance,
+    prompt_version_for,
+    summarize_and_store,
+    summary_input_hash,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -117,10 +124,26 @@ def select_bills_needing_summary(
         text, _ = summarization_input(entity.bill)
         if not text:
             continue
+        item_type = (entity.attributes or {}).get("item_type")
+        kind = item_kind(item_type)
+        if kind != "legislation" and has_no_substance(item_type, entity.name):
+            continue  # minutes, a bare date or matter number: nothing to summarize
 
         if not force:
-            expected = summary_input_hash(text, model=model, fast_model=settings.ollama_model_fast)
-            llm_claims = [c for c in entity.claims if c.generated_by.startswith("llm:")]
+            expected = summary_input_hash(
+                text, model=model, fast_model=settings.ollama_model_fast, prompt_version=prompt_version_for(kind)
+            )
+            if kind == "legislation":
+                llm_claims = [c for c in entity.claims if c.generated_by.startswith("llm:")]
+            else:
+                # Only "what it does" is generated for these; a title-only
+                # restatement (rule:) is as current as a model answer.
+                llm_claims = [
+                    c
+                    for c in entity.claims
+                    if c.claim_type == "what_it_does"
+                    and (c.generated_by.startswith("llm:") or c.generated_by == ITEM_FALLBACK_GENERATED_BY)
+                ]
             if llm_claims and all(c.input_hash == expected for c in llm_claims):
                 skipped += 1
                 continue
@@ -162,7 +185,12 @@ def mark_existing_claims_current(db, *, model: str) -> int:
         text, _ = summarization_input(entity.bill)
         if not text:
             continue
-        expected = summary_input_hash(text, model=model, fast_model=settings.ollama_model_fast)
+        expected = summary_input_hash(
+            text,
+            model=model,
+            fast_model=settings.ollama_model_fast,
+            prompt_version=prompt_version_for(item_kind((entity.attributes or {}).get("item_type"))),
+        )
         for claim in entity.claims:
             if claim.generated_by.startswith("llm:") and claim.input_hash is None:
                 claim.input_hash = expected
@@ -173,6 +201,49 @@ def mark_existing_claims_current(db, *, model: str) -> int:
     return updated
 
 
+def _claim_is_flagged(db, claim) -> bool:
+    return db.execute(
+        select(Flag.id).where(
+            (Flag.claim_id == claim.id) | ((Flag.object_type == "claim") & (Flag.object_id == claim.id))
+        ).limit(1)
+    ).first() is not None
+
+
+def retire_unneeded_claims(db) -> int:
+    """Delete AI claims that city and county records should not carry.
+
+    "Who it affects" is written for legislation and shown only for it, so an
+    earlier run's claim on an agenda item, hearing case or discussion item
+    (which says "this bill") is removed. A record with no substance (minutes,
+    a bare date or matter number) loses its "what it does" too: a model asked
+    to summarize "October 21, 2026" invents a change. A claim a reader flagged
+    is kept: deleting it would erase the report (flags reference claims with
+    ON DELETE CASCADE). Returns the number of claims deleted.
+    """
+    deleted = 0
+    stmt = (
+        select(Entity)
+        .join(Bill, Bill.entity_id == Entity.id)
+        .where(Entity.entity_type == "bill")
+        .options(selectinload(Entity.claims))
+    )
+    for entity in db.execute(stmt).scalars().all():
+        item_type = (entity.attributes or {}).get("item_type")
+        if item_kind(item_type) == "legislation":
+            continue
+        empty = has_no_substance(item_type, entity.name)
+        for claim in list(entity.claims):
+            if not claim.generated_by.startswith("llm:"):
+                continue
+            if claim.claim_type == "who_it_affects" or (empty and claim.claim_type == "what_it_does"):
+                if _claim_is_flagged(db, claim):
+                    continue
+                db.delete(claim)
+                deleted += 1
+    db.commit()
+    return deleted
+
+
 def summarize_unclaimed_bills(limit: int | None = None, *, force: bool = False) -> tuple[int, int]:
     """Returns (succeeded, failed) counts."""
     _check_ollama_reachable()
@@ -180,6 +251,9 @@ def summarize_unclaimed_bills(limit: int | None = None, *, force: bool = False) 
     db = SessionLocal()
     succeeded = failed = 0
     try:
+        retired = retire_unneeded_claims(db)
+        if retired:
+            logger.info("Removed %d AI claims that records other than legislation should not carry", retired)
         candidates, skipped = select_bills_needing_summary(
             db, model=settings.ollama_model, limit=limit, force=force
         )

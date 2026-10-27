@@ -584,8 +584,22 @@ def _bill_title(matter: dict) -> str:
     # Legistar titles carry HTML entities ("G&amp;B Oyster Bar"); the site
     # escapes text itself, so an undecoded entity would show literally.
     candidates = [t for t in (matter.get("MatterName"), matter.get("MatterTitle")) if t and not is_placeholder_title(t)]
-    full_title = html.unescape(candidates[0] if candidates else f"Matter {matter['MatterId']}")
+    full_title = _tidy_title(html.unescape(candidates[0])) if candidates else f"Matter {matter['MatterId']}"
     return full_title if len(full_title) <= 490 else full_title[:489] + "…"
+
+
+# Jacksonville puts the matter's latest history entry in its title, on a line of its
+# own: "10/27/26 CO Introduced: R" or "10/27/26 CO Introduced: LUZ, JWC". It is not
+# part of the title; the hearing-schedule lines that may follow it are, and stay.
+_HISTORY_LINE = re.compile(r"^\s*\d{1,2}/\d{1,2}/\d{2,4}\s+[A-Z]{1,4}\s+[A-Za-z][A-Za-z ]*:.*$")
+
+
+def _tidy_title(title: str) -> str:
+    """Drop history-entry lines and flatten line breaks to single spaces (browsers
+    already show them that way; plain-text uses such as feeds and page titles do
+    not). The original text stays in bill.description."""
+    lines = [ln for ln in re.split(r"\r\n|\r|\n", title) if not _HISTORY_LINE.match(ln)]
+    return " ".join(" ".join(lines).split())
 
 
 def _bill_number(matter: dict) -> str:
