@@ -17,9 +17,16 @@ describe("PrivacyPage", () => {
     expect(screen.getByText(/Informational only, not legal advice/)).toBeInTheDocument();
   });
 
-  it("discloses browser storage and the OpenStreetMap tile requests", () => {
+  it("discloses the Impact Lens session storage: what is kept, that it stays local, and how to clear it", () => {
     render(<PrivacyPage />);
-    expect(screen.getByText(/doesn.t use\s+local storage/)).toBeInTheDocument();
+    expect(screen.getByText(/role, county, municipality \(if you give one\) and property type/)).toBeInTheDocument();
+    expect(screen.getByText(/never sent to our servers/)).toBeInTheDocument();
+    expect(screen.getByText(/cleared when you close the tab/)).toBeInTheDocument();
+    expect(screen.getByText(/Clear my answers/)).toBeInTheDocument();
+  });
+
+  it("discloses the OpenStreetMap tile requests", () => {
+    render(<PrivacyPage />);
     expect(screen.getByRole("link", { name: /OpenStreetMap Foundation privacy policy/ })).toBeInTheDocument();
   });
 

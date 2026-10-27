@@ -36,10 +36,22 @@ describe("DataFreshness", () => {
     expect(await screen.findByText(/Not updated on schedule: City of Miami \(iQM2\)/)).toBeInTheDocument();
   });
 
-  it("renders nothing when the status can't be fetched", async () => {
+  it("says so when the status can't be fetched", async () => {
     vi.mocked(api.fetchSourceStatus).mockRejectedValueOnce(new Error("down"));
-    const { container } = render(<DataFreshness />);
-    await Promise.resolve();
-    expect(container).toBeEmptyDOMElement();
+    render(<DataFreshness />);
+
+    expect(await screen.findByText(/couldn't check how recently the data was updated/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "About our data" })).toBeInTheDocument();
+  });
+
+  it("does not claim a check date when a source has never been checked", async () => {
+    vi.mocked(api.fetchSourceStatus).mockResolvedValueOnce([
+      nightly("legiscan", "Florida Legislature"),
+      { ...nightly("legistar_fortlauderdale", "Fort Lauderdale"), last_checked_at: null },
+    ]);
+    render(<DataFreshness />);
+
+    expect(await screen.findByText(/no recorded update yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/last checked/)).not.toBeInTheDocument();
   });
 });

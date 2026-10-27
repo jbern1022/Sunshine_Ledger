@@ -82,3 +82,24 @@ def test_legistar_counts_are_per_city(client, db_session):
 
     assert body["legistar_jaxcityc"]["bill_count"] == 2
     assert body["legistar_fortlauderdale"]["bill_count"] == 1
+
+
+def test_a_legistar_city_with_no_rows_reports_zero_not_another_citys_total(client, db_session):
+    from datetime import date
+
+    from app.models import Bill, Entity
+
+    e = Entity(entity_type="bill", name="Jax 0", jurisdiction_level="city", jurisdiction_name="Jacksonville",
+               external_ids={}, attributes={})
+    db_session.add(e)
+    db_session.flush()
+    db_session.add(Bill(entity_id=e.id, bill_number="JA-0", session="2026", status="Introduced",
+                        introduced_date=date(2026, 1, 1), source_system="legistar", geo_scope_type="city",
+                        geo_scope_names=["x"]))
+    db_session.commit()
+
+    body = {s["key"]: s for s in client.get("/sources/status").json()}
+
+    assert body["legistar_jaxcityc"]["bill_count"] == 1
+    assert body["legistar_fortlauderdale"]["bill_count"] == 0
+    assert body["legistar_fortlauderdale"]["bills_with_text"] == 0

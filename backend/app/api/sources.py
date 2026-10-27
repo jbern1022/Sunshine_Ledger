@@ -67,6 +67,11 @@ SOURCES: tuple[SourceInfo, ...] = (
 )
 
 BY_SOURCE_SYSTEM = {s.bill_source_system: s for s in SOURCES if s.bill_source_system}
+# Source systems that several sources share (Legistar): a source with no rows of
+# its own has zero, not the system-wide total.
+_SHARED_SYSTEMS = {
+    system for system in BY_SOURCE_SYSTEM if sum(s.bill_source_system == system for s in SOURCES) > 1
+}
 
 
 class SourceStatusOut(BaseModel):
@@ -114,6 +119,8 @@ def source_status(db: Session = Depends(get_db)) -> list[SourceStatusOut]:
             total, with_text = None, None
         elif (info.bill_source_system, info.jurisdiction) in by_city:
             total, with_text = by_city[(info.bill_source_system, info.jurisdiction)]
+        elif info.bill_source_system in _SHARED_SYSTEMS:
+            total, with_text = 0, 0
         else:
             total, with_text = counts.get(info.bill_source_system, (None, None))
         out.append(

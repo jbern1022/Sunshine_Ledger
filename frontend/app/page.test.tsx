@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BrowsePage from "./page";
 import * as api from "@/lib/api";
@@ -18,10 +18,33 @@ vi.mock("@/components/BillCard", () => ({
   default: ({ bill }: { bill: BillListItem }) => <div>{bill.bill_number}</div>,
 }));
 
-let searchParams = new URLSearchParams();
-vi.mock("next/navigation", () => ({
-  useSearchParams: () => searchParams,
-}));
+// A tiny stand-in for the App Router: the URL is a store, router.push/replace
+// write to it, and useSearchParams re-renders the page when it changes.
+const nav = vi.hoisted(() => {
+  let params = new URLSearchParams();
+  const listeners = new Set<() => void>();
+  return {
+    get: () => params,
+    set: (next: URLSearchParams) => {
+      params = next;
+      listeners.forEach((l) => l());
+    },
+    subscribe: (l: () => void) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+  };
+});
+
+vi.mock("next/navigation", async () => {
+  const React = await import("react");
+  const go = (url: string) => nav.set(new URLSearchParams(url.split("?")[1] ?? ""));
+  return {
+    useSearchParams: () => React.useSyncExternalStore(nav.subscribe, nav.get, nav.get),
+    usePathname: () => "/",
+    useRouter: () => ({ push: go, replace: go }),
+  };
+});
 
 function makeBill(bill_number: string): BillListItem {
   return {
@@ -47,7 +70,7 @@ function makeBill(bill_number: string): BillListItem {
 
 describe("BrowsePage", () => {
   beforeEach(() => {
-    searchParams = new URLSearchParams();
+    nav.set(new URLSearchParams());
     vi.mocked(api.fetchBills).mockReset();
   });
 
@@ -59,7 +82,7 @@ describe("BrowsePage", () => {
   });
 
   it("passes the geo filter from the URL through to the API and shows it in the heading", async () => {
-    searchParams = new URLSearchParams({ geo: "Miami-Dade County" });
+    nav.set(new URLSearchParams({ geo: "Miami-Dade County" }));
     vi.mocked(api.fetchBills).mockResolvedValueOnce({ total: 1, items: [makeBill("R-26-0001")] });
 
     render(<BrowsePage />);
@@ -101,7 +124,7 @@ describe("BrowsePage", () => {
 
 describe("BrowsePage status filter", () => {
   beforeEach(() => {
-    searchParams = new URLSearchParams();
+    nav.set(new URLSearchParams());
     vi.mocked(api.fetchBills).mockReset();
     vi.mocked(api.fetchStatuses).mockReset();
   });
@@ -161,7 +184,7 @@ describe("BrowsePage status filter", () => {
 
 describe("BrowsePage topic filter", () => {
   beforeEach(() => {
-    searchParams = new URLSearchParams();
+    nav.set(new URLSearchParams());
     vi.mocked(api.fetchBills).mockReset();
     vi.mocked(api.fetchTags).mockReset();
   });
@@ -193,7 +216,7 @@ describe("BrowsePage topic filter", () => {
   });
 
   it("initializes the topic filter from the URL, e.g. after clicking a badge link", async () => {
-    searchParams = new URLSearchParams({ tag: "housing" });
+    nav.set(new URLSearchParams({ tag: "housing" }));
     vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
     vi.mocked(api.fetchTags).mockResolvedValue([{ slug: "housing", label: "Housing", count: 120 }]);
     render(<BrowsePage />);
@@ -206,7 +229,7 @@ describe("BrowsePage topic filter", () => {
 
 describe("BrowsePage session filter", () => {
   beforeEach(() => {
-    searchParams = new URLSearchParams();
+    nav.set(new URLSearchParams());
     vi.mocked(api.fetchBills).mockReset();
     vi.mocked(api.fetchSessions).mockReset();
     vi.mocked(api.fetchStatuses).mockResolvedValue([]);
@@ -227,5 +250,90 @@ describe("BrowsePage session filter", () => {
     await waitFor(() =>
       expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ session: "2024 Regular Session" })),
     );
+  });
+});
+
+describe("BrowsePage URL state", () => {
+  beforeEach(() => {
+    nav.set(new URLSearchParams());
+    vi.mocked(api.fetchBills).mockReset();
+  });
+
+  it("restores the search, page and filters from a shared link", async () => {
+    nav.set(new URLSearchParams("q=tax&jurisdiction=FL&status=Passed&session=2026&tag=housing&page=3"));
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 200, items: [makeBill("HB 1")] });
+    render(<BrowsePage />);
+
+    await waitFor(() =>
+      expect(api.fetchBills).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: "tax", jurisdiction_name: "FL", status: "Passed", session: "2026", tag: "housing", offset: 100,
+        }),
+      ),
+    );
+    expect(screen.getByRole("searchbox", { name: /search bill number or title/i })).toHaveValue("tax");
+  });
+
+  it("writes the page to the URL, and back (a URL change) returns to the earlier page", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 120, items: [makeBill("HB 1")] });
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+    await screen.findByText(/bills — page 1 of 3/i);
+
+    await user.click(screen.getByRole("button", { name: /next/i }));
+    expect(nav.get().get("page")).toBe("2");
+    await screen.findByText(/bills — page 2 of 3/i);
+
+    act(() => nav.set(new URLSearchParams())); // what the browser's back button does
+    expect(await screen.findByText(/bills — page 1 of 3/i)).toBeInTheDocument();
+  });
+
+  it("returns to page 1 when a filter changes, and keeps params it doesn't own", async () => {
+    nav.set(new URLSearchParams("page=2&sponsor=abc&sponsorName=Jane+Doe"));
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 120, items: [makeBill("HB 1")] });
+    vi.mocked(api.fetchTags).mockResolvedValue([{ slug: "housing", label: "Housing", count: 4 }]);
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+    await screen.findByRole("option", { name: /Housing/ });
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /filter by topic/i }), "housing");
+
+    expect(nav.get().get("tag")).toBe("housing");
+    expect(nav.get().get("page")).toBeNull();
+    expect(nav.get().get("sponsor")).toBe("abc");
+    expect(nav.get().get("sponsorName")).toBe("Jane Doe");
+  });
+
+  it("puts the search text in the URL after typing pauses", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 1, items: [makeBill("HB 1")] });
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+    await screen.findByText("HB 1");
+
+    await user.type(screen.getByRole("searchbox", { name: /search bill number or title/i }), "tax");
+
+    await waitFor(() => expect(nav.get().get("q")).toBe("tax"));
+  });
+});
+
+describe("BrowsePage load failure", () => {
+  beforeEach(() => {
+    nav.set(new URLSearchParams());
+    vi.mocked(api.fetchBills).mockReset();
+  });
+
+  it("shows a plain retry message instead of developer setup instructions, and retries", async () => {
+    vi.mocked(api.fetchBills).mockRejectedValueOnce(new Error("Failed to fetch bills: 502"));
+    const user = userEvent.setup();
+    render(<BrowsePage />);
+
+    expect(await screen.findByText(/couldn.t load bills right now/i)).toBeInTheDocument();
+    expect(screen.queryByText(/docker compose/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/502/)).not.toBeInTheDocument();
+
+    vi.mocked(api.fetchBills).mockResolvedValueOnce({ total: 1, items: [makeBill("HB 9")] });
+    await user.click(screen.getByRole("button", { name: /try again/i }));
+
+    expect(await screen.findByText("HB 9")).toBeInTheDocument();
   });
 });

@@ -52,9 +52,21 @@ export default function PrivacyPage() {
 
       <h3 className="mt-4 font-semibold text-slate-800">Browser storage and analytics</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-700">
-        That cookie is the only thing the site stores in your browser. It doesn&apos;t use
-        local storage, doesn&apos;t load any analytics or tracking scripts, and doesn&apos;t
+        The site stores two things in your browser: the cookie above, and, only if you use
+        the optional &quot;may I be impacted?&quot; check on a bill page, your answers to its
+        questions. It doesn&apos;t load any analytics or tracking scripts, and doesn&apos;t
         count or profile visitors.
+      </p>
+
+      <h3 className="mt-4 font-semibold text-slate-800">The &quot;may I be impacted?&quot; check</h3>
+      <p className="mt-1 text-sm leading-relaxed text-slate-700">
+        This check is optional and asks nothing until you choose to use it. If you answer, your
+        role, county, municipality (if you give one) and property type are kept in your
+        browser&apos;s session storage so the result stays put while you move between bills. They are
+        never sent to our servers: the only request the check makes asks for the bill&apos;s own
+        criteria, and your answers are compared with them in your browser. Session storage is
+        cleared when you close the tab, and you can clear your answers any time with the
+        &quot;Clear my answers&quot; button under the result.
       </p>
 
       <h3 className="mt-4 font-semibold text-slate-800">Map tiles</h3>

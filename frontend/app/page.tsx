@@ -1,15 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fetchBills, fetchSessions, fetchSourceStatus, fetchStatuses, fetchTags } from "@/lib/api";
+import { BROWSE_PAGE_SIZE, buildBrowseQuery, parseBrowseParams, type BrowseFilters } from "@/lib/browse-params";
 import { jurisdictionOptions } from "@/lib/jurisdictions";
 import type { BillListItem, SessionCount, SourceStatus, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
 import DataFreshness from "@/components/DataFreshness";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = BROWSE_PAGE_SIZE;
+const SEARCH_DEBOUNCE_MS = 300;
 
 function BrowsePageInner() {
   const searchParams = useSearchParams();
@@ -17,27 +19,48 @@ function BrowsePageInner() {
   const sponsorFilter = searchParams.get("sponsor") ?? "";
   const sponsorName = searchParams.get("sponsorName") ?? "";
 
-  const [q, setQ] = useState("");
-  const [jurisdiction, setJurisdiction] = useState(() => searchParams.get("jurisdiction") ?? "");
-  const [autoDetected, setAutoDetected] = useState(() => searchParams.get("auto") === "1");
-  const [status, setStatus] = useState("");
+  // Filters and the page live in the URL (lib/browse-params): the view can be
+  // shared, and back/forward walk through filter changes.
+  const router = useRouter();
+  const pathname = usePathname();
+  const { q: urlQ, jurisdiction, status, session, tag, page } = parseBrowseParams(searchParams);
+  const autoDetected = searchParams.get("auto") === "1";
+  const offset = (page - 1) * PAGE_SIZE;
+
+  const update = (patch: Partial<BrowseFilters>, replace = false) => {
+    const qs = buildBrowseQuery(new URLSearchParams(searchParams.toString()), patch);
+    const url = qs ? `${pathname}?${qs}` : pathname;
+    if (replace) router.replace(url, { scroll: false });
+    else router.push(url, { scroll: false });
+  };
+
+  // The search box keeps its own text while typing; the URL follows after a
+  // pause (replace, so each keystroke isn't a history entry).
+  const [qInput, setQInput] = useState(urlQ);
+  const latest = useRef({ qInput, urlQ, update });
+  latest.current = { qInput, urlQ, update };
+
+  useEffect(() => {
+    setQInput(urlQ); // back/forward or a shared link changed the URL
+  }, [urlQ]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const { qInput: typed, urlQ: inUrl, update: apply } = latest.current;
+      if (typed !== inUrl) apply({ q: typed }, true);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [qInput]);
+
   const [statuses, setStatuses] = useState<StatusCount[]>([]);
-  const [session, setSession] = useState(() => searchParams.get("session") ?? "");
   const [sessions, setSessions] = useState<SessionCount[]>([]);
-  const [tag, setTag] = useState(() => searchParams.get("tag") ?? "");
   const [tags, setTags] = useState<TagCount[]>([]);
   const [sourceStatuses, setSourceStatuses] = useState<SourceStatus[] | null>(null);
-  const [offset, setOffset] = useState(0);
   const [bills, setBills] = useState<BillListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Any filter change starts back at page 1 -- otherwise you could land on
-  // an offset past the end of a newly-narrowed result set.
-  useEffect(() => {
-    setOffset(0);
-  }, [q, jurisdiction, status, session, tag, geoFilter, sponsorFilter]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // The jurisdiction dropdown lists the cities the site actually ingests; if
   // the list can't be fetched it falls back to the known cities.
@@ -90,17 +113,17 @@ function BrowsePageInner() {
 
   useEffect(() => {
     if (session && sessions.length > 0 && !sessions.some((s) => s.session === session)) {
-      setSession("");
+      update({ session: "" }, true);
     }
-  }, [sessions, session]);
+  }, [sessions, session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A status that doesn't exist in the newly-chosen jurisdiction would
   // silently return nothing, so drop it rather than leave a dead filter on.
   useEffect(() => {
     if (status && statuses.length > 0 && !statuses.some((s) => s.status === status)) {
-      setStatus("");
+      update({ status: "" }, true);
     }
-  }, [statuses, status]);
+  }, [statuses, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +131,7 @@ function BrowsePageInner() {
     setError(null);
 
     fetchBills({
-      q: q || undefined,
+      q: urlQ || undefined,
       jurisdiction_name: jurisdiction || undefined,
       status: status || undefined,
       session: session || undefined,
@@ -124,7 +147,7 @@ function BrowsePageInner() {
         setTotal(res.total);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message ?? "Failed to load bills. Is the API running?");
+        if (!cancelled) setError(err.message ?? "Failed to load bills.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -133,7 +156,7 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, jurisdiction, status, session, tag, geoFilter, sponsorFilter, offset]);
+  }, [urlQ, jurisdiction, status, session, tag, geoFilter, sponsorFilter, offset, reloadKey]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -171,10 +194,7 @@ function BrowsePageInner() {
             Showing {jurisdiction === "FL" ? "Florida" : jurisdiction} bills based on your location.
           </span>
           <button
-            onClick={() => {
-              setJurisdiction("");
-              setAutoDetected(false);
-            }}
+            onClick={() => update({ jurisdiction: "" })}
             className="font-medium text-sunshine-700 hover:text-sunshine-800"
           >
             View all jurisdictions
@@ -187,17 +207,14 @@ function BrowsePageInner() {
           type="search"
           aria-label="Search bill number or title"
           placeholder="Search bill number or title…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
           className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         />
         <select
           aria-label="Filter by jurisdiction"
           value={jurisdiction}
-          onChange={(e) => {
-            setJurisdiction(e.target.value);
-            setAutoDetected(false);
-          }}
+          onChange={(e) => update({ jurisdiction: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
           {jurisdictionOptions(sourceStatuses).map((j) => (
@@ -209,7 +226,7 @@ function BrowsePageInner() {
         <select
           aria-label="Filter by status"
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(e) => update({ status: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
           <option value="">All statuses</option>
@@ -222,7 +239,7 @@ function BrowsePageInner() {
         <select
           aria-label="Filter by session"
           value={session}
-          onChange={(e) => setSession(e.target.value)}
+          onChange={(e) => update({ session: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
           <option value="">All sessions</option>
@@ -235,7 +252,7 @@ function BrowsePageInner() {
         <select
           aria-label="Filter by topic"
           value={tag}
-          onChange={(e) => setTag(e.target.value)}
+          onChange={(e) => update({ tag: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
           <option value="">All topics</option>
@@ -248,9 +265,18 @@ function BrowsePageInner() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error} — make sure the backend is running (<code>docker compose up</code>) and seeded (
-          <code>python -m app.pipeline.seed</code>).
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p className="font-medium">We couldn&apos;t load bills right now.</p>
+          <p className="mt-1">
+            The bill service may be restarting or briefly unavailable. Your filters are kept in the address bar, so you
+            can retry or come back to this link.
+          </p>
+          <button
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-50"
+          >
+            Try again
+          </button>
         </div>
       )}
 
@@ -275,7 +301,7 @@ function BrowsePageInner() {
           {(hasPrev || hasNext) && (
             <div className="mt-6 flex items-center justify-between">
               <button
-                onClick={() => setOffset((o) => Math.max(o - PAGE_SIZE, 0))}
+                onClick={() => update({ page: page - 1 })}
                 disabled={!hasPrev}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -285,7 +311,7 @@ function BrowsePageInner() {
                 Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+                onClick={() => update({ page: page + 1 })}
                 disabled={!hasNext}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >

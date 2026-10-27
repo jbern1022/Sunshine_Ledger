@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { jurisdictionOptions, LOCAL_JURISDICTIONS } from "./jurisdictions";
+import { jurisdictionOptions, localJurisdictions, LOCAL_JURISDICTIONS } from "./jurisdictions";
 import type { SourceStatus } from "./types";
 
 const status = (key: string, jurisdiction: string | null): SourceStatus => ({
@@ -21,5 +21,17 @@ describe("jurisdictionOptions", () => {
 
   it("falls back to the known cities when the status list is unavailable", () => {
     expect(jurisdictionOptions(null).map((o) => o.value)).toEqual(["", "FL", ...[...LOCAL_JURISDICTIONS].sort()]);
+  });
+});
+
+describe("localJurisdictions", () => {
+  it("uses the live source list, so a newly enabled city needs no code change", () => {
+    expect(localJurisdictions([status("legiscan", "FL"), status("legistar_newcity", "Newcity"), status("gdelt", null)])).toEqual([
+      "Newcity",
+    ]);
+  });
+
+  it("falls back to the built-in list, sorted, when the source list is unavailable", () => {
+    expect(localJurisdictions(null)).toEqual([...LOCAL_JURISDICTIONS].sort());
   });
 });

@@ -1,11 +1,15 @@
 import type { SourceStatus } from "./types";
 
-/** Cities with local bills. The location proxy matches a visitor's city against
- *  this list, and the homepage filter falls back to it when /sources/status is
- *  unreachable. Keep in step with CLIENT_JURISDICTIONS (backend/app/pipeline/
- *  legistar.py) and the Miami iQM2 source; the homepage filter itself reads the
- *  live source list, so a city missing here still appears there. */
-export const LOCAL_JURISDICTIONS = ["Miami", "Jacksonville", "Fort Lauderdale", "Coral Gables", "Key West", "Delray Beach"] as const;
+/** Fallback list of places with local bills, used only when /sources/status is
+ *  unreachable (the homepage filter and the IP-location default both read the
+ *  live source list first, so a newly enabled city appears without a code
+ *  change). Keep in step with CLIENT_JURISDICTIONS (backend/app/pipeline/
+ *  legistar.py) and the Miami iQM2 source. */
+export const LOCAL_JURISDICTIONS = [
+  "Miami", "Jacksonville", "Broward County", "Fort Lauderdale", "Coral Gables", "Key West", "Delray Beach",
+  "Hollywood", "Clearwater", "Miramar", "Doral", "Hallandale Beach", "Coconut Creek", "Pinecrest", "Margate",
+  "Deltona", "Edgewater", "North Port", "Venice", "Plant City", "Wellington", "Marco Island", "Pinellas Park",
+] as const;
 
 export interface JurisdictionOption {
   label: string;
@@ -20,8 +24,14 @@ const BASE: JurisdictionOption[] = [
 /** Homepage jurisdiction dropdown: every city the site actually ingests (from
  *  /sources/status), in a stable alphabetical order. */
 export function jurisdictionOptions(statuses: SourceStatus[] | null): JurisdictionOption[] {
-  const cities = statuses
-    ? Array.from(new Set(statuses.map((s) => s.jurisdiction).filter((j): j is string => !!j && j !== "FL")))
+  return [...BASE, ...localJurisdictions(statuses).map((c) => ({ label: c, value: c }))];
+}
+
+/** Every local jurisdiction the site ingests, alphabetical: from the live
+ *  source list when available, else the fallback list. */
+export function localJurisdictions(statuses: SourceStatus[] | null): string[] {
+  const names = statuses
+    ? statuses.map((s) => s.jurisdiction).filter((j): j is string => !!j && j !== "FL")
     : [...LOCAL_JURISDICTIONS];
-  return [...BASE, ...cities.sort().map((c) => ({ label: c, value: c }))];
+  return Array.from(new Set(names)).sort();
 }

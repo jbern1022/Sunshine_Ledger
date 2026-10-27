@@ -264,15 +264,57 @@ Live setup: `sunshineledger.josephbernal.com` (frontend) +
 container routing to each by Docker Compose service name
 (`frontend:3000` / `backend:8000`) — no host ports involved in that path.
 
-Still open, worth deciding before going fully public: there's no
-authentication anywhere (matches the BRD's public-read, no-accounts MVP
-scope) and no CAPTCHA-equivalent on `/flags` beyond the rate limit — low
-risk at current traffic levels, worth revisiting if abuse shows up.
+Still open, worth deciding before going fully public: the public site has
+no reader accounts (matches the BRD's public-read, no-accounts MVP scope)
+and no CAPTCHA-equivalent on `/flags` beyond the rate limit — low risk at
+current traffic levels, worth revisiting if abuse shows up. Administration
+is separate: the staff endpoints (flag triage, corrections, bill-layer
+review) are behind HTTP Basic auth, with credentials from `ADMIN_USERNAME`
+/ `ADMIN_PASSWORD` ([`backend/app/auth.py`](backend/app/auth.py),
+[`require_admin`](backend/app/api/flags.py)).
 
-## Not yet built (out of this session's scope)
+## What is built, and what is not
 
+**Built** means the code is in `main`; the linked file is the evidence. It
+does not mean verified in production, and it does not mean validated:
+methodology review and validation are tracked separately, and nothing below
+is claimed to have passed it.
+
+Beyond the MVP steps above:
+
+- Bill layers ("what the bill says", interpretation, expected effect, who it
+  affects): [`bill_layers.py`](backend/app/pipeline/bill_layers.py),
+  [`BillLayers.tsx`](frontend/components/BillLayers.tsx),
+  [`WhoItAffects.tsx`](frontend/components/WhoItAffects.tsx)
+- Impact Lens (optional "may this affect me?" check, answers stay in the
+  browser): [`backend/app/impact_lens/`](backend/app/impact_lens/),
+  [`ImpactLens.tsx`](frontend/components/ImpactLens.tsx)
+- ACS/BLS area context on bill pages:
+  [`demographic_overlay.py`](backend/app/pipeline/demographic_overlay.py),
+  [`AreaContext.tsx`](frontend/components/AreaContext.tsx)
+- Bill action history, votes, amendments, and filed-vs-current text
+  comparison: [`LegislativeTimeline.tsx`](frontend/components/LegislativeTimeline.tsx),
+  [`TextComparison.tsx`](frontend/components/TextComparison.tsx)
+- Corrections log and challenge form:
+  [`corrections.py`](backend/app/api/corrections.py), [`/corrections`](frontend/app/corrections/page.tsx)
+- Data freshness and per-source coverage: [`sources.py`](backend/app/api/sources.py),
+  [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md)
+- Legislator pages with sponsored bills and voting records: [`frontend/app/people/`](frontend/app/people/)
+- Election calendar: [`elections.py`](backend/app/api/elections.py)
+
+**Built, but not shown to readers:** the rhetoric-vs-substance comparison
+([`rhetoric_gap.py`](backend/app/pipeline/rhetoric_gap.py)) is a backend
+pipeline with no page or API route yet.
+
+**Not built:**
+
+- Reader accounts, watchlists and alerts (alerts also need outbound email,
+  which isn't set up)
+- Ballot lookup by address and federal officials
+- Narrative-detection NLP and GDELT stance scoring (GDELT headlines are
+  shown, without stance)
 - A dedicated standalone sources page (sources currently expand inline on
-  the bill card only, per BRD 5.4's "inline rather than a separate page")
-- Everything in Phase 2/3 and Nationwide Expansion (rhetoric layer, ACS/BLS
-  overlays, ballot lookup, federal entities) — deliberately deferred per
-  the Roadmap
+  the bill card only, per BRD 5.4's "inline rather than a separate page";
+  the methodology page also lists the data sources)
+- The Subsidy & Tax Carve-Out, Eviction/Slumlord, and other standalone
+  modules from the Roadmap

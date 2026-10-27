@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { LOCAL_JURISDICTIONS } from "@/lib/jurisdictions";
+import { localJurisdictions } from "@/lib/jurisdictions";
+import type { SourceStatus } from "@/lib/types";
 
 // BRD 5.6: default the homepage to the visitor's likely state/locality via
 // IP geolocation, while always letting them navigate elsewhere regardless
@@ -14,6 +15,21 @@ import { LOCAL_JURISDICTIONS } from "@/lib/jurisdictions";
 
 const GEO_RESOLVED_COOKIE = "sl_geo_resolved";
 const GEO_LOOKUP_TIMEOUT_MS = 1500;
+const SOURCE_LIST_TIMEOUT_MS = 1000;
+
+const API_URL = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+/** The jurisdictions the site ingests right now, so a newly enabled city is
+ *  detected without a code change. Null if the API doesn't answer, which
+ *  makes localJurisdictions fall back to its built-in list. */
+async function fetchSourceList(): Promise<SourceStatus[] | null> {
+  try {
+    const res = await fetch(`${API_URL}/sources/status`, { signal: AbortSignal.timeout(SOURCE_LIST_TIMEOUT_MS) });
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
 
 
 export const config = {
@@ -46,7 +62,9 @@ async function lookupJurisdiction(ip: string): Promise<string | null> {
       return null;
     }
 
-    const city = LOCAL_JURISDICTIONS.find((c) => c.toLowerCase() === String(data.city).toLowerCase());
+    // An unrecognized Florida city (or one we don't cover) gets the state view.
+    const cities = localJurisdictions(await fetchSourceList());
+    const city = cities.find((c) => c.toLowerCase() === String(data.city).toLowerCase());
     return city ?? "FL";
   } catch {
     return null; // geolocation is a nice-to-have default, never block the page on it
