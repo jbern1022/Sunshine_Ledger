@@ -178,14 +178,22 @@ def _repair_mojibake(s: str) -> str:
 def _find_ignoring_commas(quote: str, folded: str) -> tuple[int, int] | None:
     """(start, end) in `folded` of `quote` when the two differ only in
     commas (HB 1389, 2026-10-03: "practice, it must issue" for the amended
-    "practice it must issue"). Words, their order and other punctuation
-    must still match; the caller publishes the bill's own span."""
+    "practice it must issue") or in a space after a hyphen between two
+    letters (HB 1389, 2026-10-27: the PDF wraps "one-quarter" across a
+    line, which reads "one- quarter" once whitespace is collapsed). Words,
+    their order and other punctuation must still match; the caller
+    publishes the bill's own span."""
     def strip(s: str) -> tuple[str, list[int]]:
         out, index = [], []
         for i, ch in enumerate(s):
             if ch == ",":
                 continue
             if ch == " " and out and out[-1] == " ":
+                continue
+            # "one- quarter" matches "one-quarter". Both sides are stripped the
+            # same way, so a suspended hyphen ("pre- and post-") still matches
+            # only itself.
+            if ch == " " and len(out) >= 2 and out[-1] == "-" and out[-2].isalpha() and s[i + 1:i + 2].isalpha():
                 continue
             out.append(ch)
             index.append(i)

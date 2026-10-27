@@ -793,6 +793,42 @@ def test_missing_words_still_fail_even_with_commas_ignored():
     assert kept == []
 
 
+# HB 1389 (2026-10-27): the House PDF wraps "one-quarter" across a line
+# ("within one-\nquarter of a mile"); the model writes the word whole, and the
+# airport exception's first list item was dropped as an unverifiable quote.
+def test_a_hyphen_at_a_line_wrap_does_not_break_a_quote():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 7. (a) A proposed development near a runway within one-\nquarter of a mile laterally from the runway edge."
+    kept, dropped = verify_quotes([{"quote": "a proposed development near a runway within one-quarter of a mile laterally from the runway edge"}], text)
+    assert dropped == []
+    # The bill's own characters are published, line wrap collapsed to a space.
+    assert kept[0]["quote"] == "A proposed development near a runway within one- quarter of a mile laterally from the runway edge"
+
+
+def test_a_suspended_hyphen_is_still_matched_as_written():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. The pre- and post-construction inspections shall be filed."
+    kept, dropped = verify_quotes([{"quote": "The pre- and post-construction inspections shall be filed."}], text)
+    assert dropped == [] and kept[0]["quote"] == "The pre- and post-construction inspections shall be filed."
+
+
+def test_a_hyphen_gap_does_not_make_different_words_match():
+    from app.pipeline.bill_layers_text import verify_quotes
+
+    text = "Section 1. The board may adopt one- year rules."
+    kept, _ = verify_quotes([{"quote": "The board may adopt one-month rules."}], text)
+    assert kept == []
+
+
+def test_a_quote_with_a_wrapped_hyphen_can_be_located_in_the_text():
+    from app.pipeline.bill_layers_text import quote_position
+
+    text = "Section 7. (a) A proposed development within one-\nquarter of a mile."
+    assert quote_position("A proposed development within one- quarter of a mile", text) == text.index("A proposed")
+
+
 # HB 1389 (2026-10-03): the model quoted '0-120 percent AMI.' where the bill
 # has "0-120 percent AMI." (single vs double quotes).
 def test_single_and_double_quotes_match_and_the_bills_are_published():
