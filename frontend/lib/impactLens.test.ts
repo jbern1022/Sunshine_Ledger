@@ -260,3 +260,66 @@ describe("what the answer is based on", () => {
     expect(Object.values(RESULT_LABEL)).toEqual(["Applies to You", "May Affect You", "Text Is Ambiguous Here", "Can't Determine", "Does Not Appear to Apply", "Applies to Everyone"]);
   });
 });
+
+// Targeted requirement / exclusion / unknown-answer cases. The 40-entry audience
+// baseline never exercised these (no requirement or exclusion was mapped).
+describe("requirements and exclusions with unknown answers", () => {
+  const nt = (attr: string, values: string[], from: CriterionTest["from"]): CriterionTest => ({ attr, op: "not_in", values, from });
+  const one = (c: Criteria): LensBill => ({ entries: [entry("Landlords", c)], complete: true });
+  const landlord = role("landlord");
+
+  it("not_in on property type: a listed type is ruled out, any other type passes", () => {
+    const bill = one(crit({ audience: landlord, requires: [nt("property_type", ["single_family"], { kind: "condition", index: 0 })] }));
+    expect(label(bill, { role: "landlord", property_type: "single_family" })).toBe("Does Not Appear to Apply");
+    expect(label(bill, { role: "landlord", property_type: "multifamily" })).toBe("Applies to You");
+  });
+
+  it("not_in on property type with no answer is unknown, and asks for it", () => {
+    const bill = one(crit({ audience: landlord, requires: [nt("property_type", ["single_family"], { kind: "condition", index: 0 })] }));
+    const r = matchBill(bill, { role: "landlord" });
+    expect(r.result).toBe("cant_determine");
+    expect(r.ask).toEqual(["property_type"]);
+  });
+
+  it("not_in on jurisdiction: a reader in the listed county is out, elsewhere is in, no county is unknown", () => {
+    const bill = one(crit({ audience: landlord, requires: [nt("jurisdiction", ["county:Duval"], { kind: "condition", index: 0 })] }));
+    expect(label(bill, { role: "landlord", county: "Duval" })).toBe("Does Not Appear to Apply");
+    expect(label(bill, { role: "landlord", county: "Leon" })).toBe("Applies to You");
+    expect(matchBill(bill, { role: "landlord" }).result).toBe("cant_determine");
+  });
+
+  it("an exception that is unknown keeps a satisfied requirement from becoming Applies", () => {
+    const bill = one(crit({ audience: landlord, requires: [req("jurisdiction", COVERED)], excludes: [exc("property_type", ["single_family"])] }));
+    const r = matchBill(bill, { role: "landlord", county: "Duval" });
+    expect(r.result).toBe("cant_determine");
+    expect(r.ask).toEqual(["property_type"]);
+  });
+
+  it("a holding exception rules the entry out even when a requirement is still unknown", () => {
+    const bill = one(crit({ audience: landlord, requires: [req("jurisdiction", COVERED)], excludes: [exc("property_type", ["single_family"])] }));
+    expect(label(bill, { role: "landlord", property_type: "single_family" })).toBe("Does Not Appear to Apply");
+  });
+
+  it("a requirement that names a county and a municipality is met by either", () => {
+    const bill = one(crit({ audience: landlord, requires: [req("jurisdiction", ["county:Duval", "municipality:Miami"])] }));
+    expect(label(bill, { role: "landlord", county: "Duval" })).toBe("Applies to You");
+    expect(label(bill, { role: "landlord", county: "Broward", municipality: "Miami" })).toBe("Applies to You");
+  });
+
+  it("a county outside the list stays unknown while the municipality is unanswered", () => {
+    const bill = one(crit({ audience: landlord, requires: [req("jurisdiction", ["county:Duval", "municipality:Miami"])] }));
+    const r = matchBill(bill, { role: "landlord", county: "Broward" });
+    expect(r.result).toBe("cant_determine");
+    expect(r.ask).toEqual(["municipality"]);
+  });
+
+  it("an affected party is still tested against requirements", () => {
+    const bill = one(crit({ audience: role("insurer"), affected: role("insured"), requires: [req("jurisdiction", COVERED)] }));
+    expect(label(bill, { role: "insured", county: "Leon" })).toBe("Does Not Appear to Apply");
+  });
+
+  it("a mixed unknown and false requirement resolves to false", () => {
+    const bill = one(crit({ audience: landlord, requires: [req("jurisdiction", COVERED, 0), req("property_type", ["multifamily"], 1)] }));
+    expect(label(bill, { role: "landlord", property_type: "single_family" })).toBe("Does Not Appear to Apply");
+  });
+});

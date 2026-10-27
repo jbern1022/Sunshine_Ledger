@@ -68,3 +68,44 @@ def test_report_gives_the_wrong_rate_and_lists_each_wrong_entry():
 def test_an_empty_or_unlabeled_sheet_has_no_rate():
     report = format_report("blank.md", parse_sheet("## H1 (2026), who_it_affects v1\n\n### Entry 0: X\n- **Verdict:** \n- **Note:** \n"))
     assert "no verdict yet: 1" in report and "rate" not in report
+
+
+PARTS_SHEET = """## H1 (2026 Regular Session), who_it_affects v2
+
+### Entry 0: Landlords
+- **Audience:** role in ['landlord']
+- **Requires:** jurisdiction in ['county:Duval'] (condition 0)
+- **Review tier:** simple
+- **Verdict:** wrong - county should be Leon
+- **Note:**
+
+### Entry 1: Renters
+- **Audience:** role in ['renter']
+- **Affected party:** role in ['insured']
+- **Verdict:** correct
+- **Note:**
+"""
+
+
+def test_parts_are_recorded_per_entry():
+    t = parse_sheet(PARTS_SHEET)
+    assert t.entries[0].parts == {"requires"}
+    assert t.entries[1].parts == {"affected"}
+
+
+def test_part_coverage_counts_labels_by_part():
+    cov = parse_sheet(PARTS_SHEET).part_coverage()
+    assert cov["requires"]["entries"] == 1 and cov["requires"]["wrong"] == 1
+    assert cov["excludes"]["entries"] == 0
+    assert cov["affected"]["correct"] == 1
+
+
+def test_report_says_when_requirements_and_exclusions_were_never_tested():
+    report = format_report("s.md", parse_sheet(SHEET))
+    assert "requires: NOT TESTED" in report and "excludes: NOT TESTED" in report
+
+
+def test_report_gives_the_denominator_for_a_tested_part():
+    report = format_report("s.md", parse_sheet(PARTS_SHEET))
+    assert "requires: 1 entries, 1 labeled, 1 wrong" in report
+    assert "excludes: NOT TESTED" in report
