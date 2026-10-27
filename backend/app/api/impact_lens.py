@@ -13,13 +13,14 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.impact_lens.vocabulary import (
     FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, REGISTRY, VOCABULARY_VERSION, jurisdiction_label,
 )
-from app.models import BillLayer, BillLayerCriteria, Entity
+from app.impact_lens.selection import review_state, served_rows
+from app.models import BillLayer, Entity
 from app.schemas.impact_lens import (
     ImpactLensOut, LensEntryOut, LensItemOut, LensLayerOut, LensOptionOut, LensQuestionOut,
 )
@@ -53,18 +54,6 @@ def _current_who_layer(db: Session, entity_id: uuid.UUID) -> BillLayer | None:
             BillLayer.superseded_at.is_(None),
         )
     ).scalar_one_or_none()
-
-
-def _criteria_by_entry(db: Session, layer: BillLayer) -> dict[int, BillLayerCriteria]:
-    """The newest row per entry at the CURRENT vocabulary version (any method
-    version); rows mapped against an older vocabulary are ignored."""
-    rows = db.execute(
-        select(BillLayerCriteria)
-        .where(BillLayerCriteria.bill_layer_id == layer.id, BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION)
-        .options(selectinload(BillLayerCriteria.reviews))
-        .order_by(BillLayerCriteria.created_at, BillLayerCriteria.id)
-    ).scalars().all()
-    return {r.entry_index: r for r in rows}  # later rows overwrite earlier ones
 
 
 def _used_values(criteria_rows: list[dict]) -> tuple[set[str], set[str], set[str]]:
@@ -131,18 +120,21 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
             unavailable_reason="This bill has no Who it affects analysis yet.",
         )
 
-    mapped = _criteria_by_entry(db, layer)
+    mapped = served_rows(db, layer)
     entries: list[LensEntryOut] = []
     for i, item in enumerate(layer.items):
         row = mapped.get(i)
+        state = review_state(row) if row else None
         entries.append(LensEntryOut(
             group=str(item.get("group") or ""),
             text=str(item.get("text") or ""),
             quote=str(item.get("quote") or ""),
             conditions=[LensItemOut(text=str(c.get("text") or ""), quote=str(c.get("quote") or "")) for c in item.get("conditions") or []],
             exceptions=[LensItemOut(text=str(c.get("text") or ""), quote=str(c.get("quote") or "")) for c in item.get("exceptions") or []],
-            criteria=row.criteria if row else None,
-            reviewed=bool(row and any(r.decision == "approved" for r in row.reviews)),
+            # A rejected mapping is withheld: the entry reads as unmapped, never as a quiet miss.
+            criteria=row.criteria if row and state != "rejected" else None,
+            reviewed=state == "approved",
+            withdrawn=state == "rejected",
         ))
 
     reasons: list[str] = []
@@ -152,9 +144,12 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
         reasons.append("The analysis lists only the first entries of a longer list.")
     if not layer.items:
         reasons.append("The analysis has no entries.")
-    unmapped = sum(1 for e in entries if e.criteria is None)
+    withdrawn = sum(1 for e in entries if e.withdrawn)
+    unmapped = sum(1 for e in entries if e.criteria is None and not e.withdrawn)
     if unmapped:
         reasons.append(f"{unmapped} of {len(entries)} entries have no questions mapped yet.")
+    if withdrawn:
+        reasons.append(f"{withdrawn} of {len(entries)} entries had their questions withdrawn after review.")
 
     return ImpactLensOut(
         bill_entity_id=entity_id,
