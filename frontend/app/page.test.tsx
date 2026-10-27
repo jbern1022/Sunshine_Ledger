@@ -122,6 +122,33 @@ describe("BrowsePage", () => {
 });
 
 
+describe("BrowsePage page past the end", () => {
+  beforeEach(() => {
+    nav.set(new URLSearchParams({ page: "999" }));
+    vi.mocked(api.fetchBills).mockReset();
+  });
+
+  it("moves to the last page that exists instead of saying nothing matches", async () => {
+    vi.mocked(api.fetchBills)
+      .mockResolvedValueOnce({ total: 120, items: [] })
+      .mockResolvedValue({ total: 120, items: [makeBill("HB 120")] });
+    render(<BrowsePage />);
+
+    await waitFor(() => expect(nav.get().get("page")).toBe("3"));
+    expect(await screen.findByText(/120 bills — page 3 of 3/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no bills match your filters/i)).not.toBeInTheDocument();
+  });
+
+  it("leaves a genuinely empty result alone", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 0, items: [] });
+    render(<BrowsePage />);
+
+    expect(await screen.findByText(/no bills match your filters/i)).toBeInTheDocument();
+    expect(nav.get().get("page")).toBe("999");
+  });
+});
+
+
 describe("BrowsePage status filter", () => {
   beforeEach(() => {
     nav.set(new URLSearchParams());
