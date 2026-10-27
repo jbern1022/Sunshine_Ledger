@@ -250,8 +250,14 @@ CLIENT_JURISDICTIONS = {
         "nightly": True,
         # Every sampled sponsor (3 of 3) is the clerk's login name, not a person.
         "ignore_sponsors": ["Granicus User"],
+        # The city types nearly every agenda item "Resolution" (100 of 100 sampled
+        # 2026-10-27, including "City Manager's Report" and approvals of minutes);
+        # only items that cite a numbered resolution or ordinance count as legislation.
+        "legislation_needs_numbered_instrument": True,
         "label": "Plant City Commission (Legistar)",
-        "note": "The most recent commission matters. The sampled legislation-typed matters had no attachments, so most have no full text.",
+        "note": "The most recent commission matters. The city types almost every agenda item \"Resolution\", so an item is labelled "
+        "legislation only when its title cites a numbered resolution or ordinance. The sampled legislation-typed matters had no "
+        "attachments, so most have no full text.",
     },
     "wellington": {
         "jurisdiction": "Wellington",
@@ -359,6 +365,18 @@ def numbered_instrument(title: str) -> str | None:
     For clients (Wellington) whose own types are agenda or zoning categories."""
     match = _NUMBERED_INSTRUMENT.search(" ".join((title or "").split()))
     return match.group(1).capitalize() if match else None
+
+
+# "Resolution #229-2026 approving ...", "Public hearing on ordinance # 18-2026 to annex ...".
+_CITES_NUMBERED_INSTRUMENT = re.compile(r"\b(?:ordinance|resolution)\s+(?:no\.?\s*)?#?\s*[A-Za-z]{0,2}\d", re.IGNORECASE)
+
+
+def cites_numbered_instrument(title: str) -> bool:
+    """True when a title names a numbered resolution or ordinance anywhere in it.
+    For a client (Plant City) that types every agenda item "Resolution": reports,
+    minutes and presentations carry the type too, but only real instruments cite
+    a number."""
+    return bool(_CITES_NUMBERED_INSTRUMENT.search(" ".join((title or "").split())))
 
 
 def is_placeholder_title(text: str | None) -> bool:
@@ -540,6 +558,19 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
                 **(entity.attributes or {}),
                 "item_type": numbered_instrument(title),
                 "source_item_type": matter.get("MatterTypeName"),
+            }
+        elif (
+            info.get("legislation_needs_numbered_instrument")
+            and matter.get("MatterTypeName")
+            and item_kind(matter["MatterTypeName"]) == "legislation"
+            and not cites_numbered_instrument(title)
+        ):
+            # The city types every agenda item "Resolution"; one that cites no numbered
+            # instrument (a report, minutes) isn't legislation.
+            entity.attributes = {
+                **(entity.attributes or {}),
+                "item_type": "Other",
+                "source_item_type": matter["MatterTypeName"],
             }
         elif matter.get("MatterTypeName"):
             entity.attributes = {**(entity.attributes or {}), "item_type": matter["MatterTypeName"]}  # see item_kind.py

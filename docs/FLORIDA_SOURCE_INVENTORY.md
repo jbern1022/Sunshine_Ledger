@@ -190,6 +190,13 @@ instrument, and its real business is typed "Agenda Item". Each was sampled (200 
 matters, sponsors on 8, attachment names on up to 14 legislation-typed matters)
 before its patterns were written.
 
+Spot-check of the six newest cities against the live API (2026-10-27, 100 newest items each):
+kinds look right for North Port (10 legislation), Venice (11), Marco Island (11), Pinellas Park (30,
+sponsors are departments by design) and Wellington (27). **Plant City typed all 100 items "Resolution"**,
+including "City Manager's Report" and approvals of minutes, so every item showed as legislation; it now
+sets `legislation_needs_numbered_instrument` (only items whose title cites a numbered resolution or
+ordinance stay legislation; about 21 of 96 sampled resolutions drop to "other"). Existing items change on the next nightly.
+
 Sampled and **deliberately not onboarded yet**, with what each needs:
 
 | Place | Token | Why it waits |

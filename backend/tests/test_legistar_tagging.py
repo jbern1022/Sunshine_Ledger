@@ -362,3 +362,40 @@ def test_plant_city_ignores_the_clerks_login_as_a_sponsor(monkeypatch, db_sessio
 
     names = set(_sponsors(db_session))
     assert "Real Commissioner" in names and "Granicus User" not in names
+
+
+def test_cites_numbered_instrument_finds_a_number_anywhere_in_the_title():
+    from app.pipeline.legistar import cites_numbered_instrument
+
+    assert cites_numbered_instrument("Public hearing on ordinance # 18-2026 to amend the City Charter")
+    assert cites_numbered_instrument("Consideration of resolution #235-2026 appointing members")
+    assert cites_numbered_instrument("Resolution #229-2026 approving an amendment")
+    assert not cites_numbered_instrument("City Manager's Report")
+    assert not cites_numbered_instrument("Approval of August 24, 2026 minutes.")
+    assert not cites_numbered_instrument("Resolution approving the lease")  # no number
+
+
+def test_plant_city_labels_only_items_that_cite_a_numbered_instrument_as_legislation(monkeypatch, db_session):
+    from app.pipeline.item_kind import item_kind
+
+    class Fake(FakeLegistarClient):
+        def get_matters(self, *, top):
+            base = super().get_matters(top=top)[0]
+            return [
+                {**base, "MatterId": 1, "MatterFile": "26-1", "MatterTypeName": "Resolution", "MatterTitle": "Resolution #229-2026 approving a CIP amendment"},
+                {**base, "MatterId": 2, "MatterFile": "26-2", "MatterTypeName": "Ordinance", "MatterTitle": "A legislative public hearing on ordinance #19-2026 to annex"},
+                {**base, "MatterId": 3, "MatterFile": "26-3", "MatterTypeName": "Resolution", "MatterTitle": "City Manager's Report"},
+                {**base, "MatterId": 4, "MatterFile": "26-4", "MatterTypeName": "Resolution", "MatterTitle": "Approval of August 24, 2026 minutes."},
+            ]
+
+    monkeypatch.setattr(legistar_module, "LegistarClient", Fake)
+    monkeypatch.setattr(topic_tagging_ollama_module, "OllamaClient", lambda *a, **kw: FakeOllamaClient("[]"))
+
+    legistar_module.ingest_local_bills(db_session, client_name="plantcity", limit=4)
+
+    by_file = {e.bill.bill_number: e for e in db_session.execute(select(Entity).where(Entity.entity_type == "bill")).scalars()}
+    assert item_kind(by_file["26-1"].attributes["item_type"]) == "legislation"
+    assert item_kind(by_file["26-2"].attributes["item_type"]) == "legislation"
+    for f in ("26-3", "26-4"):
+        assert item_kind(by_file[f].attributes["item_type"]) == "other"
+        assert by_file[f].attributes["source_item_type"] == "Resolution"
