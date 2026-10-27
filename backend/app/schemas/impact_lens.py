@@ -23,6 +23,9 @@ class LensEntryOut(BaseModel):
     # A person has approved this mapping. False shows the
     # "Automatically mapped, not yet reviewed" label.
     reviewed: bool = False
+    # A person rejected the mapping: `criteria` is withheld (null) and the entry
+    # counts as unmapped. See docs/IMPACT_LENS_REVIEW_LIFECYCLE.md.
+    withdrawn: bool = False
 
 
 class LensOptionOut(BaseModel):

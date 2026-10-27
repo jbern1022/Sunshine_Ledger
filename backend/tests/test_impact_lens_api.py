@@ -148,10 +148,52 @@ def test_the_newest_mapping_wins_and_review_follows_the_row(client, db_session, 
     assert "joe" not in resp.text and "secret" not in resp.text  # reviewer and note stay private
 
 
-def test_a_rejected_review_does_not_count_as_approval(client, db_session, bill_factory):
+def test_a_rejected_mapping_is_withheld_and_the_layer_is_incomplete(client, db_session, bill_factory):
     entity = bill_factory()
     layer = _layer(db_session, entity, [LANDLORD])
     row = _criteria(db_session, layer, 0, LANDLORD_RAW)
+    db_session.add(BillLayerCriteriaReview(criteria_id=row.id, decision="rejected", reviewer="joe", note="secret"))
+    db_session.commit()
+    body = client.get(f"/bills/{entity.id}/impact-lens").json()
+    e = body["entries"][0]
+    assert e["criteria"] is None and e["withdrawn"] is True and e["reviewed"] is False
+    assert body["complete"] is False
+    assert any("withdrawn after review" in r for r in body["incomplete_reasons"])
+    assert not any("no questions mapped" in r for r in body["incomplete_reasons"])
+    assert body["questions"] == []  # a withdrawn mapping asks nothing
+    assert "joe" not in str(body) and "secret" not in str(body)
+
+
+def test_rejection_beats_an_earlier_approval(client, db_session, bill_factory):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [LANDLORD])
+    row = _criteria(db_session, layer, 0, LANDLORD_RAW)
+    db_session.add(BillLayerCriteriaReview(criteria_id=row.id, decision="approved", reviewer="joe"))
     db_session.add(BillLayerCriteriaReview(criteria_id=row.id, decision="rejected", reviewer="joe"))
     db_session.commit()
-    assert client.get(f"/bills/{entity.id}/impact-lens").json()["entries"][0]["reviewed"] is False
+    e = client.get(f"/bills/{entity.id}/impact-lens").json()["entries"][0]
+    assert e["criteria"] is None and e["withdrawn"] is True and e["reviewed"] is False
+
+
+def test_a_remapped_entry_replaces_a_withdrawn_one_and_starts_unreviewed(client, db_session, bill_factory):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [LANDLORD])
+    old = _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/7")
+    db_session.add(BillLayerCriteriaReview(criteria_id=old.id, decision="rejected", reviewer="joe"))
+    db_session.commit()
+    _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/8")
+    body = client.get(f"/bills/{entity.id}/impact-lens").json()
+    e = body["entries"][0]
+    assert e["criteria"] is not None and e["withdrawn"] is False and e["reviewed"] is False
+    assert body["complete"] is True
+
+
+def test_a_rejected_newest_row_does_not_fall_back_to_an_older_row(client, db_session, bill_factory):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [LANDLORD])
+    _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/7")
+    newer = _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/8")
+    db_session.add(BillLayerCriteriaReview(criteria_id=newer.id, decision="rejected", reviewer="joe"))
+    db_session.commit()
+    e = client.get(f"/bills/{entity.id}/impact-lens").json()["entries"][0]
+    assert e["criteria"] is None and e["withdrawn"] is True
