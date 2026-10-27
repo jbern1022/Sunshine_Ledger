@@ -164,6 +164,45 @@ def test_flags_election_calendar_past_its_reverify_date(client, db_session, monk
     assert any("re-verify date" in r for r in resp.json()["reasons"])
 
 
+def test_a_finished_calendar_past_its_reverify_date_is_not_flagged(client, db_session, monkeypatch):
+    """After the final election there are no future dates to be wrong about, so
+    the re-verify alarm must not take /health/data down until the next cycle's
+    calendar is loaded."""
+    from app.api import health as health_module
+    from app.data.elections import ElectionCalendar, ElectionEvent
+
+    _add_source(db_session, hours_ago=1)
+    finished = ElectionCalendar(
+        state="FL",
+        year=2026,
+        source_name="Florida Department of State, Division of Elections",
+        source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
+        verify_by=dt.date.today() - dt.timedelta(days=1),
+        events=(ElectionEvent(dt.date.today() - dt.timedelta(days=2), "General Election", "election"),),
+    )
+    monkeypatch.setattr(health_module, "CALENDARS", {"FL": finished})
+
+    assert client.get("/health/data").status_code == 200
+
+
+def test_a_calendar_with_a_date_still_ahead_is_flagged_once_past_its_reverify_date(client, db_session, monkeypatch):
+    from app.api import health as health_module
+    from app.data.elections import ElectionCalendar, ElectionEvent
+
+    _add_source(db_session, hours_ago=1)
+    open_ended = ElectionCalendar(
+        state="FL",
+        year=2026,
+        source_name="Florida Department of State, Division of Elections",
+        source_url="https://dos.fl.gov/elections/for-voters/election-dates/",
+        verify_by=dt.date.today() - dt.timedelta(days=1),
+        events=(ElectionEvent(dt.date.today() + dt.timedelta(days=5), "General Election", "election"),),
+    )
+    monkeypatch.setattr(health_module, "CALENDARS", {"FL": open_ended})
+
+    assert client.get("/health/data").status_code == 503
+
+
 def test_calendar_within_its_reverify_window_is_fine(client, db_session, monkeypatch):
     from app.api import health as health_module
     from app.data.elections import ElectionCalendar

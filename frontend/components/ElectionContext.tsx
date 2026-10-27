@@ -50,7 +50,10 @@ export default function ElectionContext() {
             </span>
           </span>
         ) : (
-          <span className="text-slate-500">No further dates on the {calendar.year} calendar.</span>
+          <span className="text-slate-500">
+            The {calendar.year} calendar is complete. Dates for the next election will be added when the state
+            publishes them.
+          </span>
         )}
         {electionDay && next && electionDay.label !== next.label && (
           <span className="text-slate-500">
