@@ -198,21 +198,32 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 
 Counties: Hernando and DeSoto are registered (2026-10-27, branch
 `feat/county-legistar-hernando-desoto`, not yet deployed). Both use real
-"Resolution" / "Ordinance" types and list no sponsors, so no title rule is needed. The other
-county clients were sampled the same day (200 newest matters; every one is current, newest
-2026-10-26) and are **deliberately not registered yet**: their types are agenda categories, so
-without a per-county title rule almost nothing would read as legislation.
+"Resolution" / "Ordinance" types and list no sponsors, so no title rule is needed. Pinellas, Brevard, Marion, Martin,
+Polk, Seminole and Orange (`occompt`, the Comptroller-hosted Legistar the token guesser
+missed) were sampled the same day (200 newest matters each; every one is current, newest
+2026-10-26) and are registered with `instrument_from_title`: their own types are agenda
+categories, so `titled_instrument` reads the instrument from the title (the title opens
+with a resolution or ordinance, or an approval verb is followed within a few words by one).
+It favors precision: a long compound item that mentions a resolution in a later clause, and
+titles that never use the word ("Amending Chapter 38 of the Orange County Code ..."), stay
+the source's own type. No `text_attachment` pattern yet; the scan fallback picks the
+attachment until a first ingest shows how each county names its instruments.
 
-| County | Token | Own types that map to "legislation" | What the types are | What it needs |
+| County | Token | Titles the rule reads as legislation (of 200) | Own types | Remaining gaps |
 |---|---|---|---|---|
-| Hernando | `hernandocountyfl` | 86 of 200 | Resolution, Agenda Item, Presentation, P&Z | Registered |
-| DeSoto | `desotobocc` | 55 of 200 | Other (70), Resolution, Agreement, Case | Registered; rezonings typed "Other" ("Ordinance / DCIP ...") stay "other" |
-| Pinellas | `pinellas` | 11 of 200 | Delegated Item, Contract/Agreement | Title rule: "Resolution adopting ..." sits under Contract/Agreement |
-| Brevard | `brevardfl` | 0 | Public Hearing, Consent, Resolution/Award/Presentation | Title rule; ~32 titles say ordinance/resolution but are typed otherwise |
-| Marion | `marionfl` | 0 | Consent, Budget Amendment, New Business | Title rule ("Request Adoption of a Resolution ...") |
-| Martin | `martin` | 0 | Consent, Departmental, Public Hearing | Title rule (titles are upper case: "ADOPTION OF A RESOLUTION ...") |
-| Polk | `polkcountyfl` | 0 | Consent Agenda (131) | Types end in "Agenda", so they read as agendas; needs a title rule |
-| Seminole | `seminolecountyfl` | 0 | Consent Item, Variances, Public Hearing Items | Title rule ("Approve and authorize the Chairman to execute a Resolution ...") |
+| Hernando | `hernandocountyfl` | n/a (own types) 86 | Resolution, Agenda Item, Presentation, P&Z | none |
+| DeSoto | `desotobocc` | n/a (own types) 55 | Other (70), Resolution, Agreement, Case | rezonings typed "Other" ("Ordinance / DCIP ...") stay "other" |
+| Pinellas | `pinellas` | 1 (plus 11 typed Resolution/Ordinance) | Delegated Item, Contract/Agreement | "Agreement and associated resolution" items stay agreements |
+| Brevard | `brevardfl` | 26 | Public Hearing, Consent, Resolution/Award/Presentation | "Rate Resolution Amendment" and millage items that say "... Resolution" without an approval verb |
+| Marion | `marionfl` | 13 | Consent, Budget Amendment, New Business | agreements with a supporting resolution stay agreements |
+| Martin | `martin` | 14 | Consent, Departmental, Public Hearing | 3 more titles mention one without an approval verb (not read) |
+| Polk | `polkcountyfl` | 36 | Consent Agenda (131) | "Rescind Resolution ..." stays unlabelled |
+| Seminole | `seminolecountyfl` | 16 | Consent Item, Variances, Public Hearing Items | "Resolutions recognizing ..." plural headings |
+| Orange | `occompt` | 8 | Recommendation, Public Hearing, Procurement, Agreement/Contract | ordinance items titled only by what they amend ("Amending Chapter 38 ...") and land-use items that name the ordinance mid-title are missed |
+
+Checked against all 1,400 sampled titles on 2026-10-27; the matches and near-misses were
+read by hand. Two false positives from the first draft (long compound items ending in
+"execute a Resolution") led to the 300-character limit on the verb pattern.
 
 Hillsborough is still land-use bodies only. Before any of the title-rule counties go
 nightly, also check what `jurisdiction_level = "county"` touches. Audit of the code
@@ -221,7 +232,8 @@ filter use `geo_scope_type`/`geo_scope_names`; `review_bill_layers` treats every
 "state" alike; GDELT keys on the jurisdiction name. Nothing found that breaks. The Impact Lens vocabulary already lists all 67 counties
 (`county:Hernando`), so no vocabulary change is needed for county items.
 
-Capacity: each new city adds up to 200 items on its first run, all of which the
+Capacity: the seven county clients add up to 1,400 items on their first runs (each also summarized
+nightly, and each runs the Ollama tagging step), so stagger the first ingests. Each new city adds up to 200 items on its first run, all of which the
 nightly summarizes. Seven cities in one week (Hollywood, Clearwater and the five
 above) is roughly 1,400 items, so expect a longer first run and watch Kuma
 monitor 29.
