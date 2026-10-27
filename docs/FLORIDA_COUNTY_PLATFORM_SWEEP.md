@@ -1,14 +1,14 @@
 # Florida county meeting-records platforms: manual sweep, first pass
 
-Status: partial, 2026-10-27. Continues `docs/FLORIDA_SOURCE_INVENTORY.md` (Todoist
+Status: search-level pass complete for all 67 counties, 2026-10-27. Continues `docs/FLORIDA_SOURCE_INVENTORY.md` (Todoist
 `6hm2Cxf49P22gJmp`), which covers only what token-guessing found on Legistar. This pass
-looked at 32 of the 67 counties by web search (16 in the first batch, 16 more in the second), then checked the Legistar API where a
-search result named a client. **No county site was opened in a browser** (the Chrome
+looked at the counties by web search (16 in the first batch, 16 in the second, 25 in the third: the 24 small counties plus
+a second look at Santa Rosa), then checked the Legistar API where a search result named a client or a token could be guessed. **No county site was opened in a browser** (the Chrome
 extension was not connected), so every row marked *search only* is what a search result
 said, not something I saw on the page. Do not onboard from this table without opening
 the source.
 
-Not covered here: 24 small counties not searched (listed at the end), the 10 counties the probe already found on
+Not covered here: the 10 counties the probe already found on
 Legistar (Brevard, Broward, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
 Polk, Seminole), Duval (Jacksonville is consolidated and already ingested), and
 municipalities beyond the earlier probe. Terms-of-use have not been checked for any
@@ -49,6 +49,32 @@ these).
 | Walton | Clerk hosts minutes PDFs (`waltonclerkfl.gov`); a 2014 forum post says agendas were on `walton.legistar.com` | Old Clerk PDFs and a forum post | **API checked**: Legistar client `walton` does not exist, so the 2014 claim is no longer true. Current system unknown. |
 | Columbia | County site: meeting calendar with per-meeting pages (`columbiacountyfla.com/MeetingDetails.aspx?Id=<n>`), agendas with backup and minutes as downloadable documents | Meeting detail pages through June 2026 | Search only. Per-meeting pages and a document download service; county-built. |
 | Jackson | County site "Meeting Agendas" and "Meeting Minutes" under Government; announcements recap meetings | `jacksoncountyfl.gov` | Search only; agendas and minutes not opened. |
+| Santa Rosa | County site `santarosa.fl.gov`; a listing says minutes are viewable online; commission meets 2nd and 4th Thursday in Milton | Second look: still no agenda or minutes page surfaced, only third-party meeting summaries | Search only; platform still unidentified. Needs a manual look. |
+| Baker | County site PDFs with predictable names (`bakercountyfl.org/board/agenda/CountyCommission_<mdyyyy>_1.pdf`); minutes through 2025-11-19 | Agenda PDFs 2023 to 2025 | Search only. Cheap to read if the terms allow; no index page seen. |
+| Bradford | County WordPress uploads (`bradfordcountyfl.gov/wp-content/uploads/BoCC_Agenda_-_<m-d-yyyy>.pdf`) plus an agenda-packet PDF | Agendas 2021 to 2023 only in results | Search only; current location unconfirmed. |
+| Calhoun | County site uploads of minutes PDFs (`calhouncountyfl.gov/uploads/2019/01/<yyyymmdd>officialminutesregular.pdf`) | Minutes 1985 to 2014 | Search only; nothing after 2014 surfaced. Current system unknown. |
+| Dixie | Clerk site `dixieclerk.com` (WordPress uploads): agendas, "APPROVED" minutes, yearly BOCC schedule | Minutes and agendas 2018 to 2023; 2025 schedule | Search only. Clerk-held; 2024+ minutes not seen. |
+| Franklin | County site with an Agendas & Minutes page (`franklincountyflorida.com/resources/agendas-minutes/`) and an event page per meeting | Meeting notices through August 2026 | Search only. Active and structured; the archive page was not opened. |
+| Gadsden | County site documents via `gadsdencountyfl.gov/home/showpublisheddocument/<id>/<stamp>` and a calendar component | Agendas 2013 and Jan to Feb 2024 | Search only. CivicPlus-style document URLs; nothing newer than Feb 2024 indexed. |
+| Gilchrist | County agenda PDF for the 2026-04-20 meeting (reached through a third-party host); the county's own archive not found | One 2026 agenda | Search only. City of Trenton meets in the county facility, so city and county results mix. |
+| Glades | Clerk site `gladesclerk.com` (WordPress uploads of tagged minutes PDFs) | Minutes 2016 to 2019 | Search only; newer records not seen. |
+| Gulf | County site `gulfcounty-fl.gov` and a CivicLive-hosted notices page (`gulfcounty-fl.hosted.civiclive.com/meeting/public_notices`) | FAQ gives the schedule; no official agenda or minutes found | Search only. 2025 to 2026 meetings appear only in third-party summaries. |
+| Hamilton | County site not found in results | A 2016 agenda on an advocacy site; a 2026 session described by a third party | Search only; nothing official surfaced. Needs a manual look. |
+| Hardee | County site `hardeecountyfl.gov/meetings/<slug>/`, one page per meeting | A June 2026 meeting page | Search only. Per-meeting pages; whether agenda and minutes attach was not checked. |
+| Hendry | County `hendryfla.net`; a 2021 news item links an agenda packet on a Clerk "Weblink" server | One 2021 article | Search only; current system unknown. Results were mostly Henry County, Alabama. |
+| Holmes | Clerk site `holmesclerk.com` (WordPress uploads): agendas and minutes as PDFs, minutes also as mp3; sections for 2024, 2025 and 2026 | Agendas and minutes 2016 to Sept 2024 | Search only. Clerk-held and dated; looks regular. |
+| Jefferson | County site `jeffersoncountyfl.gov` with live video; agendas and minutes linked from the Board page | Meeting schedule and video page | Search only; archive page not opened. Many results were for Jefferson counties in other states. |
+| Lafayette | Clerk site `lafayetteclerk.com` (scanned minutes and agenda PDFs) | 2017 to 2019 only | Search only. Scans; some pages cut off, so text extraction would be unreliable. |
+| Levy | County site `levycounty.org` (schedule) and Clerk `levyclerk.com` (minutes PDFs since 2012) | Minutes through 2022; schedule for 2024 | Search only; no current agenda located. |
+| Liberty | County site `libertybocc.com` with an "Agendas & Minutes" menu | Navigation only; most results were Liberty County, Georgia | Search only; archive not opened. |
+| Madison | County WordPress uploads of full packets (`madisoncountyfl.com/wp-content/uploads/BOCC-Packet-<mm.dd.yy>.pdf`) that embed the prior meeting's minutes | Packets 2023 to 2024-07-10 | Search only. **Legistar client `madison` exists but is Madison, Wisconsin** (checked bodies and matters): a name hit must be verified as Florida. |
+| Okeechobee | County calendar page links the Board's agenda on **IQM2** ("Board of County Commissioners Regular Session - Web Outline"); meetings also streamed | One county calendar entry | Search only; the IQM2 address was not opened. Same product the Miami adapter (`miami_iqm2.py`) reads, so a candidate for reuse. |
+| Suwannee | County WordPress uploads of tentative-agenda packets (`suwanneecountyfl.gov/wp-content/uploads/<Month>-<D>-<YYYY>-Packet-1.pdf`) that include prior minutes | Packets 2023 to May 2024 | Search only; nothing after mid-2024 indexed. |
+| Taylor | County site `taylorcountygov.com` commission page with some agendas and minutes as PDFs; the office holds the rest | Schedule page; 2026 meetings only in third-party summaries | Search only. Page looks partly out of date. |
+| Union | County agenda PDF for the 2026-04-20 meeting (via a third-party host); official archive not found | One 2026 agenda | Search only. Many results were other states' Union counties. |
+| Wakulla | County site `mywakulla.com` (draft agenda outline PDFs, meeting notices as news items) | Agenda 2023-08-07; notices 2024 | Search only. 2026 meetings seen only in third-party summaries. |
+| Washington | County CMS files (`washingtonfl.com/site/assets/files/<id>/<name>.pdf`): meeting notices, agendas, 2026 workshop schedule | Emergency-meeting agenda 2026-05-07; 2025 notices | Search only. Active in 2026; minutes not seen. |
+
 
 ## Takeaways
 
@@ -72,18 +98,31 @@ these).
 6. **Alachua moved off Legistar** (stale since 2025-01-15) and Walton's 2014-era
    Legistar no longer exists, so a stale registry row is a signal to re-sweep, not to
    keep polling.
+7. **Okeechobee's agenda is on IQM2**, the product behind the Miami adapter. If its
+   terms allow, that adapter may need only a new base address and mapping rather than new code.
+8. **The small counties mostly publish by uploading PDFs** to a WordPress site (Baker,
+   Bradford, Madison, Suwannee, Dixie, Glades, Lafayette, Holmes, Levy's Clerk) with dates in the
+   file name. Cheap to list, but every item is a document, not a structured record, and several
+   archives stop in 2019 to 2024 in what a search can see. Several current meetings surfaced only on
+   aggregators (Starbridge, CitizenPortal, Govly), which are not sources we should read from.
+9. **Legistar names collide across states.** `madison` answers, but it is Wisconsin. Any
+   token hit must be checked for Florida before it counts (bodies, then a recent matter).
 
-## Not searched (24 small counties)
+## Searched in the third batch (25)
 
-Baker, Bradford, Calhoun, Dixie, Franklin, Gadsden, Gilchrist, Glades, Gulf, Hamilton,
-Hardee, Hendry, Holmes, Jefferson, Lafayette, Levy, Liberty, Madison, Okeechobee,
-Suwannee, Taylor, Union, Wakulla, Washington. Each has well under 100,000 residents; most
-use the county website or the Clerk, and the earlier probe found no Legistar client for
-any of them by guessing. Santa Rosa (above) also needs a manual look.
+Santa Rosa (second look) and the 24 small counties: Baker, Bradford, Calhoun, Dixie,
+Franklin, Gadsden, Gilchrist, Glades, Gulf, Hamilton, Hardee, Hendry, Holmes, Jefferson,
+Lafayette, Levy, Liberty, Madison, Okeechobee, Suwannee, Taylor, Union, Wakulla, Washington.
+For these, 125 guessed Legistar client names (`<county>`, `<county>county`, `<county>fl`,
+`<county>countyfl`, `<county>bocc`) were also tried: the only answer was `madison`, which is
+Madison, Wisconsin. No Florida small county was found on Legistar by guessing.
 
 ## To finish the sweep
 
 - Open each row's source in a browser (reconnect the Chrome extension) and confirm
   platform, newest meeting date and whether items link to backup documents.
-- Search the 24 small counties and Santa Rosa, and the municipalities from the earlier probe.
+- Open the sources for the 25 counties of the third batch (all search-level), starting with
+  Okeechobee's IQM2 portal, Franklin, Hardee and Washington (active in 2026), and look for
+  Santa Rosa, Hamilton and Gilchrist's own archives.
+- Municipalities from the earlier probe remain.
 - Record `robots.txt`, a stated terms of use and any API for each platform.
