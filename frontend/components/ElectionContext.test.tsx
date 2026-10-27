@@ -99,3 +99,20 @@ describe("ElectionContext", () => {
     expect(await screen.findByText(/Counties may start earlier or run later/)).toBeInTheDocument();
   });
 });
+
+describe("ElectionContext after the last election", () => {
+  beforeEach(() => vi.mocked(api.fetchElections).mockReset());
+
+  it("says the calendar is complete instead of advertising a date", async () => {
+    vi.mocked(api.fetchElections).mockResolvedValueOnce({
+      ...calendar,
+      as_of: "2026-11-04",
+      next_event: null,
+      events: calendar.events.map((e) => ({ ...e, is_past: true, days_away: -10 })),
+    });
+    render(<ElectionContext />);
+
+    expect(await screen.findByText(/2026 calendar is complete/)).toBeInTheDocument();
+    expect(screen.queryByText(/Next:/)).not.toBeInTheDocument();
+  });
+});

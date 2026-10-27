@@ -89,8 +89,16 @@ def data_health(response: Response, db: Session = Depends(get_db)) -> dict:
     # voter registration deadline, and publishing a wrong one could cost
     # someone their vote. Flag it rather than trusting the date silently.
     today = now.date()
+    #
+    # A calendar whose last event has passed has no future date left to be
+    # wrong about (the re-verify date exists to catch late amendments to dates
+    # still ahead), so it isn't flagged: otherwise this endpoint would return
+    # 503 from the day after the final election until someone loads the next
+    # cycle's dates. An empty calendar still counts as unverified.
     stale_calendars = [
-        f"{cal.state} {cal.year}" for cal in CALENDARS.values() if cal.verify_by < today
+        f"{cal.state} {cal.year}"
+        for cal in CALENDARS.values()
+        if cal.verify_by < today and not (cal.events and max(e.date for e in cal.events) < today)
     ]
     if stale_calendars:
         reasons.append(
