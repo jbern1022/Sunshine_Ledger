@@ -115,7 +115,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Pinellas County Board of County Commissioners (Legistar)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Pinellas County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are delegated items and contracts; the record is "
         "labelled legislation when the county types it a resolution or ordinance, or the title is one. "
@@ -127,7 +127,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Brevard County Board of County Commissioners (Legistar)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Brevard County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are public hearings and consent items; the record "
         "is labelled legislation when its title is a resolution or ordinance or approves one. "
@@ -139,7 +139,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Marion County Board of County Commissioners (Legistar)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Marion County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are consent items and requests; the record is "
         "labelled legislation when the request is to adopt or approve a resolution or ordinance. "
@@ -151,7 +151,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Martin County Board of County Commissioners (Legistar)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Martin County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are consent and departmental items; the record is "
         "labelled legislation when its title adopts or considers a resolution or ordinance. "
@@ -163,7 +163,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Polk County Board of County Commissioners (Legistar)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Polk County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are consent agenda items; the record is labelled "
         "legislation when its title adopts or sets a hearing on a resolution or ordinance. "
@@ -175,7 +175,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Seminole County Board of County Commissioners (Legistar)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Seminole County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are consent items and variances; the record is "
         "labelled legislation when the Chairman is asked to execute, or the Board to adopt, a resolution or ordinance. "
@@ -189,7 +189,7 @@ CLIENT_JURISDICTIONS = {
         "level": "county",
         "publisher": "Orange County Board of County Commissioners (Legistar, hosted by the Comptroller)",
         "instrument_from_title": True,
-        "nightly": False,  # first ingest by hand, then flip on
+        "nightly": True,
         "label": "Orange County Commission (Legistar)",
         "note": "The most recent county commission matters. Most are recommendations, public hearings and "
         "contracts; the record is labelled legislation when its title is a resolution or ordinance or approves one. "

@@ -58,7 +58,7 @@ def test_a_long_compound_item_is_not_read_for_a_clause_buried_in_it():
     assert titled_instrument(long_title) is None
 
 
-def test_the_county_clients_that_read_titles_are_county_level_and_not_yet_nightly():
+def test_the_county_clients_that_read_titles_are_county_level_and_nightly():
     readers = {k: v for k, v in CLIENT_JURISDICTIONS.items() if v.get("instrument_from_title")}
     assert set(readers) == {"pinellas", "brevardfl", "marionfl", "martin", "polkcountyfl", "seminolecountyfl", "occompt"}
-    assert all(v["level"] == "county" and not v["nightly"] and v["label"] and v["note"] for v in readers.values())
+    assert all(v["level"] == "county" and v["nightly"] and v["label"] and v["note"] for v in readers.values())
