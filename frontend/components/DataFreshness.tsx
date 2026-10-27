@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { fetchSourceStatus } from "@/lib/api";
 import { formatChecked, nightlySummary } from "@/lib/freshness";
+import { t, tRich } from "@/lib/i18n";
 import type { SourceStatus } from "@/lib/types";
 
 /** One line under the bill list header: how fresh the bill data is, with a
@@ -22,14 +23,14 @@ export default function DataFreshness() {
 
   const link = (
     <Link href="/methodology#data-sources" className="text-sunshine-700 underline hover:text-sunshine-800">
-      About our data
+      {t("freshness.link")}
     </Link>
   );
 
   if (failed) {
     return (
       <p className="mt-1 text-xs text-amber-800" role="status">
-        We couldn&apos;t check how recently the data was updated, so these bills may be out of date · {link}
+        {tRich("freshness.failed", { link })}
       </p>
     );
   }
@@ -39,20 +40,20 @@ export default function DataFreshness() {
   if (stale.length > 0) {
     return (
       <p className="mt-1 text-xs text-amber-800" role="status">
-        Not updated on schedule: {stale.map((s) => s.label).join(", ")}. Some bills may be out of date · {link}
+        {tRich("freshness.stale", { sources: stale.map((s) => s.label).join(", "), link })}
       </p>
     );
   }
   if (lastChecked === null) {
     return (
       <p className="mt-1 text-xs text-amber-800" role="status">
-        At least one source has no recorded update yet, so some bills may be missing or out of date · {link}
+        {tRich("freshness.neverChecked", { link })}
       </p>
     );
   }
   return (
     <p className="mt-1 text-xs text-slate-500">
-      State and local bills are checked nightly · last checked {formatChecked(lastChecked)} · {link}
+      {tRich("freshness.ok", { date: formatChecked(lastChecked), link })}
     </p>
   );
 }

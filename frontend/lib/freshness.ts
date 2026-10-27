@@ -1,3 +1,4 @@
+import { intlTag, t } from "./i18n";
 import type { SourceStatus } from "./types";
 
 /** Bill.source_system -> the prefix of the /sources/status keys of the jobs that
@@ -11,8 +12,8 @@ const SOURCE_KEY_PREFIX_BY_SYSTEM: Record<string, string> = {
 
 /** "Sep 26", in Florida time. "never" if the source has no recorded check. */
 export function formatChecked(iso: string | null): string {
-  if (!iso) return "never";
-  return new Date(iso).toLocaleDateString("en-US", {
+  if (!iso) return t("freshness.never");
+  return new Date(iso).toLocaleDateString(intlTag(), {
     month: "short",
     day: "numeric",
     timeZone: "America/New_York",

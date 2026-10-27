@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { fetchSourceStatus } from "@/lib/api";
+import { t } from "@/lib/i18n";
 
 /** The methodology page's coverage limit, counted from GET /sources/status so
  *  it stays true as cities and counties are onboarded. Until the status loads,
@@ -20,15 +21,11 @@ export default function CoverageSummary() {
       .catch(() => setLocalCount(null));
   }, []);
 
-  const local =
-    localCount === null
-      ? "a growing set of local governments"
-      : `${localCount} local ${localCount === 1 ? "government" : "governments"}`;
+  const local = localCount === null ? t("coverage.localUnknown") : t("coverage.local", { count: localCount });
 
   return (
     <>
-      <span className="font-medium">Coverage is partial.</span> Florida state bills plus {local}; the list below says
-      which. A bill not appearing here does not mean it does not exist.
+      <span className="font-medium">{t("coverage.partial")}</span> {t("coverage.rest", { local })}
     </>
   );
 }
