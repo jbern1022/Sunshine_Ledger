@@ -11,7 +11,7 @@ This proposal makes no claim that any translation exists or has been reviewed.
 
 - Next.js 16 App Router, React 19; `<html lang="en">` is hard-coded in
   `frontend/app/layout.tsx`. No i18n library, no message catalogue.
-- User-facing English is inline in about 40 components and pages. The pages also build
+- User-facing English is inline in the roughly 30 components and pages. The pages also build
   sentences from data (plurals, dates, counts, "page X of Y").
 - Generated content is stored in English: bill summaries (`claims`), bill layers
   (`bill_layers.items`), Who it affects entries, Impact Lens question wording (partly
