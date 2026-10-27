@@ -110,6 +110,7 @@ def test_item_prompt_is_not_framed_as_legislation():
     assert "piece of legislation" not in p
     assert "Public Hearing" in p and "this item" in p
     assert "Never call it a bill" in p
+    assert "Do not explain or expand abbreviations" in p
 
 
 def test_only_non_legislation_gets_the_scoped_prompt_version():

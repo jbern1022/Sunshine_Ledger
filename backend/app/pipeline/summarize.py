@@ -170,6 +170,7 @@ Write a 1-3 sentence plain-language description of what this item is and what it
 - Name the kind of record when the text shows it (a public hearing, a contract, a settlement, a presentation, a proclamation).
 - Only state what is in the text above. If the text is only a title, restate the title in plain words and say the published record gives no further detail.
 - Do not guess at purpose, intent or effects. Do not use words such as "likely", "probably", "presumably", "appears to" or "seems".
+- Do not explain or expand abbreviations, codes, case names or terms unless the text above explains them. Copy them as written.
 - Do not use adjectives that imply a value judgment (e.g. "harmful", "beneficial", "important").
 - Output only the description, no preamble.
 """
