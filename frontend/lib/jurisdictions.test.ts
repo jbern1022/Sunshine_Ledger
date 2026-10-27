@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { jurisdictionOptions, localJurisdictions, LOCAL_JURISDICTIONS } from "./jurisdictions";
 import type { SourceStatus } from "./types";
 
@@ -33,5 +35,17 @@ describe("localJurisdictions", () => {
 
   it("falls back to the built-in list, sorted, when the source list is unavailable", () => {
     expect(localJurisdictions(null)).toEqual([...LOCAL_JURISDICTIONS].sort());
+  });
+});
+
+describe("the fallback list stays in step with the backend registry", () => {
+  const registry = resolve(__dirname, "../../backend/app/pipeline/legistar.py");
+
+  // CI checks out the whole repo; a frontend-only checkout has nothing to compare.
+  it.skipIf(!existsSync(registry))("names every city registered in CLIENT_JURISDICTIONS, and nothing else", () => {
+    const src = readFileSync(registry, "utf8");
+    const registered = new Set([...src.matchAll(/"jurisdiction":\s*"([^"]+)"/g)].map((m) => m[1]));
+    expect(registered.size).toBeGreaterThan(10); // the pattern still finds the registry
+    expect([...LOCAL_JURISDICTIONS].sort()).toEqual([...registered].sort());
   });
 });

@@ -160,6 +160,14 @@ function BrowsePageInner() {
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+
+  // A shared or stale link can name a page past the end of the results (the
+  // list shrank, or ?page=999 was typed). Rather than say no bills match when
+  // some do, go to the last page that exists.
+  useEffect(() => {
+    if (!loading && !error && total > 0 && offset >= total) update({ page: totalPages }, true);
+  }, [loading, error, total, offset, totalPages]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const hasPrev = offset > 0;
   const hasNext = offset + PAGE_SIZE < total;
 
