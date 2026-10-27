@@ -203,11 +203,44 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 |---|---|---|
 | Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
 
-Counties (Brevard, DeSoto, Hernando, Hillsborough, Marion, Martin, Pinellas,
-Polk, Seminole) are not onboarded; they need the `jurisdiction_level`
-audit first (ticket 6hm2FqVh66Mmww6G).
+Counties: Hernando and DeSoto are registered (2026-10-27, branch
+`feat/county-legistar-hernando-desoto`, not yet deployed). Both use real
+"Resolution" / "Ordinance" types and list no sponsors, so no title rule is needed. Pinellas, Brevard, Marion, Martin,
+Polk, Seminole and Orange (`occompt`, the Comptroller-hosted Legistar the token guesser
+missed) were sampled the same day (200 newest matters each; every one is current, newest
+2026-10-26) and are registered with `instrument_from_title`: their own types are agenda
+categories, so `titled_instrument` reads the instrument from the title (the title opens
+with a resolution or ordinance, or an approval verb is followed within a few words by one).
+It favors precision: a long compound item that mentions a resolution in a later clause, and
+titles that never use the word ("Amending Chapter 38 of the Orange County Code ..."), stay
+the source's own type. No `text_attachment` pattern yet; the scan fallback picks the
+attachment until a first ingest shows how each county names its instruments.
 
-Capacity: each new city adds up to 200 items on its first run, all of which the
+| County | Token | Titles the rule reads as legislation (of 200) | Own types | Remaining gaps |
+|---|---|---|---|---|
+| Hernando | `hernandocountyfl` | n/a (own types) 86 | Resolution, Agenda Item, Presentation, P&Z | none |
+| DeSoto | `desotobocc` | n/a (own types) 55 | Other (70), Resolution, Agreement, Case | rezonings typed "Other" ("Ordinance / DCIP ...") stay "other" |
+| Pinellas | `pinellas` | 1 (plus 11 typed Resolution/Ordinance) | Delegated Item, Contract/Agreement | "Agreement and associated resolution" items stay agreements |
+| Brevard | `brevardfl` | 26 | Public Hearing, Consent, Resolution/Award/Presentation | "Rate Resolution Amendment" and millage items that say "... Resolution" without an approval verb |
+| Marion | `marionfl` | 13 | Consent, Budget Amendment, New Business | agreements with a supporting resolution stay agreements |
+| Martin | `martin` | 14 | Consent, Departmental, Public Hearing | 3 more titles mention one without an approval verb (not read) |
+| Polk | `polkcountyfl` | 36 | Consent Agenda (131) | "Rescind Resolution ..." stays unlabelled |
+| Seminole | `seminolecountyfl` | 16 | Consent Item, Variances, Public Hearing Items | "Resolutions recognizing ..." plural headings |
+| Orange | `occompt` | 8 | Recommendation, Public Hearing, Procurement, Agreement/Contract | ordinance items titled only by what they amend ("Amending Chapter 38 ...") and land-use items that name the ordinance mid-title are missed |
+
+Checked against all 1,400 sampled titles on 2026-10-27; the matches and near-misses were
+read by hand. Two false positives from the first draft (long compound items ending in
+"execute a Resolution") led to the 300-character limit on the verb pattern.
+
+Hillsborough is still land-use bodies only. Before any of the title-rule counties go
+nightly, also check what `jurisdiction_level = "county"` touches. Audit of the code
+(2026-10-27): `item_kind.backfill_item_types` already includes counties; the geo label and
+filter use `geo_scope_type`/`geo_scope_names`; `review_bill_layers` treats everything but
+"state" alike; GDELT keys on the jurisdiction name. Nothing found that breaks. The Impact Lens vocabulary already lists all 67 counties
+(`county:Hernando`), so no vocabulary change is needed for county items.
+
+Capacity: the seven county clients add up to 1,400 items on their first runs (each also summarized
+nightly, and each runs the Ollama tagging step), so stagger the first ingests. Each new city adds up to 200 items on its first run, all of which the
 nightly summarizes. Seven cities in one week (Hollywood, Clearwater and the five
 above) is roughly 1,400 items, so expect a longer first run and watch Kuma
 monitor 29.

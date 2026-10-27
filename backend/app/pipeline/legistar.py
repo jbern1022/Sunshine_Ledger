@@ -75,6 +75,127 @@ CLIENT_JURISDICTIONS = {
         "legislation only when the motion adopts a resolution or enacts an ordinance. "
         "Matters without a PDF attachment have no full text.",
     },
+    # Hernando and DeSoto counties: sampled 2026-10-27 (200 newest matters each,
+    # newest 2026-10-26, no sponsors on the matters checked). Their own types
+    # ("Resolution", "Ordinance", "Agenda Item", "Presentation", ...) already map to
+    # kinds. The instrument is the attachment named just "Resolution" / "Ordinance"
+    # (optionally with its number); "Budget Resolution" and exhibits are not it.
+    "hernandocountyfl": {
+        "jurisdiction": "Hernando County",
+        "county": "Hernando County",
+        "level": "county",
+        "publisher": "Hernando County Board of County Commissioners (Legistar)",
+        "nightly": True,
+        "label": "Hernando County Commission (Legistar)",
+        "note": "The most recent county commission matters. About half are resolutions and ordinances; "
+        "the rest are agenda items, presentations and correspondence. Matters without a PDF attachment have no full text.",
+        "text_attachment": [r"^\s*(resolution|ordinance)\s*$", r"^\s*(resolution|ordinance)\s+[\w-]+\s*$"],
+    },
+    "desotobocc": {
+        "jurisdiction": "DeSoto County",
+        "county": "DeSoto County",
+        "level": "county",
+        "publisher": "DeSoto County Board of County Commissioners (Legistar)",
+        "nightly": True,
+        "label": "DeSoto County Commission (Legistar)",
+        "note": "The most recent county commission matters. About a quarter are resolutions and ordinances; "
+        "many others are typed just \"Other\" (rezonings, agreements) and are not labelled legislation. "
+        "Matters without a PDF attachment have no full text.",
+        "text_attachment": [r"^\s*(resolution|ordinance)\s*$", r"^\s*(resolution|ordinance)\s+[\w-]+\s*$"],
+    },
+    # Six more county clients, sampled 2026-10-27 (200 newest matters each, all current).
+    # Their own types are agenda categories ("Consent", "Public Hearing"), so
+    # `instrument_from_title` reads the instrument from the title (titled_instrument).
+    # No text_attachment pattern yet: the scan fallback picks the attachment until a
+    # first ingest shows what each county names its instruments. First ingest by hand
+    # and spot-check sponsors, kinds and text before relying on the nightly.
+    "pinellas": {
+        "jurisdiction": "Pinellas County",
+        "county": "Pinellas County",
+        "level": "county",
+        "publisher": "Pinellas County Board of County Commissioners (Legistar)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Pinellas County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are delegated items and contracts; the record is "
+        "labelled legislation when the county types it a resolution or ordinance, or the title is one. "
+        "Matters without a PDF attachment have no full text.",
+    },
+    "brevardfl": {
+        "jurisdiction": "Brevard County",
+        "county": "Brevard County",
+        "level": "county",
+        "publisher": "Brevard County Board of County Commissioners (Legistar)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Brevard County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are public hearings and consent items; the record "
+        "is labelled legislation when its title is a resolution or ordinance or approves one. "
+        "Matters without a PDF attachment have no full text.",
+    },
+    "marionfl": {
+        "jurisdiction": "Marion County",
+        "county": "Marion County",
+        "level": "county",
+        "publisher": "Marion County Board of County Commissioners (Legistar)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Marion County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are consent items and requests; the record is "
+        "labelled legislation when the request is to adopt or approve a resolution or ordinance. "
+        "Matters without a PDF attachment have no full text.",
+    },
+    "martin": {
+        "jurisdiction": "Martin County",
+        "county": "Martin County",
+        "level": "county",
+        "publisher": "Martin County Board of County Commissioners (Legistar)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Martin County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are consent and departmental items; the record is "
+        "labelled legislation when its title adopts or considers a resolution or ordinance. "
+        "Matters without a PDF attachment have no full text.",
+    },
+    "polkcountyfl": {
+        "jurisdiction": "Polk County",
+        "county": "Polk County",
+        "level": "county",
+        "publisher": "Polk County Board of County Commissioners (Legistar)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Polk County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are consent agenda items; the record is labelled "
+        "legislation when its title adopts or sets a hearing on a resolution or ordinance. "
+        "Matters without a PDF attachment have no full text.",
+    },
+    "seminolecountyfl": {
+        "jurisdiction": "Seminole County",
+        "county": "Seminole County",
+        "level": "county",
+        "publisher": "Seminole County Board of County Commissioners (Legistar)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Seminole County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are consent items and variances; the record is "
+        "labelled legislation when the Chairman is asked to execute, or the Board to adopt, a resolution or ordinance. "
+        "Matters without a PDF attachment have no full text.",
+    },
+    # Orange County: the Comptroller hosts the county's Legistar (token not guessable).
+    # Agenda PDFs live on apps.ocfl.net; 200 newest sampled 2026-10-27, newest 2026-10-26.
+    "occompt": {
+        "jurisdiction": "Orange County",
+        "county": "Orange County",
+        "level": "county",
+        "publisher": "Orange County Board of County Commissioners (Legistar, hosted by the Comptroller)",
+        "instrument_from_title": True,
+        "nightly": False,  # first ingest by hand, then flip on
+        "label": "Orange County Commission (Legistar)",
+        "note": "The most recent county commission matters. Most are recommendations, public hearings and "
+        "contracts; the record is labelled legislation when its title is a resolution or ordinance or approves one. "
+        "Land-use ordinances titled only by the amendment they make are not labelled. "
+        "Matters without a PDF attachment have no full text.",
+    },
     # Coral Gables, Key West, Delray Beach: sampled 2026-10-13 (200 newest
     # matters, sponsors on 12, attachments on 5 ordinances/resolutions each).
     "coralgables": {
@@ -379,6 +500,32 @@ def cites_numbered_instrument(title: str) -> bool:
     return bool(_CITES_NUMBERED_INSTRUMENT.search(" ".join((title or "").split())))
 
 
+# County agendas type most items by agenda category ("Consent", "Public Hearing"),
+# so the title is the only place the instrument shows. Either the title opens with
+# it ("Resolution recognizing ...", "An Ordinance Amending ...") or an approval verb
+# is followed within a few words by it ("Approve and authorize the Chairman to
+# execute a Resolution ...", "SET HEARING ... to consider the adoption of an
+# ordinance ..."). Precision over recall: a title that only mentions one in a later
+# clause, or is long and compound, stays as the source's own type.
+_TITLED_LEAD = re.compile(r"^\W*(?:[a-z]\.\s+)?(?:an?\s+|the\s+)?(?:proposed\s+)?(ordinance|resolution)s?\b", re.IGNORECASE)
+_TITLED_VERB = re.compile(
+    r"\b(?:approv(?:e|al|ing)|adopt(?:ion|ing)?|enact(?:ment|ing)?|execut(?:e|ion)|consider(?:ation|ing)?)\b"
+    r"(?:\s+and\s+\w+)?(?:[\s,]+(?:the|an?|of|to)){0,3}(?:[\s,]+[\w'\u2019-]+){0,3}?[\s,]+(ordinance|resolution)s?\b",
+    re.IGNORECASE,
+)
+_NOT_AN_INSTRUMENT = re.compile(r"\b(?:dispute|conflict|alternative)\s+resolution\b", re.IGNORECASE)
+MAX_TITLED_VERB_CHARS = 300
+
+
+def titled_instrument(title: str) -> str | None:
+    """"Ordinance" or "Resolution" when a title is the instrument or its approval, else None."""
+    text = _NOT_AN_INSTRUMENT.sub(" ", " ".join((title or "").split()))
+    match = _TITLED_LEAD.search(text)
+    if not match and len(text) <= MAX_TITLED_VERB_CHARS:
+        match = _TITLED_VERB.search(text)
+    return match.group(match.lastindex).capitalize() if match else None
+
+
 def is_placeholder_title(text: str | None) -> bool:
     return bool(text) and bool(_PLACEHOLDER_TITLE.match(" ".join(text.split())))
 
@@ -571,6 +718,16 @@ def ingest_local_bills(db: Session, *, client_name: str, limit: int = 50) -> lis
                 **(entity.attributes or {}),
                 "item_type": "Other",
                 "source_item_type": matter["MatterTypeName"],
+            }
+        elif (
+            info.get("instrument_from_title")
+            and item_kind(matter.get("MatterTypeName")) != "legislation"
+            and titled_instrument(title)
+        ):
+            entity.attributes = {
+                **(entity.attributes or {}),
+                "item_type": titled_instrument(title),
+                "source_item_type": matter.get("MatterTypeName"),
             }
         elif matter.get("MatterTypeName"):
             entity.attributes = {**(entity.attributes or {}), "item_type": matter["MatterTypeName"]}  # see item_kind.py

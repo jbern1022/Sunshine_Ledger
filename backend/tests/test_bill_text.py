@@ -294,3 +294,13 @@ def test_miramar_doral_hallandale_coconut_creek_and_pinecrest_text_attachments()
     assert pick("pinecrest", "TAB 7-Ordinance - First Reading - Amending Ch 36") .startswith("TAB 7-Ordinance")
     assert pick("pinecrest", "TAB 2-Consent - Resolution - Bid Award of US1 Median Landsacape Improvements").startswith("TAB 2-Consent")
     assert pick("pinecrest", "TAB 8-Deferral Requested") is None
+
+
+def test_hernando_and_desoto_pick_the_instrument_not_budget_resolutions_or_exhibits():
+    from app.pipeline.bill_text import select_text_attachment
+
+    for client in ("hernandocountyfl", "desotobocc"):
+        atts = _att("Exhibit A Concept Development Plan", "Budget Resolution", "Resolution 10618", "Journal 10618")
+        assert select_text_attachment(client, atts)["MatterAttachmentName"] == "Resolution 10618"
+        assert select_text_attachment(client, _att("Resolution", "Exhibit C Map"))["MatterAttachmentName"] == "Resolution"
+        assert select_text_attachment(client, _att("Budget Resolution", "Exhibit B")) is None
