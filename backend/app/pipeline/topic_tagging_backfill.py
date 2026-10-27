@@ -31,7 +31,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
 from app.models import Entity
-from app.models.tag import BillTag, Tag
+from app.models.tag import BillTag, BillTagRun, Tag
 from app.pipeline.topic_tagging import set_bill_tag_active
 from app.pipeline.topic_tagging_ollama import LOCAL_KIND, STATE_KIND, tag_local_bill
 
@@ -132,6 +132,11 @@ def backfill_local_bill_tags(limit: int | None = None, *, include_state: bool = 
                 kind = STATE_KIND if STATE_SOURCE_KEY in (entity.external_ids or {}) else LOCAL_KIND
                 tags = tag_local_bill(db, entity.id, title=entity.name, description=description or "", kind=kind)
                 db.commit()
+                run = db.execute(select(BillTagRun).where(BillTagRun.bill_entity_id == entity.id)).scalar_one_or_none()
+                if run is not None and run.outcome == "failed":
+                    failed += 1  # no tag was written; the next run retries
+                    print(f"  FAIL {entity.name!r}: {run.detail}")
+                    continue
                 succeeded += 1
                 slugs = [t.tag_id for t in tags]
                 print(f"  OK  {entity.name!r} -- {len(slugs)} tag(s)")

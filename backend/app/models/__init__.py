@@ -7,7 +7,7 @@ from app.models.bill import Bill
 from app.models.claim import Claim, ClaimSource
 from app.models.flag import Flag
 from app.models.correction import CorrectionRecord, Response
-from app.models.tag import BillTag, SubjectMapping, Tag
+from app.models.tag import BillTag, BillTagRun, SubjectMapping, Tag, TagQuarantine
 from app.models.demographic_overlay import DemographicOverlay
 from app.models.staff_analysis import StaffAnalysis
 from app.models.bill_layer import BillLayer, BillLayerSource, BillLayerReview
@@ -31,6 +31,8 @@ __all__ = [
     "Tag",
     "SubjectMapping",
     "BillTag",
+    "BillTagRun",
+    "TagQuarantine",
     "DemographicOverlay",
     "StaffAnalysis",
     "BillLayer",
