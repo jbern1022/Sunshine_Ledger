@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { submitFlag } from "@/lib/api";
+import { t } from "@/lib/i18n";
 import type { ChallengeCategory, FlagCreate } from "@/lib/types";
 
 /** Report that something on a bill page is wrong (the correction process:
@@ -10,13 +11,13 @@ import type { ChallengeCategory, FlagCreate } from "@/lib/types";
 
 type Target = Pick<FlagCreate, "object_type" | "object_id" | "object_version" | "claim_id">;
 
-const CATEGORIES: { value: ChallengeCategory; label: string }[] = [
-  { value: "factually_wrong", label: "Factually wrong" },
-  { value: "misleading", label: "Misleading or missing context" },
-  { value: "wrong_source", label: "Wrong source or quote" },
-  { value: "outdated", label: "Outdated" },
-  { value: "wrong_entity", label: "Wrong person or organization" },
-  { value: "other", label: "Other" },
+const CATEGORIES: ChallengeCategory[] = [
+  "factually_wrong",
+  "misleading",
+  "wrong_source",
+  "outdated",
+  "wrong_entity",
+  "other",
 ];
 
 type Status = "idle" | "submitting" | "sent" | "error";
@@ -64,8 +65,7 @@ export default function ChallengeForm({
   if (status === "sent") {
     return (
       <p className="mt-2 text-xs text-emerald-700">
-        Thanks. A person will review this. If it holds up, the statement is marked &ldquo;Disputed&rdquo; while it&apos;s
-        checked, and any correction is published with what changed and why.
+        {t("challenge.sent")}
       </p>
     );
   }
@@ -73,17 +73,17 @@ export default function ChallengeForm({
   return (
     <form onSubmit={submit} className="mt-2 space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
       <label className="block text-xs font-medium text-slate-600">
-        What kind of problem?
+        {t("challenge.kind")}
         <select value={category} onChange={(e) => setCategory(e.target.value as ChallengeCategory)} className={field}>
           {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
+            <option key={c} value={c}>
+              {t(`challenge.category.${c}.label`)}
             </option>
           ))}
         </select>
       </label>
       <label className="block text-xs font-medium text-slate-600">
-        What is wrong?
+        {t("challenge.what")}
         <textarea
           required
           minLength={5}
@@ -92,37 +92,37 @@ export default function ChallengeForm({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           className={field}
-          placeholder="e.g. it says 15 days, but Section 1 of the bill says 30"
+          placeholder={t("challenge.whatPlaceholder")}
         />
       </label>
       <label className="block text-xs font-medium text-slate-600">
-        Evidence link (optional; reports with evidence are reviewed first)
+        {t("challenge.evidenceUrl")}
         <input type="url" value={evidenceUrl} onChange={(e) => setEvidenceUrl(e.target.value)} className={field} placeholder="https://" />
       </label>
       <label className="block text-xs font-medium text-slate-600">
-        Or quote the evidence (optional)
+        {t("challenge.evidenceText")}
         <textarea rows={2} maxLength={4000} value={evidenceText} onChange={(e) => setEvidenceText(e.target.value)} className={field} />
       </label>
       <label className="flex items-center gap-2 text-xs text-slate-600">
         <input type="checkbox" checked={named} onChange={(e) => setNamed(e.target.checked)} />
-        I&apos;m named in this record (we&apos;ll contact you about a published response)
+        {t("challenge.named")}
       </label>
       <label className="block text-xs font-medium text-slate-600">
-        Email (optional, if you want a reply; deleted 90 days after the report is resolved)
+        {t("challenge.email")}
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
       </label>
-      {status === "error" && <p className="text-xs text-red-600">Couldn&apos;t submit. Try again.</p>}
+      {status === "error" && <p className="text-xs text-red-600">{t("challenge.error")}</p>}
       <div className="flex items-center gap-2">
         <button
           type="submit"
           disabled={status === "submitting"}
           className="rounded-md bg-sunshine-500 px-3 py-1.5 text-xs font-medium text-ledger-900 hover:bg-sunshine-400 disabled:opacity-50"
         >
-          {status === "submitting" ? "Sending…" : "Submit report"}
+          {status === "submitting" ? t("challenge.sending") : t("challenge.submit")}
         </button>
         {onClose && (
           <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:text-slate-600">
-            Cancel
+            {t("challenge.cancel")}
           </button>
         )}
       </div>
@@ -134,7 +134,7 @@ export default function ChallengeForm({
 export function FlagThis({
   billEntityId,
   target,
-  label = "Flag this",
+  label = t("card.flag"),
 }: {
   billEntityId: string;
   target?: Target;

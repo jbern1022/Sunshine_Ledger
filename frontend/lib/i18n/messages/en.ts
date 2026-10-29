@@ -213,6 +213,30 @@ export const en = {
   "bill.source.stale": " · may be out of date",
   "bill.source.tail": " · {link}",
   "bill.source.aboutData": "About our data",
+
+  "map.page.title": "Maps",
+  "map.page.intro":
+    "Two different views of the same bills: where they apply, and who files them. County and district boundaries only — no per-address mapping at MVP.",
+
+  "challenge.category.factually_wrong.label": "Factually wrong",
+  "challenge.category.misleading.label": "Misleading or missing context",
+  "challenge.category.wrong_source.label": "Wrong source or quote",
+  "challenge.category.outdated.label": "Outdated",
+  "challenge.category.wrong_entity.label": "Wrong person or organization",
+  "challenge.category.other.label": "Other",
+  "challenge.sent":
+    "Thanks. A person will review this. If it holds up, the statement is marked “Disputed” while it's checked, and any correction is published with what changed and why.",
+  "challenge.kind": "What kind of problem?",
+  "challenge.what": "What is wrong?",
+  "challenge.whatPlaceholder": "e.g. it says 15 days, but Section 1 of the bill says 30",
+  "challenge.evidenceUrl": "Evidence link (optional; reports with evidence are reviewed first)",
+  "challenge.evidenceText": "Or quote the evidence (optional)",
+  "challenge.named": "I'm named in this record (we'll contact you about a published response)",
+  "challenge.email": "Email (optional, if you want a reply; deleted 90 days after the report is resolved)",
+  "challenge.error": "Couldn't submit. Try again.",
+  "challenge.sending": "Sending…",
+  "challenge.submit": "Submit report",
+  "challenge.cancel": "Cancel",
 } as const;
 
 export type MessageKey = keyof typeof en;
