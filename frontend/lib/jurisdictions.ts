@@ -10,7 +10,7 @@ export const LOCAL_JURISDICTIONS = [
   "Hollywood", "Clearwater", "Miramar", "Doral", "Hallandale Beach", "Coconut Creek", "Pinecrest", "Margate",
   "Deltona", "Edgewater", "North Port", "Venice", "Plant City", "Wellington", "Marco Island", "Pinellas Park",
   "Hernando County", "DeSoto County", "Pinellas County", "Brevard County", "Marion County", "Martin County",
-  "Polk County", "Seminole County", "Orange County",
+  "Polk County", "Seminole County", "Orange County", "Ocala",
 ] as const;
 
 export interface JurisdictionOption {

@@ -404,6 +404,18 @@ CLIENT_JURISDICTIONS = {
         # "RESOLUTION 26-70"; most other attachments are staff reports, not the instrument.
         "text_attachment": [r"^\s*(ordinance|resolution)\s+\d"],
     },
+    "ocala": {
+        "jurisdiction": "Ocala",
+        "county": "Marion County",
+        "nightly": True,
+        # Ordinances, resolutions and budget resolutions carry their own types
+        # (13, 6 and 12 of the 300 newest matters, 2026-10-29), so no title rule is
+        # needed. The rest is "Agenda Item", code cases and magistrate cases.
+        "label": "Ocala City Council (Legistar)",
+        "note": "The most recent council matters. About a third are code-enforcement and special-magistrate cases and most of the rest "
+        "are agenda items, which are not labelled legislation. Ordinance attachments are plan maps and staff reports, not the "
+        "instrument, so ordinances have no full text.",
+    },
     "pinellaspark": {
         "jurisdiction": "Pinellas Park",
         "county": "Pinellas County",

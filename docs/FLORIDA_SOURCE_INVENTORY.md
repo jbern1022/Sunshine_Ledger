@@ -201,7 +201,7 @@ Sampled and **deliberately not onboarded yet**, with what each needs:
 
 | Place | Token | Why it waits |
 |---|---|---|
-| Ocala | `ocala` | Mostly code cases and special-magistrate cases; "Agenda Item" holds the real business. Needs a kind rule from titles. |
+| Ocala | `ocala` | Registered 2026-10-29 on `feat/onboard-ocala`. Ordinances, resolutions and budget resolutions carry their own types, so no title rule was needed; code cases, magistrate cases and "Agenda Item" stay non-legislation. Ordinance attachments are plan maps, so ordinances have no full text. First ingest by hand still to do. |
 
 Counties: Hernando and DeSoto are registered (2026-10-27, branch
 `feat/county-legistar-hernando-desoto`, not yet deployed). Both use real

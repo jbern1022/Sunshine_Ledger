@@ -197,6 +197,7 @@ def test_legistar_text_backfill_marks_no_text_and_skips_it_until_recheck(monkeyp
         ("venice", "Venice", "Sarasota County", False),
         ("marcoisland", "Marco Island", "Collier County", False),
         ("pinellaspark", "Pinellas Park", "Pinellas County", True),
+        ("ocala", "Ocala", "Marion County", False),
     ],
 )
 def test_city_registry_entries_ingest(monkeypatch, db_session, client, jurisdiction, county, committee_sponsors):
@@ -210,6 +211,15 @@ def test_city_registry_entries_ingest(monkeypatch, db_session, client, jurisdict
     assert entity.bill.geo_scope_names == [county]
     body = _sponsors(db_session)["City Commission Regular Meeting"]
     assert bool(body.attributes.get("committee")) is committee_sponsors
+
+
+def test_ocala_types_map_to_kinds_without_a_title_rule():
+    from app.pipeline.item_kind import item_kind
+
+    for legislation in ("Ordinance", "Resolution", "Budget Resolution"):
+        assert item_kind(legislation) == "legislation"
+    for other in ("Agenda Item", "Code Case", "Special Magistrate Case", "Proclamation", "CRA Agenda Item"):
+        assert item_kind(other) == "other"
 
 
 def test_adopted_instrument_reads_clearwater_action_item_titles():
