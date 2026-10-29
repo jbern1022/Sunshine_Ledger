@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { t } from "@/lib/i18n";
 import { getPerson } from "@/lib/server-api";
 import PersonRecord from "@/components/PersonRecord";
 import { ALL_TOPICS, sponsorshipCounts } from "@/lib/votingRecord";
@@ -25,14 +26,19 @@ type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const person = await getPerson(id);
-  if (!person) return { title: "Sponsor not found — Sunshine Ledger" };
+  if (!person) return { title: t("person.meta.notFound", { site: t("site.title") }) };
 
   const qualifiers = [person.role, person.district].filter(Boolean).join(" ");
-  const title = `${person.name}${qualifiers ? ` (${qualifiers})` : ""} | Sunshine Ledger`;
-  const description =
-    `Bills sponsored or co-sponsored by ${person.name}` +
-    `${person.district ? `, ${person.district}` : ""} — ${person.sponsored_count} tracked. ` +
-    "Sponsorships and recorded votes; no ratings or scores.";
+  const title = t("person.meta.title", {
+    name: person.name,
+    qualifiers: qualifiers ? ` (${qualifiers})` : "",
+    site: t("site.title"),
+  });
+  const description = t("person.meta.description", {
+    name: person.name,
+    district: person.district ? `, ${person.district}` : "",
+    count: person.sponsored_count,
+  });
 
   return {
     title,
@@ -52,7 +58,7 @@ export default async function PersonPage({ params }: Props) {
   return (
     <div>
       <Link href="/people" className="text-xs text-sunshine-700 underline">
-        ← All sponsors
+        {t("person.back")}
       </Link>
 
       <h1 className="mt-3 text-2xl font-bold text-ledger-900">{person.name}</h1>
@@ -64,33 +70,29 @@ export default async function PersonPage({ params }: Props) {
 
       {person.is_committee ? (
         <p className="mt-4 text-sm text-slate-600">
-          A committee, listed as a sponsor on the {person.sponsored_count} committee substitute
-          {person.sponsored_count === 1 ? "" : "s"} it produced. Committees don&apos;t cast recorded votes.
+          {t("person.committeeNote", { count: person.sponsored_count })}
         </p>
       ) : (
         <>
           <p className="mt-4 text-sm font-medium text-ledger-900">
             {[
-              `Sponsored ${sponsorship.sponsored}`,
-              `Co-sponsored ${sponsorship.cosponsored}`,
-              ...(isStateLegislator
-                ? [`${person.votes.length} recorded vote${person.votes.length === 1 ? "" : "s"}`]
-                : []),
+              t("person.sponsored", { count: sponsorship.sponsored }),
+              t("person.coSponsored", { count: sponsorship.cosponsored }),
+              ...(isStateLegislator ? [t("person.recordedVotes", { count: person.votes.length })] : []),
             ].join(" · ")}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Tracked bills and roll calls only. Nothing here rates or characterises this{" "}
-            {isStateLegislator ? "legislator" : "sponsor"}.
+            {t(isStateLegislator ? "person.nonRating.legislator" : "person.nonRating.sponsor")}
           </p>
         </>
       )}
 
       <PersonRecord votes={person.votes} bills={person.bills}>
         {person.votes.length === 0 && isStateLegislator && (
-          <p className="mt-4 text-sm text-slate-500">No recorded votes in the covered roll calls.</p>
+          <p className="mt-4 text-sm text-slate-500">{t("person.noVotes")}</p>
         )}
         {!isStateLegislator && !person.is_committee && (
-          <p className="mt-4 text-xs text-slate-500">Vote records aren&apos;t collected for local officials.</p>
+          <p className="mt-4 text-xs text-slate-500">{t("person.noLocalVotes")}</p>
         )}
       </PersonRecord>
     </div>

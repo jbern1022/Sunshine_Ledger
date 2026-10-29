@@ -237,6 +237,40 @@ export const en = {
   "challenge.sending": "Sending…",
   "challenge.submit": "Submit report",
   "challenge.cancel": "Cancel",
+
+  "people.title": "Sponsors",
+  "people.intro":
+    "Whoever sponsors or co-sponsors bills tracked here, with how many they're attached to. At city level a sponsor is often a committee or an office rather than a named person, as recorded by the city. Counts describe the record, not performance — filing more bills is neither good nor bad, and nothing here rates anyone.",
+  "people.search.label": "Search sponsors by name or district",
+  "people.search.placeholder": "Search by name, committee, or district…",
+  "people.kind.label": "Show sponsors of type",
+  "people.kind.all": "All",
+  "people.kind.legislator": "Legislators and local sponsors",
+  "people.kind.committee": "State committees",
+  "people.error": "Couldn't load legislators.",
+  "people.empty": "No sponsors match that search.",
+  "people.total.one": "{count} sponsor",
+  "people.total.other": "{count} sponsors",
+  "people.committee": "Committee",
+  "people.billCount.one": "{count} bill",
+  "people.billCount.other": "{count} bills",
+  "person.meta.notFound": "Sponsor not found — {site}",
+  "person.meta.title": "{name}{qualifiers} | {site}",
+  "person.meta.description":
+    "Bills sponsored or co-sponsored by {name}{district} — {count} tracked. Sponsorships and recorded votes; no ratings or scores.",
+  "person.back": "← All sponsors",
+  "person.committeeNote.one":
+    "A committee, listed as a sponsor on the {count} committee substitute it produced. Committees don't cast recorded votes.",
+  "person.committeeNote.other":
+    "A committee, listed as a sponsor on the {count} committee substitutes it produced. Committees don't cast recorded votes.",
+  "person.sponsored": "Sponsored {count}",
+  "person.coSponsored": "Co-sponsored {count}",
+  "person.recordedVotes.one": "{count} recorded vote",
+  "person.recordedVotes.other": "{count} recorded votes",
+  "person.nonRating.legislator": "Tracked bills and roll calls only. Nothing here rates or characterises this legislator.",
+  "person.nonRating.sponsor": "Tracked bills and roll calls only. Nothing here rates or characterises this sponsor.",
+  "person.noVotes": "No recorded votes in the covered roll calls.",
+  "person.noLocalVotes": "Vote records aren't collected for local officials.",
 } as const;
 
 export type MessageKey = keyof typeof en;
