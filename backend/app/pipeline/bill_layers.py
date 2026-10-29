@@ -729,6 +729,9 @@ def build_who_it_affects(bill_number: str, title: str, full_text: str, client) -
     scope = _sections_read(law, windows, read) if partial else "Bill text"
     if len(kept) > MAX_WHO_ENTRIES:
         scope += f" · first {MAX_WHO_ENTRIES} of {len(kept)} entries"
+        # Entries the cap cuts are reported with the rest, so a missing
+        # provision (HB 1389 s. 7, 2026-10-27) shows up as cut, not lost.
+        dropped += [{**e, "reason": "over the entry cap"} for e in kept[MAX_WHO_ENTRIES:]]
     return LayerResult("supported", scope, kept[:MAX_WHO_ENTRIES], dropped)
 
 
