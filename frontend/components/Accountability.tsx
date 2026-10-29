@@ -3,6 +3,7 @@ import type { BillDetail, CorrectionOut, ResponseOut } from "@/lib/types";
 import {
   CATEGORY_NAMES, CHANGE_TYPE_NAMES, changeLabel, correctionNote, forTarget, type TargetAccountability,
 } from "@/lib/accountability";
+import { t, tRich } from "@/lib/i18n";
 import { LAYER_META, formatDate } from "@/lib/layers";
 
 /** Correction process, step 4 (Notion spec): labels on the affected block,
@@ -14,18 +15,22 @@ function ResponseBlock({ r }: { r: ResponseOut }) {
   return (
     <div className="mt-2 rounded border-l-2 border-ledger-900 bg-slate-50 px-2 py-1.5 text-sm">
       <p className="text-xs font-medium text-ledger-900">
-        Response from {r.responder_name}
-        {r.responder_role && <span className="font-normal text-slate-600">, {r.responder_role}</span>},{" "}
-        {formatDate(r.received_at)}
+        {tRich("acct.response.header", {
+          name: r.responder_name,
+          role: r.responder_role ? (
+            <span className="font-normal text-slate-600">{t("acct.response.role", { role: r.responder_role })}</span>
+          ) : null,
+          date: formatDate(r.received_at),
+        })}
       </p>
       <p className="mt-0.5 whitespace-pre-line text-slate-700">{r.text}</p>
       {r.full_text_url && (
         <a href={r.full_text_url} target="_blank" rel="noreferrer" className="text-xs text-sunshine-700 underline">
-          Full response ↗
+          {t("acct.response.full")}
         </a>
       )}
       <p className="mt-0.5 text-[11px] text-slate-500">
-        Shown as received; a response is not evidence and changes no finding. Identity {r.verified_via}.
+        {t("acct.response.note", { via: r.verified_via })}
       </p>
     </div>
   );
@@ -45,11 +50,10 @@ export function AccountabilityNotes({ items, withResponses = true }: { items: Ta
             href="#corrections"
             className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 underline decoration-amber-900/40"
           >
-            Disputed — under review
+            {t("acct.disputed")}
           </a>
           <span className="ml-1.5 text-slate-600">
-            since {formatDate(d.disputed_since)}: challenged as {CATEGORY_NAMES[d.category] ?? d.category}. It stays
-            up while it&apos;s reviewed.
+            {t("acct.disputed.since", { date: formatDate(d.disputed_since), category: CATEGORY_NAMES[d.category] ?? d.category })}
           </span>
         </p>
       ))}
@@ -74,20 +78,20 @@ export function AccountabilityNotes({ items, withResponses = true }: { items: Ta
   );
 }
 
-const TRIGGER_TEXT: Record<CorrectionOut["trigger"], string> = {
-  challenge: "Prompted by a reader's challenge",
-  internal_review: "Found in Sunshine Ledger's own review",
-  source_change: "The source changed its record",
-  methodology_change: "Methodology change",
-};
+const TRIGGER_KEYS = {
+  challenge: "acct.trigger.challenge",
+  internal_review: "acct.trigger.internal_review",
+  source_change: "acct.trigger.source_change",
+  methodology_change: "acct.trigger.methodology_change",
+} as const satisfies Record<CorrectionOut["trigger"], string>;
 
-const OBJECT_TEXT: Record<string, string> = {
-  bill: "this record",
-  page_copy: "text on this page",
-  claim: "a claim on this page",
-  amendment: "an amendment entry",
-  vote: "a roll-call vote",
-};
+const OBJECT_KEYS = {
+  bill: "acct.object.bill",
+  page_copy: "acct.object.page_copy",
+  claim: "acct.object.claim",
+  amendment: "acct.object.amendment",
+  vote: "acct.object.vote",
+} as const;
 
 function describeTarget(bill: BillDetail, objectType: string, objectId: string | null): string {
   if (objectType === "bill_layer" && objectId) {
@@ -96,21 +100,21 @@ function describeTarget(bill: BillDetail, objectType: string, objectId: string |
         const versions = [b.current, ...b.earlier_versions];
         if (versions.some((v) => v?.id === objectId)) {
           const title = LAYER_META[layer as keyof typeof LAYER_META]?.title ?? "Who it affects";
-          return `the ${title} block`;
+          return t("acct.object.layerBlock", { title });
         }
       }
     }
-    return "an analysis block";
+    return t("acct.object.analysisBlock");
   }
-  return OBJECT_TEXT[objectType] ?? "this record";
+  return t(OBJECT_KEYS[objectType as keyof typeof OBJECT_KEYS] ?? "acct.object.bill");
 }
 
 function originText(c: CorrectionOut): string | null {
   if (c.origin === "sunshine_ledger_ai") {
-    return c.was_reviewed ? "AI-generated, reviewed by a person" : "AI-generated, not reviewed by a person";
+    return c.was_reviewed ? t("acct.origin.aiReviewed") : t("acct.origin.aiUnreviewed");
   }
-  if (c.origin === "legislative_staff") return "From the legislative staff analysis";
-  if (c.origin === "bill_text") return "Quoted from the bill text";
+  if (c.origin === "legislative_staff") return t("acct.origin.staff");
+  if (c.origin === "bill_text") return t("acct.origin.billText");
   return null;
 }
 
@@ -121,25 +125,35 @@ function CorrectionEntry({ bill, c }: { bill: BillDetail; c: CorrectionOut }) {
       <p className="text-sm">
         <span className="font-medium text-ledger-900">{changeLabel(c)}</span>
         <span className="text-slate-600">
-          {" "}
-          · {CHANGE_TYPE_NAMES[c.change_type]} ({c.severity}) to {describeTarget(bill, c.object_type, c.object_id)}
+          {t("acct.entry.change", {
+            type: CHANGE_TYPE_NAMES[c.change_type],
+            severity: c.severity,
+            target: describeTarget(bill, c.object_type, c.object_id),
+          })}
         </span>
       </p>
       <p className="mt-1 text-sm text-slate-700">{c.explanation}</p>
       {(c.prior_text || c.current_text) && (
         <details className="mt-1 text-xs text-slate-600" open={c.severity !== "minor"}>
-          <summary className="cursor-pointer underline">Before and after</summary>
+          <summary className="cursor-pointer underline">{t("acct.entry.beforeAfter")}</summary>
           {c.prior_text && (
             <div className="mt-1">
-              <p className="font-medium">Earlier version{c.prior_version ? ` (version ${c.prior_version})` : ""}</p>
+              <p className="font-medium">
+                {c.prior_version ? t("acct.entry.earlierVersion", { version: c.prior_version }) : t("acct.entry.earlier")}
+              </p>
               <del className="block whitespace-pre-line bg-red-50 px-1 text-slate-700">{c.prior_text}</del>
             </div>
           )}
           {c.current_text && (
             <div className="mt-1">
               <p className="font-medium">
-                {c.change_type === "retraction" ? "Now says" : "Corrected version"}
-                {c.current_version ? ` (version ${c.current_version})` : ""}
+                {c.change_type === "retraction"
+                  ? c.current_version
+                    ? t("acct.entry.nowSaysVersion", { version: c.current_version })
+                    : t("acct.entry.nowSays")
+                  : c.current_version
+                    ? t("acct.entry.correctedVersion", { version: c.current_version })
+                    : t("acct.entry.corrected")}
               </p>
               <ins className="block whitespace-pre-line bg-green-50 px-1 no-underline text-slate-700">{c.current_text}</ins>
             </div>
@@ -150,7 +164,9 @@ function CorrectionEntry({ bill, c }: { bill: BillDetail; c: CorrectionOut }) {
         <ul className="mt-1 text-xs text-slate-600">
           {c.evidence_links.map((e, i) => (
             <li key={i}>
-              {e.role ? `${e.role[0].toUpperCase()}${e.role.slice(1)} evidence: ` : "Evidence: "}
+              {e.role
+                ? t("acct.entry.evidenceRole", { role: `${e.role[0].toUpperCase()}${e.role.slice(1)}` })
+                : t("acct.entry.evidence")}
               <a href={e.url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
                 {e.note || e.url}
               </a>
@@ -159,9 +175,10 @@ function CorrectionEntry({ bill, c }: { bill: BillDetail; c: CorrectionOut }) {
         </ul>
       )}
       <p className="mt-1 text-[11px] text-slate-500">
-        {TRIGGER_TEXT[c.trigger]}
-        {origin && <> · {origin}</>} · decided by {c.decided_by_label}
-        {c.methodology_version && <> · method {c.methodology_version}</>}
+        {t(TRIGGER_KEYS[c.trigger])}
+        {origin && t("acct.entry.origin", { text: origin })}
+        {t("acct.entry.decidedBy", { label: c.decided_by_label })}
+        {c.methodology_version && t("acct.entry.method", { version: c.methodology_version })}
       </p>
     </li>
   );
@@ -180,24 +197,31 @@ export function CorrectionsSection({ bill }: { bill: BillDetail }) {
   return (
     <section id="corrections" aria-labelledby="corrections-heading" className="mt-5 scroll-mt-4">
       <h2 id="corrections-heading" className="text-sm font-semibold text-ledger-900">
-        Corrections, disputes and responses
+        {t("acct.section.title")}
       </h2>
       <p className="text-xs text-slate-500">
-        Every change Sunshine Ledger makes to this page stays listed here with the earlier version and the reason.{" "}
-        <Link href="/methodology#corrections" className="underline hover:text-slate-700">How corrections work</Link>
+        {tRich("acct.section.intro", {
+          link: (
+            <Link href="/methodology#corrections" className="underline hover:text-slate-700">
+              {t("acct.section.how")}
+            </Link>
+          ),
+        })}
       </p>
       {disputes.length > 0 && (
         <>
-          <h3 className="mt-3 text-xs font-semibold text-slate-700">Under review</h3>
+          <h3 className="mt-3 text-xs font-semibold text-slate-700">{t("acct.section.underReview")}</h3>
           <ul className="mt-1 space-y-1 text-sm text-slate-700">
             {disputes.map((d) => (
               <li key={d.flag_id}>
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
-                  Disputed — under review
+                  {t("acct.disputed")}
                 </span>{" "}
-                {describeTarget(bill, d.object_type, d.object_id)}, challenged as{" "}
-                {CATEGORY_NAMES[d.category] ?? d.category}, since {formatDate(d.disputed_since)}. The statement stays
-                up, labelled, until a decision is published.
+                {t("acct.section.dispute", {
+                  target: describeTarget(bill, d.object_type, d.object_id),
+                  category: CATEGORY_NAMES[d.category] ?? d.category,
+                  date: formatDate(d.disputed_since),
+                })}
               </li>
             ))}
           </ul>
@@ -205,7 +229,7 @@ export function CorrectionsSection({ bill }: { bill: BillDetail }) {
       )}
       {corrections.length > 0 && (
         <>
-          <h3 className="mt-3 text-xs font-semibold text-slate-700">Corrections and updates</h3>
+          <h3 className="mt-3 text-xs font-semibold text-slate-700">{t("acct.section.corrections")}</h3>
           <ul className="mt-1 space-y-2">
             {corrections.map((c) => (
               <CorrectionEntry key={c.id} bill={bill} c={c} />
@@ -215,7 +239,7 @@ export function CorrectionsSection({ bill }: { bill: BillDetail }) {
       )}
       {billLevel.responses.filter((r) => !r.superseded_by_id).length > 0 && (
         <>
-          <h3 className="mt-3 text-xs font-semibold text-slate-700">Responses</h3>
+          <h3 className="mt-3 text-xs font-semibold text-slate-700">{t("acct.section.responses")}</h3>
           {billLevel.responses.filter((r) => !r.superseded_by_id).map((r) => (
             <ResponseBlock key={r.id} r={r} />
           ))}
@@ -224,8 +248,7 @@ export function CorrectionsSection({ bill }: { bill: BillDetail }) {
       {superseded.length > 0 && (
         <details className="mt-2 text-xs text-slate-500">
           <summary className="cursor-pointer underline">
-            {superseded.length} earlier response{superseded.length === 1 ? "" : "s"}, since replaced by the
-            responder
+            {t("acct.section.superseded", { count: superseded.length })}
           </summary>
           {superseded.map((r) => (
             <ResponseBlock key={r.id} r={r} />
@@ -233,7 +256,7 @@ export function CorrectionsSection({ bill }: { bill: BillDetail }) {
         </details>
       )}
       <p className="mt-2 text-xs">
-        <Link href="/corrections" className="text-sunshine-700 underline">All corrections across the site</Link>
+        <Link href="/corrections" className="text-sunshine-700 underline">{t("acct.section.all")}</Link>
       </p>
     </section>
   );
