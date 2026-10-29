@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { fetchSourceStatus } from "@/lib/api";
 import { formatChecked } from "@/lib/freshness";
+import { t } from "@/lib/i18n";
 import type { SourceStatus } from "@/lib/types";
 
 /** Every data source with its schedule, last check, coverage and known
@@ -19,10 +20,10 @@ export default function DataSourcesList() {
   }, []);
 
   if (failed) {
-    return <p className="mt-2 text-sm text-slate-600">Source status is unavailable right now.</p>;
+    return <p className="mt-2 text-sm text-slate-600">{t("sources.unavailable")}</p>;
   }
   if (!statuses) {
-    return <p className="mt-2 text-sm text-slate-500">Loading source status…</p>;
+    return <p className="mt-2 text-sm text-slate-500">{t("sources.loading")}</p>;
   }
 
   return (
@@ -32,13 +33,13 @@ export default function DataSourcesList() {
           <span className="font-medium text-ledger-900">{s.label}</span>
           <span className="text-slate-500">
             {" "}
-            · {s.schedule} · last checked {formatChecked(s.last_checked_at)}
+            {t("sources.schedule", { schedule: s.schedule, date: formatChecked(s.last_checked_at) })}
           </span>
-          {s.stale && <span className="text-amber-800"> · not updated on schedule</span>}
+          {s.stale && <span className="text-amber-800">{t("sources.notOnSchedule")}</span>}
           {s.bill_count !== null && (
             <span className="block text-xs text-slate-500">
-              {s.bill_count.toLocaleString("en-US")} bills
-              {s.bills_with_text !== null && `, ${s.bills_with_text.toLocaleString("en-US")} with full text`}
+              {t("sources.bills", { count: s.bill_count })}
+              {s.bills_with_text !== null && t("sources.withText", { count: s.bills_with_text })}
             </span>
           )}
           <span className="block">{s.note}</span>
