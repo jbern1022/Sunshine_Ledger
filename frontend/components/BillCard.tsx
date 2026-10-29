@@ -6,6 +6,7 @@ import { fetchBill } from "@/lib/api";
 import ChallengeForm from "@/components/ChallengeForm";
 import type { BillDetail, BillListItem, SourceOut } from "@/lib/types";
 import TagBadges from "@/components/TagBadges";
+import { t, tRich } from "@/lib/i18n";
 
 const STATUS_COLORS: Record<string, string> = {
   Introduced: "bg-slate-100 text-slate-700",
@@ -68,7 +69,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
             <span>{bill.bill_number}</span>
             <span>·</span>
-            <span>{bill.jurisdiction_name ?? "Florida"}</span>
+            <span>{bill.jurisdiction_name ?? t("card.defaultJurisdiction")}</span>
             {bill.chamber && (
               <>
                 <span>·</span>
@@ -113,7 +114,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
         <p className="mt-3 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
       ) : (
         <p className="mt-3 text-sm italic text-slate-500">
-          No plain-language summary generated yet.
+          {t("card.noSummary")}
           {bill.full_text_url && (
             <>
               {" "}
@@ -123,7 +124,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 rel="noreferrer"
                 className="not-italic text-sunshine-700 underline hover:text-sunshine-800"
               >
-                Read the original bill text
+                {t("card.readOriginalText")}
               </a>
               .
             </>
@@ -132,7 +133,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
       )}
 
       <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-        {bill.primary_sponsor && <span>Sponsored by {bill.primary_sponsor}</span>}
+        {bill.primary_sponsor && <span>{t("card.sponsoredBy", { name: bill.primary_sponsor })}</span>}
         {bill.geo_scope_names.length > 0 && (
           <span>
             {bill.geo_scope_type} — {bill.geo_scope_names.join(", ")}
@@ -145,7 +146,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
             rel="noreferrer"
             className="text-sunshine-700 underline hover:text-sunshine-800"
           >
-            View original bill ↗
+            {t("card.viewOriginal")}
           </a>
         )}
       </p>
@@ -159,34 +160,34 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
             <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sunshine-100 px-1.5 text-[10px] font-bold text-sunshine-700">
               {bill.source_count}
             </span>
-            {expanded ? "Hide sources" : `Sources (${bill.source_count})`}
+            {expanded ? t("card.hideSources") : t("card.showSources", { count: bill.source_count })}
           </button>
           <button
             onClick={() => setShowFlagForm((v) => !v)}
             className="text-xs font-medium text-slate-500 hover:text-slate-600"
           >
-            Flag this
+            {t("card.flag")}
           </button>
         </div>
         <span className="text-xs text-slate-500">
-          {bill.last_action_date ? `Last action ${bill.last_action_date}` : ""}
+          {bill.last_action_date ? t("card.lastAction", { date: bill.last_action_date }) : ""}
         </span>
       </div>
 
       {expanded && (
         <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs">
-          {loading && <p className="text-slate-500">Loading sources…</p>}
+          {loading && <p className="text-slate-500">{t("card.loadingSources")}</p>}
           {!loading && whoItAffects && (
             <p className="mb-2 text-slate-600">
-              <span className="font-semibold">Who it affects: </span>
+              <span className="font-semibold">{t("card.whoItAffects")}</span>
               {whoItAffects}
             </p>
           )}
           {!loading && detail && detail.sponsors.length > 0 && (
             <p className="mb-2 text-slate-600">
-              <span className="font-semibold">Sponsors: </span>
+              <span className="font-semibold">{t("card.sponsors")}</span>
               {detail.sponsors
-                .map((s) => (s.relationship_type === "co_sponsor" ? `${s.name} (co-sponsor)` : s.name))
+                .map((s) => (s.relationship_type === "co_sponsor" ? t("card.coSponsor", { name: s.name }) : s.name))
                 .join(", ")}
             </p>
           )}
@@ -202,7 +203,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                   >
                     {s.publisher ?? s.url}
                   </a>
-                  <span className="text-slate-500"> — retrieved {new Date(s.retrieved_at).toLocaleDateString()}</span>
+                  <span className="text-slate-500">{t("card.retrieved", { date: new Date(s.retrieved_at).toLocaleDateString() })}</span>
                 </li>
               ))}
             </ul>
@@ -214,24 +215,19 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
               part of what needs tracing. */}
           {!loading && summaryModels.length > 0 && (
             <p className="mt-2 border-t border-slate-200 pt-2 text-[11px] leading-relaxed text-slate-500">
-              Plain-language summaries above were written by an AI model (
-              {summaryModels.join(", ")}) from the source{uniqueSources.length === 1 ? "" : "s"} listed
-              here, and are published without a human reviewing each one. They can be wrong or
-              incomplete — the linked source is the authority. Something look off?{" "}
-              <button
-                type="button"
-                onClick={() => setShowFlagForm(true)}
-                className="underline hover:text-slate-600"
-              >
-                Flag it
-              </button>
-              .
+              {tRich(uniqueSources.length === 1 ? "card.aiNote.oneSource" : "card.aiNote.manySources", {
+                models: summaryModels.join(", "),
+                flag: (
+                  <button type="button" onClick={() => setShowFlagForm(true)} className="underline hover:text-slate-600">
+                    {t("card.flagIt")}
+                  </button>
+                ),
+              })}
             </p>
           )}
           {!loading && detail && uniqueSources.length === 0 && (
             <p className="text-slate-500">
-              No summary sources yet (no plain-language summary has been generated for this bill) — see
-              &quot;View original bill&quot; above for where this data came from.
+              {t("card.noSources")}
             </p>
           )}
         </div>
@@ -241,7 +237,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
 
       {expanded && !loading && detail && detail.news.length > 0 && (
         <div className="mt-3 rounded-md bg-slate-50 p-3 text-xs">
-          <p className="mb-1.5 font-semibold text-slate-600">Recent news mentions</p>
+          <p className="mb-1.5 font-semibold text-slate-600">{t("card.news.title")}</p>
           <ul className="space-y-1">
             {detail.news.map((n) => (
               <li key={n.id}>
@@ -250,8 +246,12 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
                 </a>
                 <span className="text-slate-500">
                   {" "}
-                  — {n.publisher ?? "unknown outlet"}
-                  {n.published_date ? `, ${new Date(n.published_date).toLocaleDateString()}` : ""}
+                  {n.published_date
+                    ? t("card.news.withDate", {
+                        publisher: n.publisher ?? t("card.news.unknownOutlet"),
+                        date: new Date(n.published_date).toLocaleDateString(),
+                      })
+                    : t("card.news.noDate", { publisher: n.publisher ?? t("card.news.unknownOutlet") })}
                 </span>
               </li>
             ))}

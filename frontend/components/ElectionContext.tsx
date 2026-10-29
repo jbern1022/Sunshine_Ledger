@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchElections } from "@/lib/api";
+import { t, tRich } from "@/lib/i18n";
 import type { ElectionCalendar } from "@/lib/types";
 
 /** Election calendar strip (BRD 5.8).
@@ -31,53 +32,52 @@ export default function ElectionContext() {
   const next = calendar.next_event;
   const electionDay = calendar.events.find((e) => e.kind === "election" && !e.is_past);
 
+  const longDate = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  const shortDate = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
   return (
     <div className="mb-6 rounded-md border border-slate-200 bg-white px-4 py-3 text-xs">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="font-semibold text-ledger-900">
-          {calendar.state} {calendar.year} election calendar
+          {t("election.title", { state: calendar.state, year: String(calendar.year) })}
         </span>
         {next ? (
           <span className="text-slate-600">
-            Next: <span className="font-medium">{next.label}</span> —{" "}
-            {new Date(next.date + "T00:00:00").toLocaleDateString(undefined, {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-            })}{" "}
-            <span className="text-slate-500">
-              ({next.days_away === 0 ? "today" : `in ${next.days_away} days`})
-            </span>
+            {tRich("election.next", {
+              label: <span className="font-medium">{next.label}</span>,
+              date: longDate(next.date),
+              when: (
+                <span className="text-slate-500">
+                  {next.days_away === 0 ? t("election.today") : t("election.inDays", { count: next.days_away })}
+                </span>
+              ),
+            })}
           </span>
         ) : (
-          <span className="text-slate-500">
-            The {calendar.year} calendar is complete. Dates for the next election will be added when the state
-            publishes them.
-          </span>
+          <span className="text-slate-500">{t("election.complete", { year: String(calendar.year) })}</span>
         )}
         {electionDay && next && electionDay.label !== next.label && (
           <span className="text-slate-500">
-            · {electionDay.label}{" "}
-            {new Date(electionDay.date + "T00:00:00").toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-            })}
+            {t("election.alsoOn", { label: electionDay.label, date: shortDate(electionDay.date) })}
           </span>
         )}
       </div>
       {next?.note && <p className="mt-1 text-[11px] text-slate-500">{next.note}</p>}
       <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
-        Dates published by the{" "}
-        <a
-          href={calendar.source.url}
-          target="_blank"
-          rel="noreferrer"
-          className="underline hover:text-slate-600"
-        >
-          {calendar.source.name}
-        </a>
-        . Shown as civic context only — Sunshine Ledger does not link bills to candidates, parties,
-        or races, and makes no claim about how any bill bears on an election.
+        {tRich("election.source", {
+          source: (
+            <a
+              href={calendar.source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-slate-600"
+            >
+              {calendar.source.name}
+            </a>
+          ),
+        })}
       </p>
     </div>
   );

@@ -50,6 +50,74 @@ export const en = {
   "coverage.localUnknown": "a growing set of local governments",
   "coverage.local.one": "{count} local government",
   "coverage.local.other": "{count} local governments",
+
+  "election.title": "{state} {year} election calendar",
+  "election.next": "Next: {label} — {date} {when}",
+  "election.today": "(today)",
+  "election.inDays.one": "(in {count} day)",
+  "election.inDays.other": "(in {count} days)",
+  "election.complete":
+    "The {year} calendar is complete. Dates for the next election will be added when the state publishes them.",
+  "election.alsoOn": "· {label} {date}",
+  "election.source":
+    "Dates published by the {source}. Shown as civic context only — Sunshine Ledger does not link bills to candidates, parties, or races, and makes no claim about how any bill bears on an election.",
+
+  "card.defaultJurisdiction": "Florida",
+  "card.noSummary": "No plain-language summary generated yet.",
+  "card.readOriginalText": "Read the original bill text",
+  "card.sponsoredBy": "Sponsored by {name}",
+  "card.viewOriginal": "View original bill ↗",
+  "card.hideSources": "Hide sources",
+  "card.showSources": "Sources ({count})",
+  "card.flag": "Flag this",
+  "card.lastAction": "Last action {date}",
+  "card.loadingSources": "Loading sources…",
+  "card.whoItAffects": "Who it affects: ",
+  "card.sponsors": "Sponsors: ",
+  "card.coSponsor": "{name} (co-sponsor)",
+  "card.retrieved": " — retrieved {date}",
+  "card.aiNote.oneSource":
+    "Plain-language summaries above were written by an AI model ({models}) from the source listed here, and are published without a human reviewing each one. They can be wrong or incomplete — the linked source is the authority. Something look off? {flag}.",
+  "card.aiNote.manySources":
+    "Plain-language summaries above were written by an AI model ({models}) from the sources listed here, and are published without a human reviewing each one. They can be wrong or incomplete — the linked source is the authority. Something look off? {flag}.",
+  "card.flagIt": "Flag it",
+  "card.noSources":
+    "No summary sources yet (no plain-language summary has been generated for this bill) — see \"View original bill\" above for where this data came from.",
+  "card.news.title": "Recent news mentions",
+  "card.news.unknownOutlet": "unknown outlet",
+  "card.news.withDate": "— {publisher}, {date}",
+  "card.news.noDate": "— {publisher}",
+
+  "sponsored.none": "No tracked bills for this sponsor.",
+  "sponsored.title": "Sponsored and co-sponsored bills",
+  "sponsored.titleTagged": "Sponsored and co-sponsored bills tagged {topic}",
+  "sponsored.count": " ({count})",
+  "sponsored.noneTagged": "None of this sponsor's bills are tagged {topic}.",
+  "sponsored.role.sponsor": "sponsor",
+  "sponsored.role.coSponsor": "co-sponsor",
+  "sponsored.lastAction": " · last action {date}",
+  "sponsored.noSummary": "No summary generated yet.",
+  "sponsored.showFirst": "Show the first {count}",
+  "sponsored.showAll": "Show all {count}",
+
+  "map.viewLabel": "Map view",
+  "map.mode.impact": "Impact by county",
+  "map.mode.impact.caption":
+    "Counties shaded by how many tracked bills apply to them. Click a county to see its bills.",
+  "map.mode.sponsorship": "Sponsorship by district",
+  "map.mode.sponsorship.caption":
+    "State legislative districts shaded by how many tracked bills that district's legislator filed. This measures who introduces legislation, not who it affects — most state bills apply statewide.",
+  "map.loading": "Loading map…",
+  "map.error.county": "Failed to load map data",
+  "map.error.district": "Failed to load district data",
+  "map.error.hint":
+    "{error} — make sure the backend is running and boundaries are loaded ({loader} or via {seed}).",
+  "map.tooltip.county.one": "{name}: {count} bill",
+  "map.tooltip.county.other": "{name}: {count} bills",
+  "map.tooltip.noSponsor": "no tracked sponsor",
+  "map.tooltip.district.one": "{chamber} {name} — {who}: sponsored {count} tracked bill",
+  "map.tooltip.district.other": "{chamber} {name} — {who}: sponsored {count} tracked bills",
+  "map.tooltip.clickHint": " (click to see their bills)",
 } as const;
 
 export type MessageKey = keyof typeof en;
