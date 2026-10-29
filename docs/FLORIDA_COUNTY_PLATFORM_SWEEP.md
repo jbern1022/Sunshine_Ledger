@@ -68,7 +68,7 @@ these).
 | Levy | County site `levycounty.org` (schedule) and Clerk `levyclerk.com` (minutes PDFs since 2012) | Minutes through 2022; schedule for 2024 | Search only; no current agenda located. |
 | Liberty | County site `libertybocc.com` with an "Agendas & Minutes" menu | Navigation only; most results were Liberty County, Georgia | Search only; archive not opened. |
 | Madison | County WordPress uploads of full packets (`madisoncountyfl.com/wp-content/uploads/BOCC-Packet-<mm.dd.yy>.pdf`) that embed the prior meeting's minutes | Packets 2023 to 2024-07-10 | Search only. **Legistar client `madison` exists but is Madison, Wisconsin** (checked bodies and matters): a name hit must be verified as Florida. |
-| Okeechobee | County calendar page links the Board's agenda on **IQM2** ("Board of County Commissioners Regular Session - Web Outline"); meetings also streamed | One county calendar entry | Search only; the IQM2 address was not opened. Same product the Miami adapter (`miami_iqm2.py`) reads, so a candidate for reuse. |
+| Okeechobee | **IQM2**, tenant `okeechobeecountyfl.iqm2.com` (title "Meeting Portal - Okeechobee County, Florida"); county calendar and meeting pages (`Detail_Meeting.aspx`), no legislation-file records seen | **Verified 2026-10-27 by request**: the tenant answers 200 with the right title (wrong guesses redirect to an error page); `Calendar.aspx` listed 45 meeting links, none to `Detail_LegiFile.aspx`; the calendar page's dates were May 2026, so whether it is current is unconfirmed | Opened Default, Calendar and robots.txt only (4 requests, about 1 minute; no item pages). `Crawl-delay: 60` for all agents. The county site itself returns 403 to non-browser requests, so it was not read. **Not reusable as is:** the Miami adapter reads `Detail_LegiFile` records, Okeechobee publishes meetings and agenda outlines. |
 | Suwannee | County WordPress uploads of tentative-agenda packets (`suwanneecountyfl.gov/wp-content/uploads/<Month>-<D>-<YYYY>-Packet-1.pdf`) that include prior minutes | Packets 2023 to May 2024 | Search only; nothing after mid-2024 indexed. |
 | Taylor | County site `taylorcountygov.com` commission page with some agendas and minutes as PDFs; the office holds the rest | Schedule page; 2026 meetings only in third-party summaries | Search only. Page looks partly out of date. |
 | Union | County agenda PDF for the 2026-04-20 meeting (via a third-party host); official archive not found | One 2026 agenda | Search only. Many results were other states' Union counties. |
@@ -98,8 +98,12 @@ these).
 6. **Alachua moved off Legistar** (stale since 2025-01-15) and Walton's 2014-era
    Legistar no longer exists, so a stale registry row is a signal to re-sweep, not to
    keep polling.
-7. **Okeechobee's agenda is on IQM2**, the product behind the Miami adapter. If its
-   terms allow, that adapter may need only a new base address and mapping rather than new code.
+7. **Okeechobee's agenda is on IQM2**, the product behind the Miami adapter, but as meetings
+   (`Detail_Meeting.aspx` agenda outlines), not legislation-file records. The adapter would need
+   a meeting-based reader, not just a new base address. All IQM2 tenants ask crawlers for
+   `Crawl-delay: 60` (their robots.txt); at that rate one meeting's agenda is a one-minute fetch,
+   so a county's backlog is a multi-hour job and the nightly must be capped. The Miami scrape
+   already runs with no delay between requests (see Todoist `6hrFq2mH5Pj68qgG`, filed 2026-10-27).
 8. **The small counties mostly publish by uploading PDFs** to a WordPress site (Baker,
    Bradford, Madison, Suwannee, Dixie, Glades, Lafayette, Holmes, Levy's Clerk) with dates in the
    file name. Cheap to list, but every item is a document, not a structured record, and several
