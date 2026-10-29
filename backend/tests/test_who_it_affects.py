@@ -506,6 +506,17 @@ def test_up_to_twenty_entries_are_kept_and_more_are_counted():
     assert r.scope_note == "Bill text · first 20 of 22 entries"
 
 
+def test_entries_cut_by_the_cap_are_reported_as_dropped():
+    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, 23))
+    bill = "Section 1. Reports.\n" + lines
+    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, 23)]
+    r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
+    over_cap = [d for d in r.dropped if d.get("reason") == "over the entry cap"]
+    assert len(over_cap) == 2
+    assert {d["group"] for d in over_cap} == {"Agency 21", "Agency 22"}
+    assert all(d["quote"] for d in over_cap)
+
+
 class QuoteRoutingClient:
     """Answers each window with the entries whose quote that window contains."""
     model = "fake:1"
