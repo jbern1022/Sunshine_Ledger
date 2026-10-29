@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { t, tRich } from "@/lib/i18n";
 import { getBill, getSourceStatus } from "@/lib/server-api";
 import { formatChecked, sourceForBill } from "@/lib/freshness";
 import TagBadges from "@/components/TagBadges";
@@ -35,12 +36,16 @@ type Props = { params: Promise<{ id: string }>; searchParams?: Promise<{ lens?: 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const bill = await getBill(id);
-  if (!bill) return { title: "Bill not found — Sunshine Ledger" };
+  if (!bill) return { title: t("bill.meta.notFound", { site: t("site.title") }) };
 
   // Prefer the plain-language summary for the description: it's written for
   // a general audience, which is exactly what a search result needs.
   const description = (bill.what_it_does ?? bill.name ?? "").slice(0, 300);
-  const title = `${bill.bill_number} — ${bill.jurisdiction_name ?? "Florida"} | Sunshine Ledger`;
+  const title = t("bill.meta.title", {
+    number: bill.bill_number,
+    place: bill.jurisdiction_name ?? t("browse.florida"),
+    site: t("site.title"),
+  });
 
   return {
     title,
@@ -83,12 +88,12 @@ export default async function BillPage({ params, searchParams }: Props) {
   return (
     <article>
       <Link href="/" className="text-xs text-sunshine-700 underline">
-        ← All bills
+        {t("bill.back")}
       </Link>
 
       <header className="mt-3">
         <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-          <span>{bill.jurisdiction_name ?? "Florida"}</span>
+          <span>{bill.jurisdiction_name ?? t("browse.florida")}</span>
           {bill.chamber && (
             <>
               <span>·</span>
@@ -103,18 +108,19 @@ export default async function BillPage({ params, searchParams }: Props) {
           )}
         </div>
         <h1 className="mt-1 text-2xl font-bold text-ledger-900">{bill.bill_number}</h1>
-        <p className="mt-1 text-sm text-slate-600">{bill.name.trim() === "*" ? "Untitled item" : bill.name}</p>
+        <p className="mt-1 text-sm text-slate-600">{bill.name.trim() === "*" ? t("bill.untitled") : bill.name}</p>
         {!isLegislation && (
           <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            A record from {bill.jurisdiction_name ?? "the city"}&apos;s agenda
-            {bill.item_type ? ` (${bill.item_type})` : ""}, not legislation: it has no bill text, recorded votes or
-            amendments.
+            {t("bill.agendaNotice", {
+              place: bill.jurisdiction_name ?? t("bill.defaultCity"),
+              type: bill.item_type ? ` (${bill.item_type})` : "",
+            })}
           </p>
         )}
         <TagBadges tags={bill.tags} />
         <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <p>
-            <span className="font-medium text-ledger-900">Status: </span>
+            <span className="font-medium text-ledger-900">{t("bill.status")}</span>
             {bill.status}
             {bill.last_action && <> — {bill.last_action}</>}
             {bill.last_action_date && <span className="text-slate-500"> ({bill.last_action_date})</span>}
@@ -124,20 +130,16 @@ export default async function BillPage({ params, searchParams }: Props) {
               <span className="font-medium text-ledger-900">{effectiveLabel(bill.status)}: </span>
               {bill.effective.when}
               <span className="text-xs text-slate-500">
-                {" "}
-                (per the bill text
                 {bill.effective.has_exceptions || (bill.provision_dates ?? []).length > 0
-                  ? "; some sections have their own dates"
-                  : ""}
-                )
+                  ? t("bill.effective.noteSections")
+                  : t("bill.effective.note")}
               </span>
             </p>
           )}
           {isLegislation && (bill.provision_dates ?? []).length > 0 && (
             <details className="mt-1 text-xs text-slate-600">
               <summary className="cursor-pointer underline">
-                {bill.provision_dates!.length} {bill.provision_dates!.length === 1 ? "provision has its" : "provisions have their"} own
-                date
+                {t("bill.provisionDates", { count: bill.provision_dates!.length })}
               </summary>
               <ul className="mt-1 space-y-1.5">
                 {bill.provision_dates!.map((d, i) => (
@@ -166,9 +168,9 @@ export default async function BillPage({ params, searchParams }: Props) {
             <section className="mt-5">
               {/* The summary prompt was written for legislation ("This bill
                   ..."); for an agenda record, say what it is and label it. */}
-              <h2 className="text-sm font-semibold text-ledger-900">{isLegislation ? "What it does" : "About this item"}</h2>
+              <h2 className="text-sm font-semibold text-ledger-900">{isLegislation ? t("bill.whatItDoes") : t("bill.aboutItem")}</h2>
               {!isLegislation && (
-                <p className="text-xs text-slate-500">AI summary of the agenda listing. It may call this a bill; it isn&apos;t one.</p>
+                <p className="text-xs text-slate-500">{t("bill.agendaSummaryNote")}</p>
               )}
               <p className="mt-1 text-sm leading-relaxed text-slate-700">{bill.what_it_does}</p>
             </section>
@@ -178,7 +180,7 @@ export default async function BillPage({ params, searchParams }: Props) {
             <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} accountability={bill} />
           ) : isLegislation && whoItAffects && (
             <section className="mt-4">
-              <h2 className="text-sm font-semibold text-ledger-900">Who it affects</h2>
+              <h2 className="text-sm font-semibold text-ledger-900">{t("bill.whoItAffects")}</h2>
               <p className="mt-1 text-sm leading-relaxed text-slate-700">{whoItAffects}</p>
             </section>
           )}
@@ -203,7 +205,7 @@ export default async function BillPage({ params, searchParams }: Props) {
 
       {bill.sponsors.length > 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Sponsors</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.sponsors")}</h2>
           {legislatorSponsors.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
               {legislatorSponsors.map((s) => (
@@ -212,7 +214,7 @@ export default async function BillPage({ params, searchParams }: Props) {
                     {s.name}
                   </Link>
                   {s.relationship_type === "co_sponsor" && (
-                    <span className="text-slate-500"> (co-sponsor)</span>
+                    <span className="text-slate-500">{t("bill.coSponsor")}</span>
                   )}
                 </li>
               ))}
@@ -220,7 +222,7 @@ export default async function BillPage({ params, searchParams }: Props) {
           )}
           {committeeSponsors.length > 0 && (
             <p className="mt-2 text-sm text-slate-700">
-              <span className="font-medium">Committee sponsors: </span>
+              <span className="font-medium">{t("bill.committeeSponsors")}</span>
               {committeeSponsors.map((s, i) => (
                 <span key={s.entity_id}>
                   {i > 0 && "; "}
@@ -228,8 +230,7 @@ export default async function BillPage({ params, searchParams }: Props) {
                 </span>
               ))}
               <span className="block text-xs text-slate-500">
-                The committees that produced this version of the bill (a committee substitute). A
-                committee sponsoring a bill is not a legislator&apos;s endorsement.
+                {t("bill.committeeNote")}
               </span>
             </p>
           )}
@@ -238,21 +239,20 @@ export default async function BillPage({ params, searchParams }: Props) {
 
       {isLegislation && bill.votes.length === 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Votes</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.votes")}</h2>
           <p className="text-xs text-slate-500">
             {isStateBill
-              ? "No recorded roll-call votes for this bill in LegiScan's record."
-              : "Roll-call votes aren't collected for city legislation yet."}
+              ? t("bill.votes.noneState")
+              : t("bill.votes.noneCity")}
           </p>
         </section>
       )}
 
       {bill.votes.length > 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Votes</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.votes")}</h2>
           <p className="text-[11px] text-slate-500">
-            Plain vote tallies from official roll calls — not a score, and not a claim about any
-            legislator.
+            {t("bill.votes.note")}
           </p>
           <ul className="mt-1 space-y-2 text-sm">
             {bill.votes.map((v) => (
@@ -262,15 +262,15 @@ export default async function BillPage({ params, searchParams }: Props) {
                   <span className="text-xs text-slate-500">{v.date}</span>
                 </div>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  {v.passed ? "Passed" : "Failed"} {v.yea}-{v.nay}
-                  {v.nv ? `, ${v.nv} not voting` : ""}
-                  {v.absent ? `, ${v.absent} absent` : ""}
+                  {t(v.passed ? "bill.votes.passed" : "bill.votes.failed", { yea: v.yea ?? "", nay: v.nay ?? "" })}
+                  {v.nv ? t("bill.votes.notVoting", { count: v.nv }) : ""}
+                  {v.absent ? t("bill.votes.absent", { count: v.absent }) : ""}
                 </p>
                 <AccountabilityNotes items={forTarget(bill, "vote", [v.id])} />
                 {v.votes.length > 0 && (
                   <details className="mt-1">
                     <summary className="cursor-pointer text-xs text-sunshine-700 underline">
-                      {v.votes.length} individual vote{v.votes.length === 1 ? "" : "s"}
+                      {t("bill.votes.individual", { count: v.votes.length })}
                     </summary>
                     <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-3">
                       {v.votes.map((iv) => (
@@ -294,7 +294,7 @@ export default async function BillPage({ params, searchParams }: Props) {
                     rel="noreferrer"
                     className="mt-1 inline-block text-xs text-sunshine-700 underline"
                   >
-                    View roll call ↗
+                    {t("bill.votes.viewRollCall")}
                   </a>
                 )}
               </li>
@@ -305,27 +305,31 @@ export default async function BillPage({ params, searchParams }: Props) {
 
       {isLegislation && bill.amendments.length === 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.amendments")}</h2>
           <p className="text-xs text-slate-500">
             {isStateBill
-              ? "No amendments recorded for this bill in LegiScan's record."
-              : "Amendments aren't collected for city legislation yet."}
+              ? t("bill.amendments.noneState")
+              : t("bill.amendments.noneCity")}
           </p>
         </section>
       )}
 
       {bill.amendments.length > 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Amendment history</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.amendments")}</h2>
           <ul className="mt-1 space-y-1 text-sm text-slate-700">
             {bill.amendments.map((a) => (
               <li key={a.id} id={`amendment-${a.id}`} className="scroll-mt-4">
-                {a.label ? <>{a.label}</> : "Amendment"} filed {a.date}
-                {a.chamber && <> in {a.chamber}</>}
-                {a.sponsor && <>, offered by {a.sponsor}</>}
-                {a.adopted ? " — adopted" : " — not adopted"}
-                {a.description && <span className="text-slate-500"> — {a.description}</span>}
-                {a.last_action && <span className="text-slate-500"> · last action: {a.last_action}</span>}
+                {t("bill.amendment.filed", { label: a.label || t("bill.amendment.default"), date: a.date })}
+                {a.chamber && t("bill.amendment.inChamber", { chamber: a.chamber })}
+                {a.sponsor && t("bill.amendment.offeredBy", { sponsor: a.sponsor })}
+                {a.adopted ? t("bill.amendment.adopted") : t("bill.amendment.notAdopted")}
+                {a.description && (
+                  <span className="text-slate-500">{t("bill.amendment.description", { description: a.description })}</span>
+                )}
+                {a.last_action && (
+                  <span className="text-slate-500">{t("bill.amendment.lastAction", { action: a.last_action })}</span>
+                )}
                 <AccountabilityNotes items={forTarget(bill, "amendment", [a.id])} />
                 {a.amendment_text && bill.full_text && (
                   <AmendmentDiff baseText={bill.full_text} amendedText={a.amendment_text} />
@@ -339,12 +343,12 @@ export default async function BillPage({ params, searchParams }: Props) {
       <CorrectionsSection bill={bill} />
 
       <section className="mt-4">
-        <FlagThis billEntityId={bill.entity_id} label="Report a problem with this bill" />
+        <FlagThis billEntityId={bill.entity_id} label={t("bill.report")} />
       </section>
 
       {sources.length > 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Sources</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.sources")}</h2>
           <ul className="mt-1 space-y-1 text-sm">
             {sources.map((s) => (
               <li key={s.id}>
@@ -352,8 +356,7 @@ export default async function BillPage({ params, searchParams }: Props) {
                   {s.publisher ?? s.url}
                 </a>
                 <span className="text-slate-500">
-                  {" "}
-                  — retrieved {new Date(s.retrieved_at).toLocaleDateString("en-US")}
+                  {t("bill.sources.retrieved", { date: new Date(s.retrieved_at).toLocaleDateString("en-US") })}
                 </span>
               </li>
             ))}
@@ -363,9 +366,9 @@ export default async function BillPage({ params, searchParams }: Props) {
 
       {bill.news.length > 0 && (
         <section className="mt-4">
-          <h2 className="text-sm font-semibold text-ledger-900">Recent news mentions</h2>
+          <h2 className="text-sm font-semibold text-ledger-900">{t("bill.news")}</h2>
           <p className="text-[11px] text-slate-500">
-            Matched by keyword, unscored — their presence is not a claim about the bill.
+            {t("bill.news.note")}
           </p>
           <ul className="mt-1 space-y-1 text-sm">
             {bill.news.map((n) => (
@@ -373,7 +376,7 @@ export default async function BillPage({ params, searchParams }: Props) {
                 <a href={n.url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
                   {n.title}
                 </a>
-                <span className="text-slate-500"> — {n.publisher ?? "unknown outlet"}</span>
+                <span className="text-slate-500"> — {n.publisher ?? t("bill.news.unknownOutlet")}</span>
               </li>
             ))}
           </ul>
@@ -382,14 +385,14 @@ export default async function BillPage({ params, searchParams }: Props) {
 
       {summaryModels.length > 0 && (
         <p className="mt-6 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-slate-500">
-          The plain-language summaries above were written by an AI model (
-          {summaryModels.join(", ")}) from the sources listed here, and are published without a
-          human reviewing each one. They can be wrong or incomplete — the linked source is the
-          authority. See{" "}
-          <Link href="/methodology" className="underline hover:text-slate-600">
-            how this works
-          </Link>
-          .
+          {tRich("bill.aiNote", {
+            models: summaryModels.join(", "),
+            link: (
+              <Link href="/methodology" className="underline hover:text-slate-600">
+                {t("bill.aiNote.link")}
+              </Link>
+            ),
+          })}
         </p>
       )}
 
@@ -397,7 +400,7 @@ export default async function BillPage({ params, searchParams }: Props) {
         <section className="mt-4">
           <details>
             <summary className="cursor-pointer text-sm font-semibold text-ledger-900">
-              Full bill text
+              {t("bill.fullText")}
             </summary>
             <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">
               <MarkedText text={bill.full_text} />
@@ -409,25 +412,28 @@ export default async function BillPage({ params, searchParams }: Props) {
       {bill.full_text_url && (
         <p className="mt-3 text-sm">
           <a href={bill.full_text_url} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
-            Read the original bill ↗
+            {t("bill.readOriginal")}
           </a>
         </p>
       )}
 
       {bill.source_system === "iqm2" && (
         <p className="mt-3 text-xs text-slate-500">
-          Full text isn&apos;t available for Miami items: the city&apos;s portal doesn&apos;t publish it in a form
-          we can collect.
+          {t("bill.miamiNoText")}
         </p>
       )}
 
       {dataSource && (
         <p className="mt-3 text-xs text-slate-500">
-          Source: {dataSource.label} · last checked {formatChecked(dataSource.last_checked_at)}
-          {dataSource.stale && <span className="text-amber-800"> · may be out of date</span>} ·{" "}
-          <Link href="/methodology#data-sources" className="text-sunshine-700 underline hover:text-sunshine-800">
-            About our data
-          </Link>
+          {t("bill.source.line", { label: dataSource.label, date: formatChecked(dataSource.last_checked_at) })}
+          {dataSource.stale && <span className="text-amber-800">{t("bill.source.stale")}</span>}
+          {tRich("bill.source.tail", {
+            link: (
+              <Link href="/methodology#data-sources" className="text-sunshine-700 underline hover:text-sunshine-800">
+                {t("bill.source.aboutData")}
+              </Link>
+            ),
+          })}
         </p>
       )}
     </article>
