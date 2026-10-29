@@ -52,6 +52,21 @@ describe("ElectionContext", () => {
     );
   });
 
+  it("says 'in 1 day', not 'in 1 days', and 'today' on the day", async () => {
+    const withDays = (days: number): ElectionCalendar => ({
+      ...calendar,
+      next_event: { ...calendar.next_event!, days_away: days },
+    });
+    vi.mocked(api.fetchElections).mockResolvedValueOnce(withDays(1));
+    const { unmount } = render(<ElectionContext />);
+    expect(await screen.findByText(/\(in 1 day\)/)).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(api.fetchElections).mockResolvedValueOnce(withDays(0));
+    render(<ElectionContext />);
+    expect(await screen.findByText(/\(today\)/)).toBeInTheDocument();
+  });
+
   it("states the non-claim explicitly", async () => {
     // BRD 5.8 permits the calendar but rules out scoring and prediction.
     // Putting an election date above a list of bills invites readers to

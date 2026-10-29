@@ -50,6 +50,17 @@ export const en = {
   "coverage.localUnknown": "a growing set of local governments",
   "coverage.local.one": "{count} local government",
   "coverage.local.other": "{count} local governments",
+
+  "election.title": "{state} {year} election calendar",
+  "election.next": "Next: {label} — {date} {when}",
+  "election.today": "(today)",
+  "election.inDays.one": "(in {count} day)",
+  "election.inDays.other": "(in {count} days)",
+  "election.complete":
+    "The {year} calendar is complete. Dates for the next election will be added when the state publishes them.",
+  "election.alsoOn": "· {label} {date}",
+  "election.source":
+    "Dates published by the {source}. Shown as civic context only — Sunshine Ledger does not link bills to candidates, parties, or races, and makes no claim about how any bill bears on an election.",
 } as const;
 
 export type MessageKey = keyof typeof en;
