@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import type { Layer, PathOptions } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { t, tRich } from "@/lib/i18n";
 import { fetchCountyGeoJSON, fetchDistrictGeoJSON } from "@/lib/api";
 import type {
   CountyFeatureCollection,
@@ -22,19 +23,7 @@ const FL_CENTER: [number, number] = [27.8, -81.7];
  *  is affected". The mode copy below carries that caveat -- keep it. */
 type MapMode = "impact" | "sponsorship";
 
-const MODES: Record<MapMode, { label: string; caption: string }> = {
-  impact: {
-    label: "Impact by county",
-    caption:
-      "Counties shaded by how many tracked bills apply to them. Click a county to see its bills.",
-  },
-  sponsorship: {
-    label: "Sponsorship by district",
-    caption:
-      "State legislative districts shaded by how many tracked bills that district's legislator filed. " +
-      "This measures who introduces legislation, not who it affects — most state bills apply statewide.",
-  },
-};
+const MODE_KEYS: MapMode[] = ["impact", "sponsorship"];
 
 function colorForImpact(count: number): string {
   if (count === 0) return "#e2e8f0"; // slate-200
@@ -69,7 +58,7 @@ export default function MapView() {
   useEffect(() => {
     fetchCountyGeoJSON()
       .then(setCounties)
-      .catch((err) => setError(err.message ?? "Failed to load map data"));
+      .catch((err) => setError(err.message ?? t("map.error.county")));
   }, []);
 
   // Districts are fetched lazily -- the polygon set is much larger than the
@@ -78,14 +67,17 @@ export default function MapView() {
     if (mode !== "sponsorship" || districts !== null) return;
     fetchDistrictGeoJSON()
       .then(setDistricts)
-      .catch((err) => setError(err.message ?? "Failed to load district data"));
+      .catch((err) => setError(err.message ?? t("map.error.district")));
   }, [mode, districts]);
 
   if (error) {
     return (
       <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        {error} — make sure the backend is running and boundaries are loaded (
-        <code>python -m app.pipeline.load_boundaries</code> or via <code>seed.py</code>).
+        {tRich("map.error.hint", {
+          error,
+          loader: <code>python -m app.pipeline.load_boundaries</code>,
+          seed: <code>seed.py</code>,
+        })}
       </div>
     );
   }
@@ -97,10 +89,10 @@ export default function MapView() {
       <div className="mb-3">
         <div
           role="group"
-          aria-label="Map view"
+          aria-label={t("map.viewLabel")}
           className="inline-flex rounded-md border border-slate-300 p-0.5"
         >
-          {(Object.keys(MODES) as MapMode[]).map((key) => (
+          {MODE_KEYS.map((key) => (
             <button
               key={key}
               onClick={() => setMode(key)}
@@ -111,15 +103,15 @@ export default function MapView() {
                   : "text-slate-600 hover:bg-slate-50"
               }`}
             >
-              {MODES[key].label}
+              {t(`map.mode.${key}`)}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-slate-500">{MODES[mode].caption}</p>
+        <p className="mt-2 text-xs text-slate-500">{t(`map.mode.${mode}.caption`)}</p>
       </div>
 
       {!active ? (
-        <p className="text-sm text-slate-500">Loading map…</p>
+        <p className="text-sm text-slate-500">{t("map.loading")}</p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-slate-200">
           <MapContainer
@@ -150,7 +142,7 @@ export default function MapView() {
                   const props = feature.properties as CountyFeatureProperties;
                   if (props.scope_type === "statewide") return;
                   layer.bindTooltip(
-                    `${props.scope_name}: ${props.bill_count} bill${props.bill_count === 1 ? "" : "s"}`,
+                    t("map.tooltip.county", { name: props.scope_name, count: props.bill_count }),
                   );
                   layer.on("click", () => {
                     router.push(`/?geo=${encodeURIComponent(props.scope_name)}`);
@@ -173,11 +165,14 @@ export default function MapView() {
                 onEachFeature={(feature, layer: Layer) => {
                   const props = feature.properties as DistrictFeatureProperties;
                   const names = props.legislators.map((l) => l.name);
-                  const who = names.length ? names.join(", ") : "no tracked sponsor";
+                  const who = names.length ? names.join(", ") : t("map.tooltip.noSponsor");
                   layer.bindTooltip(
-                    `${props.chamber} ${props.scope_name} — ${who}: ` +
-                      `sponsored ${props.bill_count} tracked bill${props.bill_count === 1 ? "" : "s"}` +
-                      (props.legislators.length ? " (click to see their bills)" : ""),
+                    t("map.tooltip.district", {
+                      chamber: props.chamber,
+                      name: props.scope_name,
+                      who,
+                      count: props.bill_count,
+                    }) + (props.legislators.length ? t("map.tooltip.clickHint") : ""),
                   );
                   // A district can list more than one tracked legislator (a
                   // mid-session replacement, or a data hiccup) -- click

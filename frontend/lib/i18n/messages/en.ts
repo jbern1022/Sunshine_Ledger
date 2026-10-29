@@ -99,6 +99,25 @@ export const en = {
   "sponsored.noSummary": "No summary generated yet.",
   "sponsored.showFirst": "Show the first {count}",
   "sponsored.showAll": "Show all {count}",
+
+  "map.viewLabel": "Map view",
+  "map.mode.impact": "Impact by county",
+  "map.mode.impact.caption":
+    "Counties shaded by how many tracked bills apply to them. Click a county to see its bills.",
+  "map.mode.sponsorship": "Sponsorship by district",
+  "map.mode.sponsorship.caption":
+    "State legislative districts shaded by how many tracked bills that district's legislator filed. This measures who introduces legislation, not who it affects — most state bills apply statewide.",
+  "map.loading": "Loading map…",
+  "map.error.county": "Failed to load map data",
+  "map.error.district": "Failed to load district data",
+  "map.error.hint":
+    "{error} — make sure the backend is running and boundaries are loaded ({loader} or via {seed}).",
+  "map.tooltip.county.one": "{name}: {count} bill",
+  "map.tooltip.county.other": "{name}: {count} bills",
+  "map.tooltip.noSponsor": "no tracked sponsor",
+  "map.tooltip.district.one": "{chamber} {name} — {who}: sponsored {count} tracked bill",
+  "map.tooltip.district.other": "{chamber} {name} — {who}: sponsored {count} tracked bills",
+  "map.tooltip.clickHint": " (click to see their bills)",
 } as const;
 
 export type MessageKey = keyof typeof en;
