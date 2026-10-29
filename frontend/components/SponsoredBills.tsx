@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
+import { t } from "@/lib/i18n";
 import { hasTopic } from "@/lib/votingRecord";
 import type { PersonBillItem } from "@/lib/types";
 
@@ -24,17 +25,17 @@ export default function SponsoredBills({
   const visible = all ? matching : matching.slice(0, FIRST);
 
   if (bills.length === 0) {
-    return <p className="mt-4 text-sm text-slate-500">No tracked bills for this sponsor.</p>;
+    return <p className="mt-4 text-sm text-slate-500">{t("sponsored.none")}</p>;
   }
 
   return (
     <section className="mt-6" aria-labelledby="sponsored-bills-heading">
       <h2 id="sponsored-bills-heading" className="text-sm font-semibold text-ledger-900">
-        {topicLabel ? `Sponsored and co-sponsored bills tagged ${topicLabel}` : "Sponsored and co-sponsored bills"}
-        <span className="font-normal text-slate-500"> ({matching.length})</span>
+        {topicLabel ? t("sponsored.titleTagged", { topic: topicLabel }) : t("sponsored.title")}
+        <span className="font-normal text-slate-500">{t("sponsored.count", { count: matching.length })}</span>
       </h2>
       {matching.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-500">None of this sponsor&apos;s bills are tagged {topicLabel}.</p>
+        <p className="mt-2 text-sm text-slate-500">{t("sponsored.noneTagged", { topic: topicLabel ?? "" })}</p>
       ) : (
         <ul className="mt-2 space-y-3">
           {visible.map((b) => (
@@ -47,14 +48,14 @@ export default function SponsoredBills({
                   {b.bill_number}
                 </Link>
                 <span className="text-xs text-slate-500">
-                  {b.relationship_type === "co_sponsor" ? "co-sponsor" : "sponsor"}
-                  {b.last_action_date && ` · last action ${b.last_action_date}`}
+                  {b.relationship_type === "co_sponsor" ? t("sponsored.role.coSponsor") : t("sponsored.role.sponsor")}
+                  {b.last_action_date && t("sponsored.lastAction", { date: b.last_action_date })}
                 </span>
               </div>
               {b.what_it_does ? (
                 <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{b.what_it_does}</p>
               ) : (
-                <p className="mt-1.5 text-sm italic text-slate-500">No summary generated yet.</p>
+                <p className="mt-1.5 text-sm italic text-slate-500">{t("sponsored.noSummary")}</p>
               )}
               <p className="mt-1 text-xs text-slate-500">{b.status}</p>
             </li>
@@ -67,7 +68,7 @@ export default function SponsoredBills({
           onClick={() => setAll(!all)}
           className="mt-2 text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
         >
-          {all ? `Show the first ${FIRST}` : `Show all ${matching.length}`}
+          {all ? t("sponsored.showFirst", { count: FIRST }) : t("sponsored.showAll", { count: matching.length })}
         </button>
       )}
     </section>

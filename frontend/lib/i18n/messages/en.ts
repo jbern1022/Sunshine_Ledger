@@ -87,6 +87,18 @@ export const en = {
   "card.news.unknownOutlet": "unknown outlet",
   "card.news.withDate": "— {publisher}, {date}",
   "card.news.noDate": "— {publisher}",
+
+  "sponsored.none": "No tracked bills for this sponsor.",
+  "sponsored.title": "Sponsored and co-sponsored bills",
+  "sponsored.titleTagged": "Sponsored and co-sponsored bills tagged {topic}",
+  "sponsored.count": " ({count})",
+  "sponsored.noneTagged": "None of this sponsor's bills are tagged {topic}.",
+  "sponsored.role.sponsor": "sponsor",
+  "sponsored.role.coSponsor": "co-sponsor",
+  "sponsored.lastAction": " · last action {date}",
+  "sponsored.noSummary": "No summary generated yet.",
+  "sponsored.showFirst": "Show the first {count}",
+  "sponsored.showAll": "Show all {count}",
 } as const;
 
 export type MessageKey = keyof typeof en;
