@@ -61,6 +61,32 @@ export const en = {
   "election.alsoOn": "· {label} {date}",
   "election.source":
     "Dates published by the {source}. Shown as civic context only — Sunshine Ledger does not link bills to candidates, parties, or races, and makes no claim about how any bill bears on an election.",
+
+  "card.defaultJurisdiction": "Florida",
+  "card.noSummary": "No plain-language summary generated yet.",
+  "card.readOriginalText": "Read the original bill text",
+  "card.sponsoredBy": "Sponsored by {name}",
+  "card.viewOriginal": "View original bill ↗",
+  "card.hideSources": "Hide sources",
+  "card.showSources": "Sources ({count})",
+  "card.flag": "Flag this",
+  "card.lastAction": "Last action {date}",
+  "card.loadingSources": "Loading sources…",
+  "card.whoItAffects": "Who it affects: ",
+  "card.sponsors": "Sponsors: ",
+  "card.coSponsor": "{name} (co-sponsor)",
+  "card.retrieved": " — retrieved {date}",
+  "card.aiNote.oneSource":
+    "Plain-language summaries above were written by an AI model ({models}) from the source listed here, and are published without a human reviewing each one. They can be wrong or incomplete — the linked source is the authority. Something look off? {flag}.",
+  "card.aiNote.manySources":
+    "Plain-language summaries above were written by an AI model ({models}) from the sources listed here, and are published without a human reviewing each one. They can be wrong or incomplete — the linked source is the authority. Something look off? {flag}.",
+  "card.flagIt": "Flag it",
+  "card.noSources":
+    "No summary sources yet (no plain-language summary has been generated for this bill) — see \"View original bill\" above for where this data came from.",
+  "card.news.title": "Recent news mentions",
+  "card.news.unknownOutlet": "unknown outlet",
+  "card.news.withDate": "— {publisher}, {date}",
+  "card.news.noDate": "— {publisher}",
 } as const;
 
 export type MessageKey = keyof typeof en;
