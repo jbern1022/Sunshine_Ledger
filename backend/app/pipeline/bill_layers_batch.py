@@ -32,7 +32,7 @@ from app.models import Bill, Entity, Source, StaffAnalysis
 from app.pipeline import bill_layers as gen
 from app.pipeline.bill_layers_store import current_layer, layer_input_hash, store_layer_version
 from app.pipeline.bill_layers_text import extract_effect_section, extract_fiscal_section
-from app.pipeline.summarize import OllamaClient
+from app.pipeline.summarize import LAYERS_SEED, OllamaClient
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +224,9 @@ if __name__ == "__main__":
                         break
             print(f"\n{n} bill(s) with work.")
         else:
-            client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=4096)
+            client = OllamaClient(
+                model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=4096, seed=LAYERS_SEED
+            )
             ok, bad = process_bills(db, client, limit=args.limit, max_minutes=args.max_minutes)
             print(f"\nDone: {ok} block version(s) written, {bad} bill(s) failed.")
             sys.exit(exit_code(written=ok, failed=bad))

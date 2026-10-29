@@ -231,6 +231,13 @@ def generate_item_description(
     return f"{label}: {plain_title}. The published record gives no further detail here.", True
 
 
+# Fixed seed for the bill-layer and Impact Lens clients. Temperature 0 alone did not
+# make runs repeatable: three runs of the same code on HB 1389's text gave 23, 24 and
+# 26 Who-it-affects entries, so a published block (and what the 20-entry cap kept)
+# depended on the run. With a seed two runs were identical.
+LAYERS_SEED = 42
+
+
 class OllamaError(RuntimeError):
     pass
 
@@ -253,6 +260,7 @@ class OllamaClient:
         timeout: float = 120.0,
         temperature: float | None = None,
         num_predict: int | None = None,
+        seed: int | None = None,
     ) -> None:
         self.host = (host or settings.ollama_host).rstrip("/")
         self.model = model or settings.ollama_model
@@ -262,6 +270,8 @@ class OllamaClient:
         # A cap on output tokens, so a degenerate answer ends instead of
         # running into the timeout (bill layers: 4,096).
         self.num_predict = num_predict
+        # A fixed sampling seed, so the same prompt gives the same answer.
+        self.seed = seed
         self._client = httpx.Client(timeout=timeout)
 
     def generate(self, prompt: str, *, json_mode: bool = False) -> str:
@@ -276,6 +286,8 @@ class OllamaClient:
             options["temperature"] = self.temperature
         if self.num_predict is not None:
             options["num_predict"] = self.num_predict
+        if self.seed is not None:
+            options["seed"] = self.seed
         if options:
             body["options"] = options
         # Retry once, after a short pause, on a connection-level failure

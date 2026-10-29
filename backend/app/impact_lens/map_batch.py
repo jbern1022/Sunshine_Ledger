@@ -170,7 +170,7 @@ def export_sheet(db: Session, pairs: list[tuple[Bill, BillLayer]]) -> str:
 if __name__ == "__main__":
     from app.db import SessionLocal
     from app.logging_setup import quiet_http_logging
-    from app.pipeline.summarize import OllamaClient
+    from app.pipeline.summarize import LAYERS_SEED, OllamaClient
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     quiet_http_logging()
@@ -192,7 +192,7 @@ if __name__ == "__main__":
                 pending = pending_who_layers(db)
                 print(f"{len(pending)} bills with unmapped entries; first: {[b.bill_number for b, _ in pending[:10]]}")
                 sys.exit(0)
-            client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=2048)
+            client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=2048, seed=LAYERS_SEED)
             stored, failed, bills = process_pending(
                 db, client, generated_by=f"llm:{settings.ollama_layers_model}", limit=args.limit, max_minutes=args.max_minutes
             )
@@ -210,7 +210,7 @@ if __name__ == "__main__":
             for bill, layer in pairs:
                 print(f"{bill.bill_number} ({bill.session}): {len(layer.items)} entries")
             sys.exit(0)
-        client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=2048)
+        client = OllamaClient(model=settings.ollama_layers_model, timeout=300, temperature=0, num_predict=2048, seed=LAYERS_SEED)
         failed_total = 0
         for bill, layer in pairs:
             stored, skipped, failed = map_layer(db, layer, client, generated_by=f"llm:{settings.ollama_layers_model}")

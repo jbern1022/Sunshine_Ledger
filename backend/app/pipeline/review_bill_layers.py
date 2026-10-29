@@ -30,7 +30,7 @@ from app.models import Bill, Entity, StaffAnalysis
 from app.pipeline import bill_layers as gen
 from app.pipeline.bill_layers_batch import latest_staff_analysis, staff_label
 from app.pipeline.bill_layers_text import extract_effect_section, extract_fiscal_section
-from app.pipeline.summarize import OllamaClient
+from app.pipeline.summarize import LAYERS_SEED, OllamaClient
 
 # Matches this script's own report headings, e.g. "## H0565 — Some Title" or
 # "## 2026-0548-W — A Local Ordinance".
@@ -84,7 +84,7 @@ def build_client(args: argparse.Namespace) -> OllamaClient:
     model, and this always gets the longer layers timeout (300s), matching
     the batch job (see bill_layers_batch.py) so a manual review run isn't
     more timeout-prone than the nightly one."""
-    return OllamaClient(model=args.model or settings.ollama_layers_model, timeout=300)
+    return OllamaClient(model=args.model or settings.ollama_layers_model, timeout=300, seed=LAYERS_SEED)
 
 
 def _render(title: str, result: gen.LayerResult) -> list[str]:
