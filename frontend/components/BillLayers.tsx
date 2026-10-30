@@ -1,4 +1,5 @@
 import type { BillLayers as Layers, LayerBlock, LayerKey, LayerVersion, Origin } from "@/lib/types";
+import { t } from "@/lib/i18n";
 import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes } from "@/components/Accountability";
 import { forTarget, type Accountability } from "@/lib/accountability";
@@ -30,7 +31,7 @@ function VersionBody({ layer, version }: { layer: LayerKey; version: LayerVersio
   if (version.evidence_state === "insufficient_evidence") {
     return (
       <p className="mt-1 text-sm text-slate-600">
-        <span className="font-medium">Insufficient evidence</span> — {version.scope_note}
+        <span className="font-medium">{t("who.insufficient")}</span> — {version.scope_note}
       </p>
     );
   }
@@ -46,11 +47,11 @@ function VersionBody({ layer, version }: { layer: LayerKey; version: LayerVersio
           {item.section_ref && <span className="ml-1 text-xs text-slate-500">({item.section_ref})</span>}
           {item.assumptions.length > 0 && (
             <div className="mt-0.5 text-xs text-slate-500">
-              Assumptions: {item.assumptions.join("; ")}
+              {t("layers.assumptions", { list: item.assumptions.join("; ") })}
             </div>
           )}
           {item.affected_groups.length > 0 && (
-            <div className="mt-0.5 text-xs text-slate-500">Affected groups: {item.affected_groups.join(", ")}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{t("layers.affectedGroups", { list: item.affected_groups.join(", ") })}</div>
           )}
         </li>
       ))}
@@ -80,54 +81,57 @@ function Block({ billEntityId, layer, origin, block, hasStaffAnalysis, accountab
       )}
       {!version ? (
         <p className="mt-1 text-sm text-slate-600">
-          {origin === "legislative_staff" && !hasStaffAnalysis ? "No staff analysis published." : "Not yet evaluated."}
+          {origin === "legislative_staff" && !hasStaffAnalysis ? t("layers.noStaff") : t("layers.notEvaluated")}
         </p>
       ) : (
         <>
           <VersionBody layer={layer} version={version} />
           {origin === "bill_text" && version.evidence_state === "supported" && (
-            <p className="mt-1 text-[11px] text-slate-500">Quotes checked word for word against the bill text</p>
+            <p className="mt-1 text-[11px] text-slate-500">{t("layers.quotesChecked")}</p>
           )}
           {version.scope_note === "Drawn from the first part of a long bill" && (
-            <p className="mt-1 text-[11px] text-slate-500">Drawn from the first part of a long bill</p>
+            <p className="mt-1 text-[11px] text-slate-500">{t("layers.firstPart")}</p>
           )}
           {version.sources.length > 0 && (
             <p className="mt-2 text-[11px] text-slate-500">
-              Source:{" "}
+              {t("who.source")}
               {version.sources.map((s, i) => (
                 <span key={s.id}>
                   {i > 0 && "; "}
                   {s.url ? (
                     <a href={s.url} className="underline hover:text-slate-700">
-                      {origin === "legislative_staff" ? "staff analysis (PDF)" : billTextLabel(s)}
+                      {origin === "legislative_staff" ? t("layers.staffPdf") : billTextLabel(s)}
                     </a>
                   ) : (
-                    origin === "legislative_staff" ? "staff analysis" : billTextLabel(s)
-                  )}{" "}
-                  (retrieved {formatDate(s.retrieved_at)})
+                    origin === "legislative_staff" ? t("layers.staff") : billTextLabel(s)
+                  )}
+                  {t("layers.retrieved", { date: formatDate(s.retrieved_at) })}
                 </span>
               ))}
             </p>
           )}
           <p className="mt-1 text-[11px] text-slate-500">
-            {version.generated_by.replace(/^llm:/, "Model: ")} · method {version.method_version} · updated{" "}
-            {formatDate(version.created_at)}
+            {t("who.footer", {
+              model: version.generated_by.replace(/^llm:/, t("who.model")),
+              method: version.method_version,
+              date: formatDate(version.created_at),
+            })}
           </p>
           <FlagThis
             billEntityId={billEntityId}
             target={{ object_type: "bill_layer", object_id: version.id, object_version: version.version }}
-            label="Flag this block"
+            label={t("who.flagBlock")}
           />
           {block && block.earlier_versions.length > 0 && (
             <details className="mt-1 text-xs text-slate-500">
               <summary className="cursor-pointer underline">
-                {block.earlier_versions.length} earlier version{block.earlier_versions.length === 1 ? "" : "s"}
+                {t("layers.earlier", { count: block.earlier_versions.length })}
               </summary>
               {block.earlier_versions.map((v) => (
                 <div key={v.id} className="mt-2 border-t border-slate-100 pt-1">
                   <div>
-                    Version {v.version} · {formatDate(v.created_at)}
-                    {v.superseded_at && <> – replaced {formatDate(v.superseded_at)}</>}
+                    {t("layers.versionLine", { version: v.version, date: formatDate(v.created_at) })}
+                    {v.superseded_at && t("layers.replaced", { date: formatDate(v.superseded_at) })}
                     {reviewLabel(origin, v) && <> · {reviewLabel(origin, v)}</>}
                   </div>
                   <VersionBody layer={layer} version={v} />
@@ -167,7 +171,7 @@ export default function BillLayers({ billEntityId, layers, hasStaffAnalysis, fal
             ))}
             {showFallback && (
               <div className="mt-2 text-sm text-slate-700">
-                <p className="text-xs font-medium text-slate-500">AI summary of the official description</p>
+                <p className="text-xs font-medium text-slate-500">{t("layers.fallbackLabel")}</p>
                 <p className="mt-0.5">{fallbackSummary}</p>
               </div>
             )}

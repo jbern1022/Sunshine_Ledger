@@ -398,6 +398,21 @@ export const en = {
   "area.county": "{id} County",
   "area.heading": "{badge} · {place}",
   "area.sourceLine": "Source: {source}, {asOf}.",
+
+  "layers.assumptions": "Assumptions: {list}",
+  "layers.affectedGroups": "Affected groups: {list}",
+  "layers.noStaff": "No staff analysis published.",
+  "layers.notEvaluated": "Not yet evaluated.",
+  "layers.quotesChecked": "Quotes checked word for word against the bill text",
+  "layers.firstPart": "Drawn from the first part of a long bill",
+  "layers.staffPdf": "staff analysis (PDF)",
+  "layers.staff": "staff analysis",
+  "layers.retrieved": " (retrieved {date})",
+  "layers.earlier.one": "{count} earlier version",
+  "layers.earlier.other": "{count} earlier versions",
+  "layers.versionLine": "Version {version} · {date}",
+  "layers.replaced": " – replaced {date}",
+  "layers.fallbackLabel": "AI summary of the official description",
 } as const;
 
 export type MessageKey = keyof typeof en;
