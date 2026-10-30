@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { t } from "@/lib/i18n";
 import { becameLaw, buildTimeline, formatStepDate } from "@/lib/timeline";
 import type { ActionOut, AmendmentOut, RollCallOut } from "@/lib/types";
 
@@ -27,11 +28,11 @@ export default function LegislativeTimeline({ actions, votes, amendments, offici
   return (
     <section className="mt-4" aria-labelledby="timeline-heading">
       <h2 id="timeline-heading" className="text-sm font-semibold text-ledger-900">
-        {becameLaw(actions) ? "How it became law" : "Legislative history"}
+        {becameLaw(actions) ? t("timeline.becameLaw") : t("timeline.history")}
       </h2>
       <p className="text-[11px] text-slate-500">
-        From the official record.{" "}
-        {showAll ? `All ${steps.length} steps.` : `Key steps: filing, recorded votes, adopted amendments and the outcome.`}
+        {t("timeline.fromRecord")}
+        {showAll ? t("timeline.allSteps", { count: steps.length }) : t("timeline.keySteps")}
       </p>
       <ol className="mt-2 space-y-1.5 border-l border-slate-200 pl-3 text-sm">
         {shown.map((s, i) => (
@@ -62,12 +63,12 @@ export default function LegislativeTimeline({ actions, votes, amendments, offici
             aria-expanded={showAll}
             className="font-medium text-sunshine-700 underline hover:text-sunshine-800"
           >
-            {showAll ? "Show key steps only" : `Show all ${steps.length} steps`}
+            {showAll ? t("timeline.showKey") : t("timeline.showAll", { count: steps.length })}
           </button>
         ) : null}
         {officialUrl && (
           <a href={officialUrl} target="_blank" rel="noreferrer" className="text-sunshine-700 underline">
-            Official bill history ↗
+            {t("timeline.official")}
           </a>
         )}
       </div>
