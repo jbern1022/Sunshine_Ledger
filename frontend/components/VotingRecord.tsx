@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
+import { t } from "@/lib/i18n";
 import {
   ALL_TOPICS,
   VOTE_KINDS,
@@ -19,13 +20,15 @@ const PAGE = 25;
 function StageLine({ label, summary }: { label: string; summary: StageSummary }) {
   return (
     <p className="text-sm text-slate-700">
-      <span className="font-medium">{label}: </span>
+      <span className="font-medium">{t("voting.stage.label", { label })}</span>
       {summary.rollCalls === 0 ? (
-        <span className="text-slate-500">none in the covered roll calls</span>
+        <span className="text-slate-500">{t("voting.stage.none")}</span>
       ) : (
         <>
-          {summary.rollCalls} roll call{summary.rollCalls === 1 ? "" : "s"} on {summary.bills} bill
-          {summary.bills === 1 ? "" : "s"} —{" "}
+          {t("voting.stage.summary", {
+            rollCalls: t("voting.stage.rollCalls", { count: summary.rollCalls }),
+            bills: t("voting.stage.bills", { count: summary.bills }),
+          })}
           {VOTE_KINDS.map((k, i) => (
             <span key={k.value}>
               {i > 0 && " · "}
@@ -59,7 +62,7 @@ export default function VotingRecord({
   const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const topics = topicsVotedOn(votes);
-  const label = topics.find((t) => t.slug === topic)?.label;
+  const label = topics.find((tp) => tp.slug === topic)?.label;
   const matching = votes.filter((v) => hasTopic(v, topic));
   const { floor, committee } = summarizeVotes(votes, topic);
   const sponsorship = sponsorshipCounts(bills, topic);
@@ -72,46 +75,44 @@ export default function VotingRecord({
   return (
     <section className="mt-4" aria-labelledby="voting-record-heading">
       <h2 id="voting-record-heading" className="text-sm font-semibold text-ledger-900">
-        Voting record
+        {t("voting.title")}
       </h2>
       <p className="text-[11px] text-slate-500">
-        Roll calls recorded by the Florida Legislature in the 2024, 2025 and 2026 sessions (regular and special), via LegiScan.
-        Voice votes aren&apos;t recorded. Plain counts, not a score or a claim about this legislator.
+        {t("voting.note")}
       </p>
 
-      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter votes by bill topic">
-        {[{ slug: ALL_TOPICS, label: "All topics", count: votes.length }, ...topics].map((t) => (
+      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={t("voting.filter.label")}>
+        {[{ slug: ALL_TOPICS, label: t("voting.allTopics"), count: votes.length }, ...topics].map((tp) => (
           <button
-            key={t.slug || "all"}
+            key={tp.slug || "all"}
             type="button"
-            onClick={() => choose(t.slug)}
-            aria-pressed={topic === t.slug}
+            onClick={() => choose(tp.slug)}
+            aria-pressed={topic === tp.slug}
             className={`rounded-full border px-2.5 py-0.5 text-xs ${
-              topic === t.slug
+              topic === tp.slug
                 ? "border-ledger-900 bg-ledger-900 text-white"
                 : "border-slate-300 text-slate-700 hover:border-slate-500"
             }`}
           >
-            {t.label} {t.count}
+            {t("voting.topicChip", { label: tp.label, count: String(tp.count) })}
           </button>
         ))}
       </div>
 
       <div className="mt-3 space-y-1 rounded-md bg-slate-50 p-3">
         <p className="text-sm font-medium text-ledger-900">
-          {label ? `Recorded votes on bills tagged ${label}` : "All recorded votes"}
+          {label ? t("voting.heading.tagged", { topic: label }) : t("voting.heading.all")}
         </p>
-        <StageLine label="Floor votes" summary={floor} />
-        <StageLine label="Committee votes" summary={committee} />
+        <StageLine label={t("voting.stage.floor")} summary={floor} />
+        <StageLine label={t("voting.stage.committee")} summary={committee} />
         <p className="text-sm text-slate-700">
-          <span className="font-medium">Sponsorship: </span>
-          sponsored {sponsorship.sponsored} · co-sponsored {sponsorship.cosponsored} bill
-          {sponsorship.cosponsored === 1 ? "" : "s"}
-          {label ? ` tagged ${label}` : ""}
+          <span className="font-medium">{t("voting.sponsorship")}</span>
+          {t("voting.sponsorship.counts", { sponsored: sponsorship.sponsored, count: sponsorship.cosponsored })}
+          {label ? t("voting.sponsorship.tagged", { topic: label }) : ""}
         </p>
         {label && (
           <p className="text-[11px] text-slate-500">
-            A bill can carry several topics, so totals across topics overlap.
+            {t("voting.overlap")}
           </p>
         )}
       </div>
@@ -123,7 +124,7 @@ export default function VotingRecord({
         aria-controls="vote-list"
         className="mt-2 text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
       >
-        {open ? "Hide the votes" : `Show the ${matching.length} vote${matching.length === 1 ? "" : "s"}`}
+        {open ? t("voting.hide") : t("voting.show", { count: matching.length })}
       </button>
 
       {open && (
@@ -137,13 +138,13 @@ export default function VotingRecord({
                 <span className="text-slate-600"> {v.bill_name}</span>
                 {v.roll_call_description && (
                   <span className="block text-xs text-slate-500">
-                    {v.stage === "floor" ? "Floor · " : ""}
+                    {v.stage === "floor" ? t("voting.floorPrefix") : ""}
                     {v.roll_call_description}
                     {v.source_url && (
                       <>
                         {" · "}
                         <a href={v.source_url} target="_blank" rel="noreferrer" className="underline">
-                          roll call ↗
+                          {t("voting.rollCall")}
                         </a>
                       </>
                     )}
@@ -164,7 +165,7 @@ export default function VotingRecord({
           onClick={() => setShown(shown + PAGE)}
           className="mt-2 text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
         >
-          Show more ({matching.length - shown} more)
+          {t("voting.more", { count: matching.length - shown })}
         </button>
       )}
     </section>

@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type { DemographicMetric, DemographicOverlay } from "@/lib/types";
 
 /** Census ACS / BLS figures for the area tied to this bill, per badge.
@@ -7,10 +8,9 @@ import type { DemographicMetric, DemographicOverlay } from "@/lib/types";
  *  as the bill's reach. ACS margins of error are always shown (BRD 7).
  *  Server-rendered, no interactivity. */
 
-const SOURCE: Record<string, string> = {
-  acs: "U.S. Census Bureau, American Community Survey 5-year estimates",
-  bls: "U.S. Bureau of Labor Statistics, Local Area Unemployment Statistics",
-};
+function sourceName(source: string): string {
+  return source === "acs" ? t("area.source.acs") : source === "bls" ? t("area.source.bls") : source;
+}
 
 function amount(value: number, unit: string): string {
   if (unit === "percent") return `${value.toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
@@ -19,14 +19,14 @@ function amount(value: number, unit: string): string {
 
 function margin(value: number, unit: string): string {
   const n = value.toLocaleString("en-US", { maximumFractionDigits: unit === "percent" ? 1 : 0 });
-  return unit === "percent" ? `${n} points` : n;
+  return unit === "percent" ? t("area.points", { n }) : n;
 }
 
 function Metric({ m, source }: { m: DemographicMetric; source: string }) {
   if (m.estimate === null) {
     return (
       <li>
-        {m.label}: <span className="text-slate-500">not available</span>
+        {m.label}: <span className="text-slate-500">{t("area.notAvailable")}</span>
       </li>
     );
   }
@@ -34,9 +34,9 @@ function Metric({ m, source }: { m: DemographicMetric; source: string }) {
     <li>
       {m.label}: <span className="font-medium text-ledger-900">{amount(m.estimate, m.unit)}</span>
       {m.margin_of_error !== null ? (
-        <span className="text-slate-500"> (± {margin(m.margin_of_error, m.unit)} margin of error)</span>
+        <span className="text-slate-500">{t("area.margin", { margin: margin(m.margin_of_error, m.unit) })}</span>
       ) : source === "acs" ? (
-        <span className="text-slate-500"> (margin of error not published)</span>
+        <span className="text-slate-500">{t("area.marginUnpublished")}</span>
       ) : null}
     </li>
   );
@@ -44,8 +44,8 @@ function Metric({ m, source }: { m: DemographicMetric; source: string }) {
 
 function where(o: DemographicOverlay): string {
   return o.geography_type === "district"
-    ? `${o.geography_id}, the primary sponsor's district`
-    : `${o.geography_id} County`;
+    ? t("area.district", { id: o.geography_id })
+    : t("area.county", { id: o.geography_id });
 }
 
 export default function AreaContext({ overlays }: { overlays: DemographicOverlay[] }) {
@@ -53,17 +53,16 @@ export default function AreaContext({ overlays }: { overlays: DemographicOverlay
   const sponsorDistrict = overlays.some((o) => o.geography_type === "district");
   return (
     <section aria-labelledby="area-context" className="mt-5">
-      <h2 id="area-context" className="text-sm font-semibold text-ledger-900">Area context</h2>
+      <h2 id="area-context" className="text-sm font-semibold text-ledger-900">{t("area.title")}</h2>
       <p className="text-xs text-slate-500">
-        Background figures for the area, by topic. They describe the place, not what this bill would change.
-        {sponsorDistrict &&
-          " A state bill applies statewide; these figures cover only the primary sponsor's district."}
+        {t("area.intro")}
+        {sponsorDistrict && t("area.statewideNote")}
       </p>
       <div className="mt-2 space-y-2">
         {overlays.map((o) => (
           <div key={`${o.badge_slug}-${o.source}-${o.geography_id}`} className="rounded border border-slate-200 p-3 text-sm text-slate-700">
             <h3 className="text-xs font-medium text-slate-600">
-              {o.badge_label} · {where(o)}
+              {t("area.heading", { badge: o.badge_label, place: where(o) })}
             </h3>
             <ul className="mt-1 space-y-0.5">
               {o.metrics.map((m) => (
@@ -71,7 +70,7 @@ export default function AreaContext({ overlays }: { overlays: DemographicOverlay
               ))}
             </ul>
             <p className="mt-1 text-[11px] text-slate-500">
-              Source: {SOURCE[o.source] ?? o.source}, {o.as_of}.
+              {t("area.sourceLine", { source: sourceName(o.source), asOf: o.as_of })}
             </p>
           </div>
         ))}

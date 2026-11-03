@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchPeople } from "@/lib/api";
+import { t } from "@/lib/i18n";
 import type { PersonListItem } from "@/lib/types";
 
 /** Whoever sponsors tracked bills.
@@ -45,7 +46,7 @@ export default function PeoplePage() {
         setTotal(res.total);
         setError(null);
       })
-      .catch(() => !cancelled && setError("Couldn't load legislators."))
+      .catch(() => !cancelled && setError(t("people.error")))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -59,29 +60,26 @@ export default function PeoplePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-ledger-900">Sponsors</h1>
+      <h1 className="text-2xl font-bold text-ledger-900">{t("people.title")}</h1>
       <p className="mt-1 text-sm text-slate-500">
-        Whoever sponsors or co-sponsors bills tracked here, with how many they&apos;re attached to.
-        At city level a sponsor is often a committee or an office rather than a named person, as
-        recorded by the city. Counts describe the record, not performance — filing more bills is
-        neither good nor bad, and nothing here rates anyone.
+        {t("people.intro")}
       </p>
 
       <input
         type="search"
-        aria-label="Search sponsors by name or district"
-        placeholder="Search by name, committee, or district…"
+        aria-label={t("people.search.label")}
+        placeholder={t("people.search.placeholder")}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         className="mt-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
       />
 
-      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Show sponsors of type">
+      <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label={t("people.kind.label")}>
         {(
           [
-            ["", "All"],
-            ["legislator", "Legislators and local sponsors"],
-            ["committee", "State committees"],
+            ["", t("people.kind.all")],
+            ["legislator", t("people.kind.legislator")],
+            ["committee", t("people.kind.committee")],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -101,16 +99,16 @@ export default function PeoplePage() {
       </div>
 
       {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
-      {!error && loading && <p className="mt-4 text-sm text-slate-500">Loading…</p>}
+      {!error && loading && <p className="mt-4 text-sm text-slate-500">{t("browse.loadingPage")}</p>}
       {!error && !loading && people.length === 0 && (
-        <p className="mt-4 text-sm text-slate-500">No sponsors match that search.</p>
+        <p className="mt-4 text-sm text-slate-500">{t("people.empty")}</p>
       )}
 
       {!error && !loading && people.length > 0 && (
         <>
           <p className="mt-4 text-xs text-slate-500">
-            {total} sponsor{total === 1 ? "" : "s"}
-            {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
+            {t("people.total", { count: total })}
+            {totalPages > 1 && t("browse.pageSuffix", { page: currentPage, pages: totalPages })}
           </p>
           <ul className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
             {people.map((p) => (
@@ -123,11 +121,11 @@ export default function PeoplePage() {
                     {p.name}
                   </Link>
                   <span className="ml-2 text-xs text-slate-500">
-                    {p.is_committee ? "Committee" : [p.role, p.district, p.party].filter(Boolean).join(" · ")}
+                    {p.is_committee ? t("people.committee") : [p.role, p.district, p.party].filter(Boolean).join(" · ")}
                   </span>
                 </div>
                 <span className="shrink-0 text-xs text-slate-500">
-                  {p.sponsored_count} bill{p.sponsored_count === 1 ? "" : "s"}
+                  {t("people.billCount", { count: p.sponsored_count })}
                 </span>
               </li>
             ))}
@@ -140,17 +138,17 @@ export default function PeoplePage() {
                 disabled={!hasPrev}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                ← Previous
+                {t("browse.previous")}
               </button>
               <span className="text-xs text-slate-500">
-                Page {currentPage} of {totalPages}
+                {t("browse.pageOf", { page: currentPage, pages: totalPages })}
               </span>
               <button
                 onClick={() => setOffset((o) => o + PAGE_SIZE)}
                 disabled={!hasNext}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next →
+                {t("browse.next")}
               </button>
             </div>
           )}

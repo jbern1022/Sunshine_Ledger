@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fetchBills, fetchSessions, fetchSourceStatus, fetchStatuses, fetchTags } from "@/lib/api";
 import { BROWSE_PAGE_SIZE, buildBrowseQuery, parseBrowseParams, type BrowseFilters } from "@/lib/browse-params";
+import { t, tRich } from "@/lib/i18n";
 import { jurisdictionOptions } from "@/lib/jurisdictions";
 import type { BillListItem, SessionCount, SourceStatus, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
@@ -79,7 +80,7 @@ function BrowsePageInner() {
   useEffect(() => {
     let cancelled = false;
     fetchTags()
-      .then((t) => !cancelled && setTags(t))
+      .then((list) => !cancelled && setTags(list))
       .catch(() => !cancelled && setTags([]));
     return () => {
       cancelled = true;
@@ -147,7 +148,7 @@ function BrowsePageInner() {
         setTotal(res.total);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message ?? "Failed to load bills.");
+        if (!cancelled) setError(err.message ?? t("browse.error.fallback"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -174,20 +175,23 @@ function BrowsePageInner() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ledger-900">Tracked bills</h1>
+        <h1 className="text-2xl font-bold text-ledger-900">{t("browse.title")}</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Plain-language summaries of Florida state and local legislation. Every summary links to its source.
+          {t("browse.intro")}
           {geoFilter && (
             <>
               {" "}
-              Filtered to <span className="font-medium text-ledger-900">{geoFilter}</span>.
+              {tRich("browse.filteredGeo", { geo: <span className="font-medium text-ledger-900">{geoFilter}</span> })}
             </>
           )}
           {sponsorFilter && (
             <>
               {" "}
-              Filtered to bills sponsored by{" "}
-              <span className="font-medium text-ledger-900">{sponsorName || "this legislator"}</span>.
+              {tRich("browse.filteredSponsor", {
+                name: (
+                  <span className="font-medium text-ledger-900">{sponsorName || t("browse.thisLegislator")}</span>
+                ),
+              })}
             </>
           )}
         </p>
@@ -199,13 +203,13 @@ function BrowsePageInner() {
       {autoDetected && jurisdiction && (
         <div className="mb-4 flex items-center justify-between rounded-md bg-sunshine-50 px-3 py-2 text-xs text-slate-600">
           <span>
-            Showing {jurisdiction === "FL" ? "Florida" : jurisdiction} bills based on your location.
+            {t("browse.autoDetected", { place: jurisdiction === "FL" ? t("browse.florida") : jurisdiction })}
           </span>
           <button
             onClick={() => update({ jurisdiction: "" })}
             className="font-medium text-sunshine-700 hover:text-sunshine-800"
           >
-            View all jurisdictions
+            {t("browse.viewAll")}
           </button>
         </div>
       )}
@@ -213,14 +217,14 @@ function BrowsePageInner() {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
         <input
           type="search"
-          aria-label="Search bill number or title"
-          placeholder="Search bill number or title…"
+          aria-label={t("browse.search.label")}
+          placeholder={t("browse.search.placeholder")}
           value={qInput}
           onChange={(e) => setQInput(e.target.value)}
           className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         />
         <select
-          aria-label="Filter by jurisdiction"
+          aria-label={t("browse.filter.jurisdiction")}
           value={jurisdiction}
           onChange={(e) => update({ jurisdiction: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
@@ -232,41 +236,41 @@ function BrowsePageInner() {
           ))}
         </select>
         <select
-          aria-label="Filter by status"
+          aria-label={t("browse.filter.status")}
           value={status}
           onChange={(e) => update({ status: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
-          <option value="">All statuses</option>
+          <option value="">{t("browse.all.statuses")}</option>
           {statuses.map((s) => (
             <option key={s.status} value={s.status}>
-              {s.status} ({s.count})
+              {t("browse.option", { label: s.status, count: String(s.count) })}
             </option>
           ))}
         </select>
         <select
-          aria-label="Filter by session"
+          aria-label={t("browse.filter.session")}
           value={session}
           onChange={(e) => update({ session: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
-          <option value="">All sessions</option>
+          <option value="">{t("browse.all.sessions")}</option>
           {sessions.map((s) => (
             <option key={s.session} value={s.session}>
-              {s.session} ({s.count})
+              {t("browse.option", { label: s.session, count: String(s.count) })}
             </option>
           ))}
         </select>
         <select
-          aria-label="Filter by topic"
+          aria-label={t("browse.filter.topic")}
           value={tag}
           onChange={(e) => update({ tag: e.target.value })}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500"
         >
-          <option value="">All topics</option>
-          {tags.map((t) => (
-            <option key={t.slug} value={t.slug}>
-              {t.label} ({t.count})
+          <option value="">{t("browse.all.topics")}</option>
+          {tags.map((tg) => (
+            <option key={tg.slug} value={tg.slug}>
+              {t("browse.option", { label: tg.label, count: String(tg.count) })}
             </option>
           ))}
         </select>
@@ -274,31 +278,30 @@ function BrowsePageInner() {
 
       {error && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p className="font-medium">We couldn&apos;t load bills right now.</p>
+          <p className="font-medium">{t("browse.error.title")}</p>
           <p className="mt-1">
-            The bill service may be restarting or briefly unavailable. Your filters are kept in the address bar, so you
-            can retry or come back to this link.
+            {t("browse.error.body")}
           </p>
           <button
             onClick={() => setReloadKey((k) => k + 1)}
             className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-50"
           >
-            Try again
+            {t("browse.retry")}
           </button>
         </div>
       )}
 
-      {!error && loading && <p className="text-sm text-slate-500">Loading bills…</p>}
+      {!error && loading && <p className="text-sm text-slate-500">{t("browse.loading")}</p>}
 
       {!error && !loading && bills.length === 0 && (
-        <p className="text-sm text-slate-500">No bills match your filters.</p>
+        <p className="text-sm text-slate-500">{t("browse.empty")}</p>
       )}
 
       {!error && !loading && bills.length > 0 && (
         <>
           <p className="mb-3 text-xs text-slate-500">
-            {total} bill{total === 1 ? "" : "s"}
-            {totalPages > 1 && ` — page ${currentPage} of ${totalPages}`}
+            {t("browse.total", { count: total })}
+            {totalPages > 1 && t("browse.pageSuffix", { page: currentPage, pages: totalPages })}
           </p>
           <div className="space-y-4">
             {bills.map((bill) => (
@@ -313,17 +316,17 @@ function BrowsePageInner() {
                 disabled={!hasPrev}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                ← Previous
+                {t("browse.previous")}
               </button>
               <span className="text-xs text-slate-500">
-                Page {currentPage} of {totalPages}
+                {t("browse.pageOf", { page: currentPage, pages: totalPages })}
               </span>
               <button
                 onClick={() => update({ page: page + 1 })}
                 disabled={!hasNext}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Next →
+                {t("browse.next")}
               </button>
             </div>
           )}
@@ -335,7 +338,7 @@ function BrowsePageInner() {
 
 export default function BrowsePage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
+    <Suspense fallback={<p className="text-sm text-slate-500">{t("browse.loadingPage")}</p>}>
       <BrowsePageInner />
     </Suspense>
   );
