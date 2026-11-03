@@ -1,8 +1,11 @@
 # Impact Lens: which location does each criterion need?
 
-Status: draft for Joe's review, 2026-10-26. Nothing in the wording or the model has
-changed. Todoist `6hr2PW6M6HVFhh3p`. Scenario tests that pin today's behavior:
-`frontend/lib/impactLens.location.test.ts`.
+Status: **resolved 2026-11-03** by `docs/IMPACT_LENS_ROLE_LOCATIONS.md` (owner approved the
+semantics 2026-10-29). Slice 1 is built: one location per kind, a single role. The sections
+below are the original analysis, kept as written. Todoist `6hr2PW6M6HVFhh3p`.
+`frontend/lib/impactLens.location.test.ts` now pins what the matcher does when the server sends
+**no** role-to-location table (an older API), where everything is compared with residence;
+`frontend/lib/impactLens.roleLocation.test.ts` pins the new behavior.
 
 ## The problem
 

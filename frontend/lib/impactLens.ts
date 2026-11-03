@@ -415,13 +415,15 @@ export interface ImpactLensResponse {
   layer: { id: string; version: number; evidence_state: string; scope_note: string; method_version: string; created_at: string } | null;
   entries: LensEntry[];
   questions: LensQuestion[];
+  /** role -> which of the reader's locations that role's rules are about. */
+  role_locations?: Record<string, LocationKind>;
 }
 
 export function toLensBill(r: ImpactLensResponse): LensBill {
-  return { entries: r.entries, complete: r.complete };
+  return { entries: r.entries, complete: r.complete, role_locations: r.role_locations };
 }
 
-/** Answers are only ever these four keys; anything else in storage is dropped. */
+/** Answers are only ever these keys (one per question); anything else in storage is dropped. */
 export const ANSWER_KEYS: QuestionKey[] = QUESTION_KEYS;
 
 export function cleanAnswers(raw: unknown): Answers {

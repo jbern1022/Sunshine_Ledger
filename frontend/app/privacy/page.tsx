@@ -61,9 +61,11 @@ export default function PrivacyPage() {
       <h3 className="mt-4 font-semibold text-slate-800">The &quot;may I be impacted?&quot; check</h3>
       <p className="mt-1 text-sm leading-relaxed text-slate-700">
         This check is optional and asks nothing until you choose to use it. If you answer, your
-        role, county, municipality (if you give one) and property type are kept in your
-        browser&apos;s session storage so the result stays put while you move between bills. They are
-        never sent to our servers: the only request the check makes asks for the bill&apos;s own
+        role, the county and city, town or village (if you give one) of where you live, or, when a
+        bill&apos;s rule is about them, of a property you own or rent out, or of your business or
+        workplace, and the property type are kept in your browser&apos;s session storage so the
+        result stays put while you move between bills. These are counties and cities only, never
+        an address. They are never sent to our servers: the only request the check makes asks for the bill&apos;s own
         criteria, and your answers are compared with them in your browser. Session storage is
         cleared when you close the tab, and you can clear your answers any time with the
         &quot;Clear my answers&quot; button under the result.

@@ -69,7 +69,7 @@ describe("ImpactLens", () => {
     expect(screen.getByText("Automatically mapped, not yet reviewed by a person.")).toBeInTheDocument();
     expect(screen.getByText(/not legal or financial advice/)).toBeInTheDocument();
     // answers live in this browser only
-    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v1") ?? "{}")).toEqual({ role: "renter", county: "Duval" });
+    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({ role: "renter", county: "Duval" });
   });
 
   it("None of These is an answer: it settles the role question for a bill that names other roles", async () => {
@@ -95,7 +95,7 @@ describe("ImpactLens", () => {
   });
 
   it("restores answers from this session, lets you change one, and clears them all", async () => {
-    window.sessionStorage.setItem("impactLens.answers.v1", JSON.stringify({ role: "renter", county: "Duval", evil: "x" }));
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({ role: "renter", county: "Duval", evil: "x" }));
     vi.mocked(api.fetchImpactLens).mockResolvedValue(base);
     const user = userEvent.setup();
     render(<ImpactLens billEntityId="b1" />);
@@ -105,7 +105,9 @@ describe("ImpactLens", () => {
     await user.click(screen.getByRole("button", { name: "Change County" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Can't Determine"));
 
+    window.sessionStorage.setItem("impactLens.answers.v1", JSON.stringify({ role: "renter" })); // left over from before the v2 key
     await user.click(screen.getByRole("button", { name: "Clear my answers" }));
+    expect(window.sessionStorage.getItem("impactLens.answers.v2")).toBeNull();
     expect(window.sessionStorage.getItem("impactLens.answers.v1")).toBeNull();
     expect(screen.queryByText(/Your answers:/)).toBeNull();
   });
@@ -150,7 +152,7 @@ describe("ImpactLens", () => {
     expect(next).toBeDisabled();
     await user.click(screen.getByRole("radio", { name: "Renter" }));
     expect(next).toBeEnabled();
-    expect(window.sessionStorage.getItem("impactLens.answers.v1")).toBeNull(); // nothing stored yet
+    expect(window.sessionStorage.getItem("impactLens.answers.v2")).toBeNull(); // nothing stored yet
   });
 
   it("keeps keyboard focus: first question after opening, then the result when the questions run out", async () => {
@@ -170,11 +172,94 @@ describe("ImpactLens", () => {
   });
 
   it("with no questions to ask, opening puts focus on the result", async () => {
-    window.sessionStorage.setItem("impactLens.answers.v1", JSON.stringify({ role: "renter", county: "Duval" }));
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({ role: "renter", county: "Duval" }));
     vi.mocked(api.fetchImpactLens).mockResolvedValue(base);
     const user = userEvent.setup();
     render(<ImpactLens billEntityId="b1" />);
     await user.click(screen.getByRole("button", { name: "Yes, check" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveFocus());
+  });
+});
+
+const COUNTIES = ["Broward", "Miami-Dade", "Palm Beach", "Duval", "Orange", "Leon", "Lee", "Polk", "Bay"];
+const countyOptions = COUNTIES.map((c) => ({ value: c, label: `${c} County` }));
+const ROLE_LOCATIONS = { renter: "residence", landlord: "property", employee: "business" } as const;
+const landlordBill = (extraEntries: LensEntry[] = [], extraQuestions: ImpactLensResponse["questions"] = []): ImpactLensResponse => ({
+  ...base,
+  role_locations: ROLE_LOCATIONS,
+  entries: [
+    entry("Landlords", crit({ audience: { kind: "attr", attr: "role", any_of: ["landlord"] },
+      requires: [{ attr: "jurisdiction", op: "in", values: ["county:Broward"], from: { kind: "condition", index: 0 } }] })),
+    ...extraEntries,
+  ],
+  questions: [
+    { key: "role", label: "Role", question: "Which best describes you in relation to this bill?",
+      options: [{ value: "landlord", label: "Landlord" }, { value: "renter", label: "Renter" }, { value: "none_of_these", label: "None of These" }] },
+    ...extraQuestions,
+    { key: "property_county", label: "Property County", question: "In which Florida county is the property?", options: countyOptions },
+  ],
+});
+
+describe("ImpactLens: role-specific locations", () => {
+  it("asks a landlord where the property is, and matches a Broward rental owned from Miami-Dade", async () => {
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(landlordBill());
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await user.click(await screen.findByRole("radio", { name: "Landlord" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    const property = await screen.findByLabelText("In which Florida county is the property?");
+    expect(screen.queryByLabelText("Which Florida county do you live in?")).toBeNull();
+    await user.selectOptions(property, "Broward");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applies to You"));
+    // only the answers the bill needed are kept, in this browser
+    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({ role: "landlord", property_county: "Broward" });
+  });
+
+  it("offers 'same as where I live' when the residence county is already known, and copies it", async () => {
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({ role: "landlord", county: "Broward" }));
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(landlordBill());
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+
+    const same = await screen.findByRole("button", { name: "Same as where I live (Broward County)" });
+    expect(screen.getByRole("status")).toHaveTextContent("Can't Determine");
+    await user.click(same);
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applies to You"));
+    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({
+      role: "landlord", county: "Broward", property_county: "Broward",
+    });
+  });
+
+  it("changing the property county drops the property city chosen under it, and not the residence city", async () => {
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({
+      role: "landlord", county: "Duval", municipality: "Jacksonville", property_county: "Broward", property_municipality: "Miramar",
+    }));
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(landlordBill());
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await user.click(await screen.findByRole("button", { name: "Change Property County" }));
+    await waitFor(() =>
+      expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({
+        role: "landlord", county: "Duval", municipality: "Jacksonville",
+      }),
+    );
+  });
+
+  it("does not offer the shortcut for a residence question, or when no residence county is known", async () => {
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(landlordBill());
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await user.click(await screen.findByRole("radio", { name: "Landlord" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await screen.findByLabelText("In which Florida county is the property?");
+    expect(screen.queryByRole("button", { name: /Same as where I live/ })).toBeNull();
   });
 });

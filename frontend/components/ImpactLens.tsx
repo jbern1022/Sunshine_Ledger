@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchImpactLens } from "@/lib/api";
 import {
+  QUESTION_KEYS,
   cleanAnswers,
   matchBill,
   toLensBill,
@@ -22,8 +23,16 @@ import {
  *  The result is relevance, not legal advice, and never changes the record.
  */
 
-const STORAGE_KEY = "impactLens.answers.v1";
-const NONE = "none_of_these";
+const STORAGE_KEY = "impactLens.answers.v2";
+/** The v1 key held only the residence answers. Cleared with the rest so it does not linger. */
+const OLD_STORAGE_KEY = "impactLens.answers.v1";
+
+/** A municipality answer only makes sense under the county answered with it. */
+const CITY_OF: Partial<Record<QuestionKey, QuestionKey>> = {
+  county: "municipality",
+  property_county: "property_municipality",
+  business_county: "business_municipality",
+};
 
 function readAnswers(): Answers {
   try {
@@ -42,6 +51,7 @@ function writeAnswers(a: Answers) {
 function forgetAnswers() {
   try {
     window.sessionStorage.removeItem(STORAGE_KEY);
+    window.sessionStorage.removeItem(OLD_STORAGE_KEY);
   } catch {
     /* nothing to clear */
   }
@@ -164,7 +174,8 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   function answer(key: QuestionKey, v: string) {
     const next: Answers = { ...answers, [key]: v };
     // A different county invalidates a municipality chosen under the old one.
-    if (key === "county") delete next.municipality;
+    const city = CITY_OF[key];
+    if (city) delete next[city];
     setAnswers(next);
     writeAnswers(next);
     focusPending.current = true;
@@ -172,7 +183,22 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   function change(key: QuestionKey) {
     const next = { ...answers };
     delete next[key];
-    if (key === "county") delete next.municipality;
+    const city = CITY_OF[key];
+    if (city) delete next[city];
+    setAnswers(next);
+    writeAnswers(next);
+    focusPending.current = true;
+  }
+  /** Answer a property or business county question with the reader's residence county
+   *  (and city, if they gave one). */
+  function sameAsResidence(key: QuestionKey) {
+    if (answers.county === undefined) return;
+    const next: Answers = { ...answers, [key]: answers.county };
+    const city = CITY_OF[key];
+    if (city) {
+      if (answers.municipality !== undefined) next[city] = answers.municipality;
+      else delete next[city];
+    }
     setAnswers(next);
     writeAnswers(next);
     focusPending.current = true;
@@ -183,7 +209,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
     focusPending.current = true;
   }
 
-  const answeredChips = (["role", "county", "municipality", "property_type"] as QuestionKey[]).filter((k) => answers[k] !== undefined);
+  const answeredChips = QUESTION_KEYS.filter((k) => answers[k] !== undefined);
   const labelFor = (k: QuestionKey, v: string) => byKey.get(k)?.options.find((o) => o.value === v)?.label ?? v;
   // "Role: Local Government", but "Duval County" rather than "County: Duval County".
   const describe = (k: QuestionKey, v: string) => {
@@ -241,7 +267,21 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
           {result.ask.length > 0 &&
             result.ask.slice(0, 1).map((key) => {
               const q = byKey.get(key);
-              return q ? <QuestionBlock key={key} q={q} value={answers[key]} onAnswer={answer} /> : null;
+              if (!q) return null;
+              // A property or workplace is often where the reader lives. If they have
+              // already told us their county, let them reuse it rather than answer twice.
+              const residence = answers.county;
+              const canReuse = (key === "property_county" || key === "business_county") && residence !== undefined;
+              return (
+                <div key={key}>
+                  <QuestionBlock q={q} value={answers[key]} onAnswer={answer} />
+                  {canReuse && (
+                    <button type="button" onClick={() => sameAsResidence(key)} className="mt-1 text-sm underline text-sunshine-700">
+                      Same as where I live ({q.options.find((o) => o.value === residence)?.label ?? residence})
+                    </button>
+                  )}
+                </div>
+              );
             })}
 
           <div role="status" aria-live="polite" tabIndex={-1} data-lens-result className={`mt-3 rounded-md border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sunshine-700 ${TONE[result.result]}`}>
