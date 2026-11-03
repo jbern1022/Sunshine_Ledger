@@ -105,6 +105,26 @@ PROPERTY_TYPE = Attribute(
 
 REGISTRY: dict[str, Attribute] = {a.key: a for a in (ROLE, JURISDICTION, PROPERTY_TYPE)}
 
+# Which of a reader's locations a role's rules are about. A place a bill names
+# is compared with the reader's location of this kind, not always with where
+# they live (docs/IMPACT_LENS_ROLE_LOCATIONS.md). Sent to the browser with every
+# bill so the matcher keeps no copy; a test requires every role to be listed.
+RESIDENCE, PROPERTY, BUSINESS = "residence", "property", "business"
+ROLE_LOCATIONS: dict[str, str] = {
+    "renter": RESIDENCE,
+    "insured": RESIDENCE,
+    # A government's own area is not a residence; kept as residence until the
+    # model has a place for it.
+    "local_government": RESIDENCE,
+    "landlord": PROPERTY,
+    "homeowner": PROPERTY,
+    "property_developer": PROPERTY,
+    "employer": BUSINESS,
+    "business_owner": BUSINESS,
+    "employee": BUSINESS,
+    "healthcare_provider": BUSINESS,
+}
+
 
 def is_forbidden(key: str) -> bool:
     k = key.lower()

@@ -68,3 +68,7 @@ class ImpactLensOut(BaseModel):
     layer: LensLayerOut | None = None
     entries: list[LensEntryOut] = []
     questions: list[LensQuestionOut] = []
+    # role -> "residence" | "property" | "business": which of the reader's
+    # locations that role's rules are about. Static, so also sent when a bill
+    # has no analysis.
+    role_locations: dict[str, str] = {}

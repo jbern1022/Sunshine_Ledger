@@ -19,7 +19,10 @@ describe("PrivacyPage", () => {
 
   it("discloses the Impact Lens session storage: what is kept, that it stays local, and how to clear it", () => {
     render(<PrivacyPage />);
-    expect(screen.getByText(/role, county, municipality \(if you give one\) and property type/)).toBeInTheDocument();
+    expect(screen.getByText(/your role, the county and city, town or village \(if you give one\) of where you live/)).toBeInTheDocument();
+    // a bill about landlords or employers asks about the property or the workplace instead
+    expect(screen.getByText(/of a property you own or rent out, or of your business or workplace/)).toBeInTheDocument();
+    expect(screen.getByText(/never an address/)).toBeInTheDocument();
     expect(screen.getByText(/never sent to our servers/)).toBeInTheDocument();
     expect(screen.getByText(/cleared when you close the tab/)).toBeInTheDocument();
     expect(screen.getByText(/Clear my answers/)).toBeInTheDocument();

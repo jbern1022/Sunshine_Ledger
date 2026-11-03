@@ -2,10 +2,12 @@ import { describe, it, expect } from "vitest";
 import { matchBill } from "./impactLens";
 import type { Criteria, CriterionTest, LensBill, LensEntry } from "./impactLens";
 
-// Pins what the matcher does today with ONE location answer, for the scenarios
-// in docs/IMPACT_LENS_LOCATION_SEMANTICS.md. Cases marked LIMITATION are
-// behaviour the document proposes to change; if a test here starts failing
-// because the model changed on purpose, update the document with it.
+// Pins what the matcher does with ONE location answer when the bill carries no
+// role-to-location table (`role_locations`), i.e. from an older API: every place
+// is compared with residence. With the table the server now sends, a landlord's
+// or employee's places are compared with the property or workplace instead; see
+// impactLens.roleLocation.test.ts and docs/IMPACT_LENS_ROLE_LOCATIONS.md. The
+// LIMITATION cases below are exactly what the table fixes.
 
 const crit = (over: Partial<Criteria>): Criteria => ({
   entry_index: 0, vocabulary_version: 2, relevance: "direct", audience: null, affected: null,

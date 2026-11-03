@@ -67,19 +67,42 @@ export interface LensBill {
    * "Does Not Appear to Apply".
    */
   complete: boolean;
+  /**
+   * Server-sent: which of the reader's locations a role's rules are about.
+   * A place a bill names is compared with the reader's location of that kind.
+   * Absent (an older API) or a role not listed means residence.
+   */
+  role_locations?: Record<string, LocationKind>;
 }
+
+/** Which of a reader's locations a criterion is about. */
+export type LocationKind = "residence" | "property" | "business";
 
 /** What a reader has chosen to tell us. Interests are deliberately absent. */
 export interface Answers {
   role?: Role;
-  /** County name as in the vocabulary, e.g. "Duval". */
+  /** Residence county name as in the vocabulary, e.g. "Duval". */
   county?: string;
-  /** Municipality name, e.g. "Jacksonville". Optional, asked after county. */
+  /** Residence municipality, e.g. "Jacksonville". Optional, asked after county. */
   municipality?: string;
+  /** County and municipality of the property a landlord, owner or developer is asked about. */
+  property_county?: string;
+  property_municipality?: string;
+  /** County and municipality of the business or workplace. */
+  business_county?: string;
+  business_municipality?: string;
   property_type?: string;
 }
 
-export type QuestionKey = "role" | "county" | "municipality" | "property_type";
+export type QuestionKey =
+  | "role"
+  | "county"
+  | "municipality"
+  | "property_county"
+  | "property_municipality"
+  | "business_county"
+  | "business_municipality"
+  | "property_type";
 
 export type ResultKind = "applies" | "may_affect" | "ambiguous" | "cant_determine" | "does_not_appear" | "everyone_only";
 
@@ -145,30 +168,50 @@ function roleIn(test: RoleTest, answers: Answers): Tri {
   return tri(test.any_of.includes(answers.role));
 }
 
-function jurisdictionIn(values: (string | number)[], answers: Answers): Tri {
+/** The answer keys that hold a reader's county and municipality for each kind of location. */
+const PLACE_KEYS: Record<LocationKind, { county: "county" | "property_county" | "business_county"; municipality: "municipality" | "property_municipality" | "business_municipality" }> = {
+  residence: { county: "county", municipality: "municipality" },
+  property: { county: "property_county", municipality: "property_municipality" },
+  business: { county: "business_county", municipality: "business_municipality" },
+};
+
+function jurisdictionIn(values: (string | number)[], answers: Answers, kind: LocationKind): Tri {
+  const keys = PLACE_KEYS[kind];
+  const county = answers[keys.county];
+  const municipality = answers[keys.municipality];
   let sawUnknown = false;
   for (const raw of values) {
-    const [kind, ...rest] = String(raw).split(":");
+    const [valueKind, ...rest] = String(raw).split(":");
     const name = rest.join(":");
-    if (kind === "county") {
-      if (answers.county === undefined) sawUnknown = true;
-      else if (answers.county === name) return "true";
-    } else if (kind === "municipality") {
-      if (answers.municipality === undefined) sawUnknown = true;
-      else if (answers.municipality === name) return "true";
+    if (valueKind === "county") {
+      if (county === undefined) sawUnknown = true;
+      else if (county === name) return "true";
+    } else if (valueKind === "municipality") {
+      if (municipality === undefined) sawUnknown = true;
+      else if (municipality === name) return "true";
     }
   }
   return sawUnknown ? "unknown" : "false";
 }
 
-function testCriterion(t: CriterionTest, answers: Answers): { r: Tri; missing: QuestionKey[] } {
+/** Which of the reader's locations an entry's place names are compared with: the one
+ *  the reader's own role regulates, once the entry is known to be about that role.
+ *  Anything else (an unmapped or "anyone" audience, an affected-only reader, an
+ *  unlisted role, an older API with no table) keeps today's meaning, residence. */
+function locationKindFor(relation: Relation, answers: Answers, roleLocations: LensBill["role_locations"]): LocationKind {
+  if (relation !== "bound" || answers.role === undefined) return "residence";
+  return roleLocations?.[answers.role] ?? "residence";
+}
+
+function testCriterion(t: CriterionTest, answers: Answers, kind: LocationKind = "residence"): { r: Tri; missing: QuestionKey[] } {
   if (t.attr === "jurisdiction") {
-    const base = t.op === "in" || t.op === "not_in" ? jurisdictionIn(t.values, answers) : "unknown";
+    const base = t.op === "in" || t.op === "not_in" ? jurisdictionIn(t.values, answers, kind) : "unknown";
     const r = t.op === "not_in" ? negate(base) : base;
     const missing: QuestionKey[] = [];
     if (r === "unknown") {
-      if (answers.county === undefined) missing.push("county");
-      else if (t.values.some((v) => String(v).startsWith("municipality:"))) missing.push("municipality");
+      const keys = PLACE_KEYS[kind];
+      if (answers[keys.county] === undefined) missing.push(keys.county);
+      else if (t.values.some((v) => String(v).startsWith("municipality:"))) missing.push(keys.municipality);
     }
     return { r, missing };
   }
@@ -198,7 +241,12 @@ function relationOf(c: Criteria, answers: Answers): { relation: Relation; missin
   return { relation: "unknown", missing: answers.role === undefined ? ["role"] : [] };
 }
 
-export function evaluateEntry(entry: LensEntry, index: number, answers: Answers): EntryEvaluation {
+export function evaluateEntry(
+  entry: LensEntry,
+  index: number,
+  answers: Answers,
+  roleLocations?: LensBill["role_locations"],
+): EntryEvaluation {
   const make = (status: EntryStatus, relation: Relation, reason: string, missing: QuestionKey[] = []): EntryEvaluation => ({
     index,
     entry,
@@ -212,6 +260,7 @@ export function evaluateEntry(entry: LensEntry, index: number, answers: Answers)
   if (!c) return make("unknown", "unknown", "This provision has not been mapped to questions yet.");
 
   const { relation, missing: roleMissing } = relationOf(c, answers);
+  const kind = locationKindFor(relation, answers, roleLocations);
   if (relation === "none") {
     return make("no", "none", `Your answer for role is outside who this provision is about (${entry.group}).`);
   }
@@ -221,7 +270,7 @@ export function evaluateEntry(entry: LensEntry, index: number, answers: Answers)
   const missing: QuestionKey[] = [...roleMissing];
   let unknown = relation === "unknown";
   for (const t of c.requires) {
-    const { r, missing: m } = testCriterion(t, answers);
+    const { r, missing: m } = testCriterion(t, answers, kind);
     if (r === "false") {
       return make("no", relation, `A condition the bill states is not met by your answers: ${entry.conditions[t.from.index]?.text ?? "a condition"}.`);
     }
@@ -231,7 +280,7 @@ export function evaluateEntry(entry: LensEntry, index: number, answers: Answers)
     }
   }
   for (const t of c.excludes) {
-    const { r, missing: m } = testCriterion(t, answers);
+    const { r, missing: m } = testCriterion(t, answers, kind);
     if (r === "true") {
       return make("no", relation, `An exception the bill states applies to you: ${entry.exceptions[t.from.index]?.text ?? "an exception"}.`);
     }
@@ -261,19 +310,31 @@ export function evaluateEntry(entry: LensEntry, index: number, answers: Answers)
 
 // ---- the bill -------------------------------------------------------------
 
+/** Every question the lens can ask, in the order it asks them: role first, then the
+ *  residence, property and business places, then the property type. */
+export const QUESTION_KEYS: QuestionKey[] = [
+  "role",
+  "county",
+  "municipality",
+  "property_county",
+  "property_municipality",
+  "business_county",
+  "business_municipality",
+  "property_type",
+];
+
 function circumstances(answers: Answers): { key: QuestionKey; value: string }[] {
   const out: { key: QuestionKey; value: string }[] = [];
-  for (const key of ["role", "county", "municipality", "property_type"] as QuestionKey[]) {
+  for (const key of QUESTION_KEYS) {
     const value = answers[key];
     if (value !== undefined) out.push({ key, value });
   }
   return out;
 }
 
-const ASK_ORDER: QuestionKey[] = ["role", "county", "municipality", "property_type"];
 
 export function matchBill(bill: LensBill, answers: Answers): LensResult {
-  const evaluations = bill.entries.map((e, i) => evaluateEntry(e, i, answers));
+  const evaluations = bill.entries.map((e, i) => evaluateEntry(e, i, answers, bill.role_locations));
 
   const personal = evaluations.filter((e) => e.relation !== "everyone");
   const everyone = evaluations.filter((e) => e.relation === "everyone" && e.status === "match");
@@ -314,7 +375,7 @@ export function matchBill(bill: LensBill, answers: Answers): LensResult {
   if (!settled) {
     for (const e of [...unknown, ...ambiguous]) e.missing.forEach((m) => askSet.add(m));
   }
-  const ask = ASK_ORDER.filter((q) => askSet.has(q));
+  const ask = QUESTION_KEYS.filter((q) => askSet.has(q));
 
   const why: WhyStep[] = basis
     .filter((e) => result === "applies" || result === "may_affect" || result === "ambiguous")
@@ -354,14 +415,16 @@ export interface ImpactLensResponse {
   layer: { id: string; version: number; evidence_state: string; scope_note: string; method_version: string; created_at: string } | null;
   entries: LensEntry[];
   questions: LensQuestion[];
+  /** role -> which of the reader's locations that role's rules are about. */
+  role_locations?: Record<string, LocationKind>;
 }
 
 export function toLensBill(r: ImpactLensResponse): LensBill {
-  return { entries: r.entries, complete: r.complete };
+  return { entries: r.entries, complete: r.complete, role_locations: r.role_locations };
 }
 
-/** Answers are only ever these four keys; anything else in storage is dropped. */
-export const ANSWER_KEYS: QuestionKey[] = ["role", "county", "municipality", "property_type"];
+/** Answers are only ever these keys (one per question); anything else in storage is dropped. */
+export const ANSWER_KEYS: QuestionKey[] = QUESTION_KEYS;
 
 export function cleanAnswers(raw: unknown): Answers {
   const out: Answers = {};

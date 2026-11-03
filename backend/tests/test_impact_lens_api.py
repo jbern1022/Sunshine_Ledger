@@ -72,7 +72,9 @@ def test_a_fully_mapped_supported_layer_is_complete_with_the_slice_it_needs(clie
     assert e["criteria"]["audience"]["any_of"] == ["landlord"]
     assert e["conditions"][0]["text"] == "Applies in Duval County."
     keys = [q["key"] for q in body["questions"]]
-    assert keys == ["role", "county", "property_type"]  # no municipality: the bill names none
+    # A landlord rule is about where the property is, so that is what is asked
+    # (not where the landlord lives). No municipality: the bill names none.
+    assert keys == ["role", "property_county", "property_type"]
     role = body["questions"][0]
     assert [o["value"] for o in role["options"]] == ["landlord", "none_of_these"] and role["options"][0]["label"] == "Landlord"
     assert role["options"][-1]["label"] == "None of These"  # a renter reading a landlord bill can still answer
@@ -91,8 +93,9 @@ def test_municipalities_only_the_places_the_bill_names(client, db_session, bill_
                       "from": {"kind": "condition", "index": 0}}],
     })
     questions = {q["key"]: q for q in client.get(f"/bills/{entity.id}/impact-lens").json()["questions"]}
-    assert [o["value"] for o in questions["municipality"]["options"]] == ["Jacksonville", "none_of_these"]
-    assert questions["municipality"]["counties"] == {"Jacksonville": ["Duval"]}
+    assert [o["value"] for o in questions["property_municipality"]["options"]] == ["Jacksonville", "none_of_these"]
+    assert questions["property_municipality"]["counties"] == {"Jacksonville": ["Duval"]}
+    assert "municipality" not in questions
     assert "property_type" not in questions
 
 
@@ -197,3 +200,76 @@ def test_a_rejected_newest_row_does_not_fall_back_to_an_older_row(client, db_ses
     db_session.commit()
     e = client.get(f"/bills/{entity.id}/impact-lens").json()["entries"][0]
     assert e["criteria"] is None and e["withdrawn"] is True
+
+
+# ---- role-specific locations (docs/IMPACT_LENS_ROLE_LOCATIONS.md) ----------
+
+def test_every_role_has_a_location_kind_and_the_response_sends_the_table(client, bill_factory):
+    from app.impact_lens.vocabulary import REGISTRY
+
+    expected = {
+        "renter": "residence", "insured": "residence", "local_government": "residence",
+        "landlord": "property", "homeowner": "property", "property_developer": "property",
+        "employer": "business", "business_owner": "business", "employee": "business",
+        "healthcare_provider": "business",
+    }
+    # A role added to the vocabulary must say which location it regulates.
+    assert set(REGISTRY["role"].values) == set(expected)
+
+    entity = bill_factory()  # no Who layer: the table is static, so it is sent anyway
+    assert client.get(f"/bills/{entity.id}/impact-lens").json()["role_locations"] == expected
+
+
+def test_a_landlord_bill_asks_where_the_property_is_not_where_the_reader_lives(client, db_session, bill_factory):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [LANDLORD])
+    _criteria(db_session, layer, 0, LANDLORD_RAW)  # landlord, requires county:Duval
+    questions = {q["key"]: q for q in client.get(f"/bills/{entity.id}/impact-lens").json()["questions"]}
+    assert "county" not in questions
+    prop = questions["property_county"]
+    assert prop["question"] == "In which Florida county is the property?"
+    assert len(prop["options"]) == 67 and {"value": "Duval", "label": "Duval County"} in prop["options"]
+
+
+def _entry(group, role, place):
+    name = place.partition(":")[2]  # the mapper keeps a place only if the cited text names it
+    return (
+        {"group": group, "text": "t", "quote": "q",
+         "conditions": [{"text": f"Applies in {name}.", "quote": f"This applies in {name}."}], "exceptions": []},
+        {"audience": {"kind": "attr", "attr": "role", "any_of": [role]} if role else {"kind": "anyone"},
+         "requires": [{"attr": "jurisdiction", "op": "in", "values": [place], "from": {"kind": "condition", "index": 0}}]},
+    )
+
+
+def _question_keys(client, db_session, bill_factory, *entries):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [item for item, _ in entries])
+    for i, (_, raw) in enumerate(entries):
+        _criteria(db_session, layer, i, raw)
+    return [q["key"] for q in client.get(f"/bills/{entity.id}/impact-lens").json()["questions"]]
+
+
+def test_a_renter_bill_still_asks_where_the_reader_lives(client, db_session, bill_factory):
+    keys = _question_keys(client, db_session, bill_factory, _entry("Renters", "renter", "county:Duval"))
+    assert keys == ["role", "county"]
+
+
+def test_an_employee_bill_asks_where_the_workplace_is(client, db_session, bill_factory):
+    keys = _question_keys(client, db_session, bill_factory, _entry("Employees", "employee", "municipality:Jacksonville"))
+    assert keys == ["role", "business_county", "business_municipality"]
+
+
+def test_a_bill_with_several_kinds_asks_each_location_once(client, db_session, bill_factory):
+    keys = _question_keys(
+        client, db_session, bill_factory,
+        _entry("Landlords", "landlord", "county:Duval"),
+        _entry("Renters", "renter", "county:Duval"),
+        _entry("Landlords", "landlord", "county:Broward"),
+        _entry("Employers", "employer", "county:Orange"),
+    )
+    assert keys == ["role", "county", "property_county", "business_county"]
+
+
+def test_an_anyone_provision_asks_where_the_reader_lives(client, db_session, bill_factory):
+    keys = _question_keys(client, db_session, bill_factory, _entry("Anyone", None, "county:Duval"))
+    assert keys == ["county"]
