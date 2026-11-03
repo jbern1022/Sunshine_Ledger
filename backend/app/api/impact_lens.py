@@ -17,7 +17,8 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.impact_lens.vocabulary import (
-    FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, REGISTRY, VOCABULARY_VERSION, jurisdiction_label,
+    BUSINESS, FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, PROPERTY, REGISTRY, RESIDENCE, ROLE_LOCATIONS,
+    VOCABULARY_VERSION, jurisdiction_label,
 )
 from app.impact_lens.selection import review_state, served_rows
 from app.models import BillLayer, Entity
@@ -56,25 +57,77 @@ def _current_who_layer(db: Session, entity_id: uuid.UUID) -> BillLayer | None:
     ).scalar_one_or_none()
 
 
-def _used_values(criteria_rows: list[dict]) -> tuple[set[str], set[str], set[str]]:
-    """(roles, jurisdiction values, property types) the criteria mention."""
+def _used_values(criteria_rows: list[dict]) -> tuple[set[str], set[str]]:
+    """(roles, property types) the criteria mention."""
     roles: set[str] = set()
-    jurisdictions: set[str] = set()
     property_types: set[str] = set()
     for c in criteria_rows:
         for side in (c.get("audience"), c.get("affected")):
             if side and side.get("kind") == "attr":
                 roles.update(side.get("any_of") or [])
         for t in (c.get("requires") or []) + (c.get("excludes") or []):
-            if t.get("attr") == "jurisdiction":
-                jurisdictions.update(t.get("values") or [])
-            elif t.get("attr") == "property_type":
+            if t.get("attr") == "property_type":
                 property_types.update(t.get("values") or [])
-    return roles, jurisdictions, property_types
+    return roles, property_types
+
+
+def _location_kinds(criteria: dict) -> set[str]:
+    """The kinds of the reader's location this entry's place names are compared
+    with: the kind of each role it binds, plus residence for readers it only
+    affects and for an unmapped or "anyone" audience. Mirrors the matcher's
+    locationKindFor in frontend/lib/impactLens.ts."""
+    kinds: set[str] = set()
+    audience = criteria.get("audience")
+    if audience and audience.get("kind") == "attr":
+        kinds.update(ROLE_LOCATIONS.get(r, RESIDENCE) for r in audience.get("any_of") or [])
+    else:
+        kinds.add(RESIDENCE)
+    affected = criteria.get("affected")
+    if affected and affected.get("kind") == "attr" and affected.get("any_of"):
+        kinds.add(RESIDENCE)
+    return kinds or {RESIDENCE}
+
+
+# Per kind of location: the county question, the municipality question, and
+# their answer keys. The matcher reads the same keys (PLACE_KEYS in impactLens.ts).
+_PLACE_QUESTIONS = {
+    RESIDENCE: dict(
+        county_key="county", county_label="County", county_q="Which Florida county do you live in?",
+        city_key="municipality", city_label="City, Town or Village",
+        city_q="Do you live in one of these cities, towns or villages?",
+    ),
+    PROPERTY: dict(
+        county_key="property_county", county_label="Property County", county_q="In which Florida county is the property?",
+        city_key="property_municipality", city_label="Property City, Town or Village",
+        city_q="Is the property in one of these cities, towns or villages?",
+    ),
+    BUSINESS: dict(
+        county_key="business_county", county_label="Business County",
+        county_q="In which Florida county is the business or workplace?",
+        city_key="business_municipality", city_label="Business City, Town or Village",
+        city_q="Is the business or workplace in one of these cities, towns or villages?",
+    ),
+}
 
 
 def _questions(criteria_rows: list[dict]) -> list[LensQuestionOut]:
-    roles, jurisdictions, property_types = _used_values(criteria_rows)
+    roles, property_types = _used_values(criteria_rows)
+    # kind -> municipality names the entries of that kind name; a kind is asked
+    # about only if some entry of that kind tests a place.
+    places: dict[str, set[str]] = {}
+    for c in criteria_rows:
+        jurisdiction_values = [
+            v
+            for t in (c.get("requires") or []) + (c.get("excludes") or [])
+            if t.get("attr") == "jurisdiction"
+            for v in (t.get("values") or [])
+        ]
+        if not jurisdiction_values:
+            continue
+        for kind in _location_kinds(c):
+            names = places.setdefault(kind, set())
+            names.update(v.partition(":")[2] for v in jurisdiction_values if v.startswith("municipality:"))
+
     out: list[LensQuestionOut] = []
     if roles:
         role_attr = REGISTRY["role"]
@@ -82,19 +135,20 @@ def _questions(criteria_rows: list[dict]) -> list[LensQuestionOut]:
             key="role", label=role_attr.label, question=role_attr.question,
             options=_with_none([LensOptionOut(value=v, label=_title(v)) for v in role_attr.values if v in roles]),
         ))
-    if jurisdictions:
+    for kind in (RESIDENCE, PROPERTY, BUSINESS):
+        if kind not in places:
+            continue
+        q = _PLACE_QUESTIONS[kind]
         out.append(LensQuestionOut(
-            key="county", label="County", question="Which Florida county do you live in?",
+            key=q["county_key"], label=q["county_label"], question=q["county_q"],
             options=[LensOptionOut(value=c, label=jurisdiction_label(f"county:{c}")) for c in FLORIDA_COUNTIES],
         ))
-        named = sorted(v.partition(":")[2] for v in jurisdictions if v.startswith("municipality:"))
-        named = [n for n in named if n in MUNICIPALITY_COUNTIES]
+        named = sorted(n for n in places[kind] if n in MUNICIPALITY_COUNTIES)
         if named:
             # Only the places the bill names; a reader outside them picks
             # "None of These"
             out.append(LensQuestionOut(
-                key="municipality", label="City, Town or Village",
-                question="Do you live in one of these cities, towns or villages?",
+                key=q["city_key"], label=q["city_label"], question=q["city_q"],
                 options=_with_none([LensOptionOut(value=n, label=n) for n in named]),
                 counties={n: list(MUNICIPALITY_COUNTIES[n]) for n in named},
             ))
@@ -118,6 +172,7 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
         return ImpactLensOut(
             bill_entity_id=entity_id, available=False, vocabulary_version=VOCABULARY_VERSION,
             unavailable_reason="This bill has no Who it affects analysis yet.",
+            role_locations=ROLE_LOCATIONS,
         )
 
     mapped = served_rows(db, layer)
@@ -163,4 +218,5 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
         ),
         entries=entries,
         questions=_questions([e.criteria for e in entries if e.criteria]),
+        role_locations=ROLE_LOCATIONS,
     )
