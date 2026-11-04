@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 2
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/8"
+METHOD_VERSION = "impact_lens_criteria/9"
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
