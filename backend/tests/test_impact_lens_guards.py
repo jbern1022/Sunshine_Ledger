@@ -84,6 +84,46 @@ def test_commercial_still_maps_when_the_text_means_a_kind_of_property():
         assert run(raw, entry)["excludes"][0]["values"] == ["commercial"], text
 
 
+PERMIT_POWER = {
+    "text": "However, a local government may require a building permit for any electrical, plumbing, structural, mechanical, or gas work performed on a lot containing a single-family dwelling, regardless of the value of the work.",
+    "quote": "However, a local government may require a building permit for any electrical, plumbing, structural, mechanical, or gas work performed on a lot containing a single-family dwelling, regardless of the value of the work."}
+
+
+def test_an_exception_that_grants_a_power_is_not_an_exclusion_of_the_property_type():
+    # S1234 (2026) entry 13: the rule protects owners of single-family dwellings;
+    # the exception only keeps a permit for some kinds of work on their lots.
+    # Mapping it to "excludes single_family" would tell those owners the rule
+    # does not apply to them.
+    entry = {"group": "Local government", "exceptions": [PERMIT_POWER]}
+    raw = {"excludes": [{"attr": "property_type", "op": "in", "values": ["single_family"], "from": {"kind": "exception", "index": 0}}]}
+    out = run(raw, entry)
+    assert out["excludes"] == []
+    assert out["unmapped"][-1]["kind"] == "exception"
+
+
+TWO_FAMILY_COND = {
+    "text": "b. The wall or barrier is installed on the residential property of a single-family or two-family dwelling or townhouse.",
+    "quote": "b. The wall or barrier is installed on the residential property of a single-family or two-family dwelling or townhouse."}
+
+
+def test_a_condition_naming_a_dwelling_kind_the_vocabulary_lacks_is_not_half_mapped():
+    # S1234 (2026) entry 15: "single-family or two-family dwelling or townhouse"
+    # was mapped to "requires single_family", ruling out the owner of a
+    # two-family home or townhouse for a rule that covers them.
+    entry = {"group": "Local government", "conditions": [TWO_FAMILY_COND]}
+    raw = {"requires": [{"attr": "property_type", "op": "in", "values": ["single_family"], "from": {"kind": "condition", "index": 0}}]}
+    out = run(raw, entry)
+    assert out["requires"] == []
+    assert out["unmapped"][-1]["kind"] == "condition"
+
+
+def test_a_single_dwelling_kind_the_vocabulary_has_still_maps():
+    for text in ("The work is on a single-family dwelling.", "The work is on a single-family home or a multifamily building."):
+        entry = {"group": "Local government", "conditions": [{"text": text, "quote": text}]}
+        raw = {"requires": [{"attr": "property_type", "op": "in", "values": ["single_family"], "from": {"kind": "condition", "index": 0}}]}
+        assert run(raw, entry)["requires"][0]["values"] == ["single_family"], text
+
+
 def test_a_value_must_appear_in_the_cited_text():
     entry = {"group": "Landlords", "conditions": [{"text": "Applies in Duval County.", "quote": "This section applies in Duval County."}]}
     raw = {"audience": role("landlord"),
