@@ -59,6 +59,31 @@ def test_airport_exception_lists_are_not_mapped_to_a_property_type():
     assert out["excludes"] == [] and out["unmapped"][-1]["reason"] == "it is too long or compound to map exactly"
 
 
+COMMERCIAL_COVERAGES = {
+    "text": "This section does not apply to commercial coverages, to private passenger motor vehicle insurance coverages, or to disputes relating to liability coverages in policies of property insurance.",
+    "quote": "This section does not apply to commercial coverages, to private\npassenger motor vehicle insurance coverages, or to disputes\nrelating to liability coverages in policies of property\ninsurance."}
+
+
+def test_commercial_coverages_is_an_insurance_term_not_a_commercial_property():
+    # H0341 (2026) property insurance mediation: three entries were mapped to
+    # "property_type excludes commercial" and would have told a commercial
+    # property owner the rule does not apply to them.
+    entry = {"group": "Named insureds or their representatives", "exceptions": [COMMERCIAL_COVERAGES]}
+    raw = {"excludes": [{"attr": "property_type", "op": "in", "values": ["commercial"], "from": {"kind": "exception", "index": 0}}]}
+    out = run(raw, entry)
+    assert out["excludes"] == []
+    assert "does not state any" in out["unmapped"][-1]["reason"]
+
+
+def test_commercial_still_maps_when_the_text_means_a_kind_of_property():
+    for text in ("This section does not apply to commercial buildings.",
+                 "Not commercial property rented by its owner.",
+                 "This section does not apply to a commercial or industrial site."):
+        entry = {"group": "Landlords", "exceptions": [{"text": text, "quote": text}]}
+        raw = {"excludes": [{"attr": "property_type", "op": "in", "values": ["commercial"], "from": {"kind": "exception", "index": 0}}]}
+        assert run(raw, entry)["excludes"][0]["values"] == ["commercial"], text
+
+
 def test_a_value_must_appear_in_the_cited_text():
     entry = {"group": "Landlords", "conditions": [{"text": "Applies in Duval County.", "quote": "This section applies in Duval County."}]}
     raw = {"audience": role("landlord"),

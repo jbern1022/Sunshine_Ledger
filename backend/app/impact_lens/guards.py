@@ -36,7 +36,9 @@ ROLE_WORDS = {
 PROPERTY_WORDS = {
     "single_family": r"single[- ]family",
     "multifamily": r"multi[- ]?family",
-    "commercial": r"\bcommercial\b",
+    # "commercial coverages", "commercial insurance", "commercial vehicles" are
+    # kinds of insurance or vehicle, not a kind of property (H0341, 2026).
+    "commercial": r"\bcommercial\b(?!\s+(?:coverages?|insurance|polic(?:y|ies)|lines?|risks?|carriers?|insurers?|vehicles?|motor|auto|drivers?|general\s+liability))",
 }
 
 MAX_CITED_CHARS = 250
