@@ -196,6 +196,9 @@ def validate_criteria(
                 if why3:
                     note(kind, idx, why3)
                     continue
+                if kind == "exception" and not guards.states_carve_out(f"{text} {quote}"):
+                    note(kind, idx, "the exception does not carve anything out; it grants a power or limits the rule")
+                    continue
                 values = guards.evidenced_values(test["attr"], test["values"], f"{text} {quote}")
                 for dropped in [v for v in test["values"] if v not in values]:
                     notes.append(f"{kind} {idx}: dropped '{dropped}' (the {kind} does not state it)")

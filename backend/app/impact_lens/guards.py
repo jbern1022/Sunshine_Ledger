@@ -41,6 +41,12 @@ PROPERTY_WORDS = {
     "commercial": r"\bcommercial\b(?!\s+(?:coverages?|insurance|polic(?:y|ies)|lines?|risks?|carriers?|insurers?|vehicles?|motor|auto|drivers?|general\s+liability))",
 }
 
+# Kinds of dwelling the property_type vocabulary cannot express. A condition that
+# names one beside a supported kind would be half-mapped ("single-family or
+# two-family or townhouse" -> single_family rules out the others; S1234, 2026,
+# entry 15), so it stays unmapped.
+UNSUPPORTED_DWELLINGS = r"\b(two[- ]family|duplex(?:es)?|town ?(?:house|home)s?|condominiums?|condos?)\b"
+
 MAX_CITED_CHARS = 250
 
 # Statute references carry digits that say nothing about the condition.
@@ -92,6 +98,18 @@ def too_complex(text: str, quote: str) -> str | None:
     return None
 
 
+# An exception only EXCLUDES a group when its own words carve something out. One
+# that grants a power or limits the rule ("a local government may still require
+# a permit for plumbing work on a single-family lot") names the group as context,
+# not as excluded (S1234, 2026, entry 13).
+_CARVE_OUT = re.compile(r"\b(not|no|exempt\w*|exclud\w*|except\w*|other than|unless)\b", re.IGNORECASE)
+
+
+def states_carve_out(text: str) -> bool:
+    """Whether an exception's words carve something out of the rule."""
+    return bool(_CARVE_OUT.search(text or ""))
+
+
 def evidenced_values(attr: str, values: list[str], cited: str) -> list[str]:
     """The values the cited text actually states."""
     kept = []
@@ -100,7 +118,7 @@ def evidenced_values(attr: str, values: list[str], cited: str) -> list[str]:
             name = v.partition(":")[2]
             ok = bool(name) and re.search(rf"\b{re.escape(name)}\b", cited)
         elif attr == "property_type":
-            ok = v in PROPERTY_WORDS and re.search(PROPERTY_WORDS[v], cited, re.IGNORECASE)
+            ok = not re.search(UNSUPPORTED_DWELLINGS, cited, re.IGNORECASE) and v in PROPERTY_WORDS and re.search(PROPERTY_WORDS[v], cited, re.IGNORECASE)
         else:
             ok = True  # no evidence rule for other attributes yet
         if ok:
