@@ -63,6 +63,26 @@ def is_anyone(group: str) -> bool:
 _HEAD_END = r"(?=\s*(?:$|[,.;(]|\b(?:and|or|of|that|who|which|in|under|for|with|to)\b))"
 
 
+# Not inside a hyphenated word: "Not-for-profit", "Out-of-state".
+_PREPOSITION = re.compile(r"(?<![\w-])(?:of|within|in|for|at|near|from|by|under|with|on|to)(?![\w-])", re.IGNORECASE)
+
+
+# "Governing body of a municipality", "Units of local government", "Board of County
+# Commissioners of X County": the group is the government's own body, so the place
+# or government after "of" is the role.
+_GOVERNMENT_BODY = re.compile(
+    r"^\s*(?:the\s+)?(?:(?:city|county|town|village|municipal)\s+)?"
+    r"(?:boards?\s+of\s+county\s+commissioners|governing\s+(?:bod(?:y|ies)|boards?)|boards?|commissions?|councils?|units?)\s+of\b",
+    re.IGNORECASE)
+
+
+def _is_government_body(before: str) -> bool:
+    """`before` (the words ahead of a role word) opens with a government body
+    and has no other preposition after that first "of"."""
+    m = _GOVERNMENT_BODY.match(before)
+    return bool(m) and not _PREPOSITION.search(before[m.end():])
+
+
 def supported_roles(group: str, roles: list[str]) -> list[str]:
     """The roles the group itself names as its head noun."""
     out = []
@@ -71,7 +91,14 @@ def supported_roles(group: str, roles: list[str]) -> list[str]:
             continue
         pattern = ROLE_WORDS[r]
         # ROLE_WORDS patterns are \b(...)\b; add the head-noun lookahead after the last \b
-        if re.search(pattern[:-2] + r"\b" + _HEAD_END, group or "", re.IGNORECASE):
+        m = re.search(pattern[:-2] + r"\b" + _HEAD_END, group or "", re.IGNORECASE)
+        if not m:
+            continue
+        before = (group or "")[: m.start()]
+        # A role word after a preposition is a place or object, not the group
+        # ("Land within Lee County", "Supervisor of Elections of Lee County").
+        # The exception is a government's own body: "Governing body of a county".
+        if not _PREPOSITION.search(before) or (r == "local_government" and _is_government_body(before)):
             out.append(r)
     return out
 

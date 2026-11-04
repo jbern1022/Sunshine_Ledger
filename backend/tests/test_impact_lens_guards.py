@@ -166,6 +166,46 @@ def test_a_rejected_audience_falls_back_to_the_groups_own_words():
     assert run({"audience": role("property_developer")}, {"group": "Owner of a property in a multifamily project"})["audience"] is None
 
 
+def test_a_place_the_group_sits_in_is_not_the_groups_role():
+    # H4013 (2026) entry 0, "Land within Lee County", was mapped to
+    # local_government because "County" ended the group. The group is land; the
+    # county only says where. Same for "Supervisor of Elections of Lee County".
+    for group in ("Land within Lee County", "Supervisor of Elections of Lee County"):
+        out = run({"audience": role("local_government")}, {"group": group})
+        assert out["audience"] is None, group
+    # the fallback from the group's own words must not pick it up either
+    assert run({"audience": {"kind": "anyone"}}, {"group": "Land within Lee County"})["audience"] is None
+
+
+def test_a_hyphenated_word_is_not_a_preposition():
+    # Stored groups: "Not-for-profit hospitals", "Out-of-state employees" lost their
+    # role because "for"/"of" inside a hyphenated word read as a preposition.
+    for group, expected in (("Not-for-profit hospitals", "healthcare_provider"),
+                            ("Out-of-state employees", "employee"),
+                            ("Out-of-state employee", "employee")):
+        assert run({"audience": role(expected)}, {"group": group})["audience"]["any_of"] == [expected], group
+
+
+def test_a_governing_body_of_a_place_is_that_governments_role():
+    # Stored groups that ARE local government although the place follows "of".
+    for group in ("Governing body of a municipality", "Governing body of a county", "Governing board of the county",
+                  "Units of local government", "Board of County Commissioners of Brevard County",
+                  "City Commission of the City of Miramar"):
+        assert run({"audience": role("local_government")}, {"group": group})["audience"]["any_of"] == ["local_government"], group
+    # a person or a thing in a place is still not the government
+    for group in ("Supervisor of Elections of Lee County", "Residents of the county", "Land within Lee County"):
+        assert run({"audience": role("local_government")}, {"group": group})["audience"] is None, group
+
+
+def test_a_role_that_leads_the_group_is_still_its_role():
+    for group, expected in (("Landlords of residential property", "landlord"),
+                            ("County", "local_government"),
+                            ("Counties and municipalities", "local_government"),
+                            ("Tenants and landlords in Broward County", "landlord")):
+        roles = [role(expected)]
+        assert run({"audience": roles[0]}, {"group": group})["audience"]["any_of"] == [expected], group
+
+
 def test_a_role_word_must_be_the_head_noun_of_the_group():
     # S1166 entry 6: small employer carriers are insurers, not employers
     assert run({"audience": role("employer")}, {"group": "Small employer carriers"})["audience"] is None
