@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { fetchPeople } from "@/lib/api";
 import { t } from "@/lib/i18n";
 import type { PersonListItem } from "@/lib/types";
@@ -21,7 +22,10 @@ import type { PersonListItem } from "@/lib/types";
  */
 const PAGE_SIZE = 100;
 
-export default function PeoplePage() {
+function PeoplePageInner() {
+  // ?district=HD-045 shows the current and former members of that district.
+  const raw = useSearchParams()?.get("district") ?? "";
+  const district = /^(HD|SD|CD)-\d{3}$/.test(raw) ? raw : "";
   const [people, setPeople] = useState<PersonListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
@@ -39,7 +43,7 @@ export default function PeoplePage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchPeople({ q: q || undefined, kind: kind || undefined, limit: PAGE_SIZE, offset })
+    fetchPeople({ q: q || undefined, kind: kind || undefined, district: district || undefined, limit: PAGE_SIZE, offset })
       .then((res) => {
         if (cancelled) return;
         setPeople(res.items);
@@ -51,7 +55,7 @@ export default function PeoplePage() {
     return () => {
       cancelled = true;
     };
-  }, [q, kind, offset]);
+  }, [q, kind, district, offset]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -64,6 +68,13 @@ export default function PeoplePage() {
       <p className="mt-1 text-sm text-slate-500">
         {t("people.intro")}
       </p>
+
+      {district && (
+        <p className="mt-2 text-xs text-slate-600">
+          {t("people.districtFilter", { code: district })}{" "}
+          <Link href="/people" className="text-sunshine-700 underline">{t("people.districtClear")}</Link>
+        </p>
+      )}
 
       <input
         type="search"
@@ -155,5 +166,13 @@ export default function PeoplePage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function PeoplePage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-500">{t("browse.loadingPage")}</p>}>
+      <PeoplePageInner />
+    </Suspense>
   );
 }

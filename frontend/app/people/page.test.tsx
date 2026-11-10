@@ -172,3 +172,15 @@ describe("PeoplePage committees", () => {
     expect(vi.mocked(api.fetchPeople)).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "committee" }));
   });
 });
+
+describe("PeoplePage district filter", () => {
+  beforeEach(() => vi.mocked(api.fetchPeople).mockReset());
+
+  it("shows everyone when there is no district in the URL", async () => {
+    vi.mocked(api.fetchPeople).mockResolvedValue({ total: 1, items: [makePerson("a")] });
+    render(<PeoplePage />);
+    await screen.findByText("Person a");
+    expect(api.fetchPeople).toHaveBeenLastCalledWith(expect.objectContaining({ district: undefined }));
+    expect(screen.queryByText(/Showing current and former members/)).not.toBeInTheDocument();
+  });
+});

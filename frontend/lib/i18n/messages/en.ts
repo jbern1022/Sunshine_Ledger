@@ -20,6 +20,8 @@ export const en = {
   "nav.map": "Map",
   "nav.districts": "Districts",
   "person.districtLink": "See district {code}",
+  "people.districtFilter": "Showing current and former members of {code}.",
+  "people.districtClear": "Show everyone",
   "person.reasonSource": "Source for the reason",
 
   "footer.about":
