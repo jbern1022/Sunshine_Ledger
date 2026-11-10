@@ -27,6 +27,7 @@ from app.models.crawl_checkpoint import CrawlCheckpoint
 from app.models.office_tenure import OfficeTenure
 from app.models.district import District, MapPlan
 from app.models.federal_text import FederalBillText, FederalPlaceFinding
+from app.models.entitlement import EntitlementGrant
 
 __all__ = [
     "Entity",
@@ -65,4 +66,5 @@ __all__ = [
     "District",
     "FederalBillText",
     "FederalPlaceFinding",
+    "EntitlementGrant",
 ]
