@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
@@ -11,6 +12,7 @@ from app.db import get_db
 from app.api.bills import _active_tags_by_bill
 from app.models import Bill, Claim, Entity, Event, Relationship, Source
 from app.schemas.person import (
+    TenureItem,
     BillTopic,
     PersonBillItem,
     PersonDetail,
@@ -195,7 +197,22 @@ def get_person(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> PersonDet
         for bill, bill_entity, rel_attrs, event_date, event_title, source_url in vote_rows
     ]
 
+    from app.tenures import left_office_label, person_tenures, tenure_label
+
+    tenures = person_tenures(db, person.id)
+    today = datetime.now(timezone.utc).date()
     return PersonDetail(
+        tenures=[
+            TenureItem(
+                office=t.office_type, district=t.district, start_date=t.start_date.isoformat(),
+                scheduled_end=t.scheduled_end.isoformat() if t.scheduled_end else None,
+                end_date=t.end_date.isoformat() if t.end_date else None,
+                end_reason=t.end_reason, end_reason_source_url=t.end_reason_source_url,
+                label=tenure_label(t),
+            )
+            for t in tenures
+        ],
+        former_label=left_office_label(tenures, today=today),
         entity_id=person.id,
         name=person.name,
         district=_attrs(person).get("district"),

@@ -57,7 +57,21 @@ class PersonVoteItem(BaseModel):
     tags: list[BillTopic] = []
 
 
+class TenureItem(BaseModel):
+    office: str
+    district: int | None
+    start_date: str
+    scheduled_end: str | None
+    end_date: str | None
+    end_reason: str | None
+    end_reason_source_url: str | None
+    label: str | None  # "Former ..." once the tenure has ended
+
+
 class PersonDetail(PersonListItem):
+    tenures: list[TenureItem] = []
+    # Set when every recorded tenure has ended: the visible "Former ..." line.
+    former_label: str | None = None
     bills: list[PersonBillItem]
     votes: list[PersonVoteItem]
 

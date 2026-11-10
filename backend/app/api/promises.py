@@ -19,6 +19,7 @@ from app.auth import require_admin
 from app.db import get_db
 from app.models import ElectionWinner, OfficialSite, PromiseFlag, PromiseItem, PromiseReview, SiteSnapshot
 from app.rate_limit import limiter
+from app.tenures import LEFT_OFFICE_STATUS, has_left_office, person_tenures
 
 router = APIRouter(prefix="/promises", tags=["promises"])
 
@@ -32,7 +33,16 @@ PUBLIC_STATES = ("unreviewed", "flagged", "approved")
 STATE_LABEL = {"unreviewed": "Unreviewed", "flagged": "Flagged - under review", "approved": "Reviewed"}
 
 
-def _item_out(i: PromiseItem) -> dict:
+def _office_status(db: Session, w: ElectionWinner) -> str | None:
+    """'Left office before outcome could be determined' when the official's
+    recorded tenures have all ended. Never an 'unfulfilled' verdict."""
+    if w.person_entity_id is None:
+        return None
+    tenures = person_tenures(db, w.person_entity_id)
+    return LEFT_OFFICE_STATUS if has_left_office(tenures, today=datetime.now(timezone.utc).date()) else None
+
+
+def _item_out(i: PromiseItem, db: Session | None = None) -> dict:
     snap, w = i.snapshot, i.winner
     return {
         "id": i.id,
@@ -56,6 +66,7 @@ def _item_out(i: PromiseItem) -> dict:
             "district": w.district,
             "party": w.party,
             "result_status": w.result_status,
+            "office_status": _office_status(db, w) if db is not None else None,
         },
     }
 
@@ -89,7 +100,7 @@ def list_promises(
     rows = db.execute(
         stmt.order_by(ElectionWinner.chamber, ElectionWinner.district, PromiseItem.char_start).limit(limit).offset(offset)
     ).unique().scalars().all()
-    return {"disclosure": DISCLOSURE, "total": total, "items": [_item_out(i) for i in rows]}
+    return {"disclosure": DISCLOSURE, "total": total, "items": [_item_out(i, db) for i in rows]}
 
 
 @router.get("/coverage")
@@ -137,7 +148,7 @@ def review_queue(
     ).unique().scalars().all()
     out = []
     for i in rows:
-        d = _item_out(i)
+        d = _item_out(i, db)
         d["flag_count"] = i.flag_count
         d["open_flags"] = [f.reason_text for f in i.flags if f.resolved_at is None]
         out.append(d)
@@ -154,7 +165,7 @@ def get_promise(item_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     item = db.execute(_base_stmt().where(PromiseItem.id == item_id)).unique().scalar_one_or_none()
     if item is None or item.review_state not in PUBLIC_STATES:
         raise HTTPException(status_code=404, detail="Not found")
-    return {"disclosure": DISCLOSURE, **_item_out(item)}
+    return {"disclosure": DISCLOSURE, **_item_out(item, db)}
 
 
 @router.post("/{item_id}/flag", status_code=201)
