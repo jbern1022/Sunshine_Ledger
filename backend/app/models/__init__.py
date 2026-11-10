@@ -24,6 +24,7 @@ from app.models.promise import (
     SiteSnapshot,
 )
 from app.models.crawl_checkpoint import CrawlCheckpoint
+from app.models.office_tenure import OfficeTenure
 
 __all__ = [
     "Entity",
@@ -57,4 +58,5 @@ __all__ = [
     "PromiseFlag",
     "PromiseReview",
     "CrawlCheckpoint",
+    "OfficeTenure",
 ]

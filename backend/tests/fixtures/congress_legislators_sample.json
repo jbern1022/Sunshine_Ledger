@@ -1,0 +1,219 @@
+[
+ {
+  "id": {
+   "bioguide": "B001257",
+   "govtrack": 412250,
+   "opensecrets": "N00027462",
+   "fec": [
+    "H6FL09070"
+   ],
+   "wikidata": "Q1555314"
+  },
+  "name": {
+   "first": "Gus",
+   "last": "Bilirakis",
+   "official_full": "Gus M. Bilirakis",
+   "middle": "M."
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "start": "2007-01-04",
+    "end": "2009-01-03",
+    "state": "FL",
+    "district": 9,
+    "party": "Republican",
+    "url": "http://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2009-01-06",
+    "end": "2011-01-03",
+    "state": "FL",
+    "district": 9,
+    "party": "Republican",
+    "url": "http://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2011-01-05",
+    "end": "2013-01-03",
+    "state": "FL",
+    "district": 9,
+    "party": "Republican",
+    "url": "http://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2013-01-03",
+    "end": "2015-01-03",
+    "state": "FL",
+    "party": "Republican",
+    "district": 12,
+    "url": "http://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2015-01-06",
+    "end": "2017-01-03",
+    "state": "FL",
+    "party": "Republican",
+    "district": 12,
+    "url": "https://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2017-01-03",
+    "end": "2019-01-03",
+    "state": "FL",
+    "district": 12,
+    "party": "Republican",
+    "url": "https://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2019-01-03",
+    "end": "2021-01-03",
+    "state": "FL",
+    "district": 12,
+    "party": "Republican",
+    "url": "https://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2021-01-03",
+    "end": "2023-01-03",
+    "state": "FL",
+    "district": 12,
+    "party": "Republican",
+    "url": "https://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2023-01-03",
+    "end": "2025-01-03",
+    "state": "FL",
+    "district": 12,
+    "party": "Republican",
+    "url": "https://bilirakis.house.gov"
+   },
+   {
+    "type": "rep",
+    "start": "2025-01-03",
+    "end": "2027-01-03",
+    "state": "FL",
+    "district": 12,
+    "party": "Republican",
+    "url": "https://bilirakis.house.gov"
+   }
+  ]
+ },
+ {
+  "id": {
+   "bioguide": "S001217",
+   "fec": [
+    "S8FL00273"
+   ],
+   "govtrack": 412838,
+   "opensecrets": "N00043290",
+   "wikidata": "Q439729"
+  },
+  "name": {
+   "first": "Rick",
+   "last": "Scott",
+   "official_full": "Rick Scott"
+  },
+  "terms": [
+   {
+    "type": "sen",
+    "start": "2019-01-08",
+    "end": "2025-01-03",
+    "state": "FL",
+    "class": 1,
+    "party": "Republican",
+    "url": "https://www.rickscott.senate.gov"
+   },
+   {
+    "type": "sen",
+    "start": "2025-01-03",
+    "end": "2031-01-03",
+    "state": "FL",
+    "class": 1,
+    "party": "Republican",
+    "url": "https://www.rickscott.senate.gov"
+   }
+  ]
+ },
+ {
+  "id": {
+   "bioguide": "C000127",
+   "govtrack": 300018,
+   "opensecrets": "N00007836",
+   "fec": [
+    "S8WA00194",
+    "H2WA01054"
+   ],
+   "wikidata": "Q22250"
+  },
+  "name": {
+   "first": "Maria",
+   "last": "Cantwell",
+   "official_full": "Maria Cantwell"
+  },
+  "terms": [
+   {
+    "type": "rep",
+    "start": "1993-01-05",
+    "end": "1995-01-03",
+    "state": "WA",
+    "district": 1,
+    "party": "Democrat"
+   },
+   {
+    "type": "sen",
+    "start": "2001-01-03",
+    "end": "2007-01-03",
+    "state": "WA",
+    "class": 1,
+    "party": "Democrat",
+    "url": "http://cantwell.senate.gov"
+   },
+   {
+    "type": "sen",
+    "start": "2007-01-04",
+    "end": "2013-01-03",
+    "state": "WA",
+    "class": 1,
+    "party": "Democrat",
+    "url": "http://cantwell.senate.gov"
+   },
+   {
+    "type": "sen",
+    "start": "2013-01-03",
+    "end": "2019-01-03",
+    "state": "WA",
+    "party": "Democrat",
+    "class": 1,
+    "url": "https://www.cantwell.senate.gov"
+   },
+   {
+    "type": "sen",
+    "start": "2019-01-03",
+    "end": "2025-01-03",
+    "state": "WA",
+    "class": 1,
+    "party": "Democrat",
+    "url": "https://www.cantwell.senate.gov"
+   },
+   {
+    "type": "sen",
+    "start": "2025-01-03",
+    "end": "2031-01-03",
+    "state": "WA",
+    "class": 1,
+    "party": "Democrat",
+    "url": "https://www.cantwell.senate.gov"
+   }
+  ]
+ }
+]
