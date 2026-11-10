@@ -5,7 +5,7 @@ import type { MetadataRoute } from "next";
  *  auth-gated regardless. */
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/" },
+    rules: { userAgent: "*", allow: "/", disallow: "/admin" },
     sitemap: "https://sunshineledger.josephbernal.com/sitemap.xml",
   };
 }

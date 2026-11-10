@@ -148,3 +148,44 @@ export async function flagPromise(id: string, reason_text: string): Promise<void
   });
   if (!res.ok) throw new Error(`Failed to flag: ${res.status}`);
 }
+
+// ---- promise review (admin) ----------------------------------------------------------
+// The reviewer's username and password are kept only in the page's memory and
+// sent as HTTP Basic credentials on each call; they are never stored.
+
+export interface AdminPromise {
+  id: string;
+  quote: string;
+  source_url: string;
+  review_state: string;
+  review_label: string;
+  flag_count: number;
+  open_flags: string[];
+  automated_labels: { commitment_type?: string; topics?: string[] };
+  official: { name: string; chamber: string; district: number };
+  snapshot: { fetched_at: string; content_hash: string | null };
+}
+
+function basic(user: string, pass: string): HeadersInit {
+  return { Authorization: `Basic ${btoa(`${user}:${pass}`)}` };
+}
+
+export async function fetchPromiseQueue(user: string, pass: string): Promise<{ total: number; items: AdminPromise[] }> {
+  const res = await fetch(`${API_URL}/promises/admin/queue?limit=50`, { headers: basic(user, pass), cache: "no-store" });
+  if (res.status === 401) throw new Error("unauthorized");
+  if (!res.ok) throw new Error(`Failed to load the queue: ${res.status}`);
+  return res.json();
+}
+
+export type ReviewAction = "approve" | "reject" | "not_a_commitment" | "reclassify" | "unflag";
+
+export async function reviewPromise(
+  user: string, pass: string, id: string, body: { action: ReviewAction; note?: string; classification?: string },
+): Promise<void> {
+  const res = await fetch(`${API_URL}/promises/admin/${id}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...basic(user, pass) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Review failed: ${res.status}`);
+}
