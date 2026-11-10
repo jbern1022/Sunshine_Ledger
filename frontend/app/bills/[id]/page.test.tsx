@@ -6,6 +6,7 @@ import type { BillDetail } from "@/lib/types";
 
 vi.mock("@/lib/server-api", () => ({
   getBill: vi.fn(),
+  getFloridaPlaces: vi.fn(() => Promise.resolve(null)),
   getSourceStatus: vi.fn(() => Promise.resolve(null)),
 }));
 

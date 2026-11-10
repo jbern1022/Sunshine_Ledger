@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { t, tRich } from "@/lib/i18n";
-import { getBill, getSourceStatus } from "@/lib/server-api";
+import { getBill, getFloridaPlaces, getSourceStatus } from "@/lib/server-api";
 import { formatChecked, sourceForBill } from "@/lib/freshness";
 import TagBadges from "@/components/TagBadges";
 import AmendmentDiff from "@/components/AmendmentDiff";
@@ -13,6 +13,7 @@ import TextComparison from "@/components/TextComparison";
 import WhoItAffects from "@/components/WhoItAffects";
 import AreaContext from "@/components/AreaContext";
 import ImpactLens from "@/components/ImpactLens";
+import FloridaPlaces from "@/components/FloridaPlaces";
 import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes, CorrectionsSection } from "@/components/Accountability";
 import { forTarget } from "@/lib/accountability";
@@ -61,6 +62,8 @@ export default async function BillPage({ params, searchParams }: Props) {
   const showLens = (searchParams ? (await searchParams).lens : undefined) === "1";
   const [bill, statuses] = await Promise.all([getBill(id), getSourceStatus()]);
   if (!bill) notFound();
+  // Federal bills only: the Florida places the text names.
+  const floridaPlaces = bill.source_system === "congress" ? await getFloridaPlaces(id) : null;
   const dataSource = sourceForBill(statuses, bill.source_system, bill.jurisdiction_name);
   const legislatorSponsors = bill.sponsors.filter((s) => !s.is_committee);
   const committeeSponsors = bill.sponsors.filter((s) => s.is_committee);
@@ -187,6 +190,7 @@ export default async function BillPage({ params, searchParams }: Props) {
         </>
       )}
 
+      {floridaPlaces && <FloridaPlaces data={floridaPlaces} />}
       {isLegislation && showLens && <ImpactLens billEntityId={bill.entity_id} />}
       {isLegislation && <AreaContext overlays={bill.demographic_overlays ?? []} />}
 

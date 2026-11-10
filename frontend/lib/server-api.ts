@@ -2,6 +2,7 @@ import type { BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, Pe
   PromiseList,
   DistrictList,
   DistrictDetail,
+  FloridaPlaces,
 } from "./types";
 
 /** Server-side API base.
@@ -164,6 +165,16 @@ export async function getDistrict(code: string): Promise<DistrictDetail | null |
   try {
     const res = await fetch(`${SERVER_API_URL}/districts/${encodeURIComponent(code)}`, { next: { revalidate: 600 } });
     if (res.status === 404) return undefined;
+    return res.ok ? res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Florida places named in a federal bill's text. Null when unavailable. */
+export async function getFloridaPlaces(entityId: string): Promise<FloridaPlaces | null> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/bills/${entityId}/florida-places`, { next: { revalidate: 600 } });
     return res.ok ? res.json() : null;
   } catch {
     return null;

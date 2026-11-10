@@ -551,3 +551,19 @@ export interface DistrictDetail {
     profile: { badge_slug: string; badge_label: string; vintage: string; metrics: DistrictMetric[] }[];
   };
 }
+
+/** Florida places a federal bill's text names (GET /bills/{id}/florida-places). */
+export interface FloridaPlaceFinding {
+  kind: "state" | "county" | "municipality" | "named_place" | "disaster";
+  name: string;
+  counties: string[];
+  section: string | null;
+  quote: string;
+}
+export interface FloridaPlaces {
+  label: string;
+  not_covered: string;
+  method_version?: string;
+  text_version: { type: string | null; date: string | null; source_url: string } | null;
+  findings: FloridaPlaceFinding[];
+}

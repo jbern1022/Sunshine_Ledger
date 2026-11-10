@@ -454,6 +454,17 @@ export const en = {
   "districts.moe": "±{moe} margin of error",
   "districts.highMoe": "Low reliability: the margin of error is large relative to the estimate.",
   "districts.suppressed": "Not shown: the margin of error is as large as the estimate.",
+  "federal.places.title": "Florida places this bill names",
+  "federal.places.version": "From the text as {type}{date}.",
+  "federal.places.none": "No Florida place is named in the text we have.",
+  "federal.places.noText": "We don't have the text of this bill yet.",
+  "federal.places.kind.state": "Names Florida",
+  "federal.places.kind.county": "County",
+  "federal.places.kind.municipality": "City, town or village",
+  "federal.places.kind.named_place": "Named place",
+  "federal.places.kind.disaster": "Disaster declaration",
+  "federal.places.counties": "In {counties} County",
+  "federal.places.source": "Printed text",
 } as const;
 
 export type MessageKey = keyof typeof en;
