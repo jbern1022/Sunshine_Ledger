@@ -34,24 +34,32 @@ member (a `sponsor`-like relationship plus the member's promises) needs that
 table ingested. Open: pick the source (committee report tables, or the
 committees' published project lists) and confirm its terms.
 
-## Layer 2: nationwide categories (not built; needs decisions)
+## Layer 2: nationwide categories (built, owner-approved 2026-11-10)
 
-The mapper and matcher already do the work once a bill has a Who-it-affects
-layer and the vocabulary has the category. What is missing:
+Three roles were added to the vocabulary (VOCABULARY_VERSION 3):
+`flood_insurance_policyholder` (location: the insured property),
+`medicare_beneficiary` (residence), `small_employer` (business). Answers stay in
+the browser. Version 3 only adds values, so rows mapped at version 2 stay
+served (`COMPATIBLE_VERSIONS`) until an entry is remapped; the mapper method is
+now `impact_lens_criteria/10`, so the nightly mapping step remaps everything.
 
-1. **Vocabulary additions.** Proposed, none added yet: roles
-   `flood_insurance_policyholder`, `medicare_beneficiary`, `small_employer`
-   (or `employer` plus an employee-count number). `medicare_beneficiary`
-   passes the forbidden-dimension filter by name but is an age/health proxy, so
-   it needs an explicit owner decision under the Impact Lens privacy boundary
-   (answers stay in the browser). Bump `VOCABULARY_VERSION` with any change.
-2. **Layers for federal bills.** Text is now stored; the layer generator
-   reads `Bill.full_text` and already skips non-delegation federal bills.
-   Federal bills run long (the NDAA is 2.7 MB), so the generator's length
-   limits need a federal strategy (by section) before it runs on them.
-3. **Optional ACS context** (residents 65+, with margins of error): the
-   district profile code already shows ACS with MOE; a statewide table is a
-   small addition once the wording is approved.
+- **Guards.** A group names the role only by its own words ("Medicare
+  beneficiaries", "flood insurance policyholders", "small employers"), and the
+  specific role replaces the general one it also matches (small employer over
+  employer, Medicare enrollee over insured). "Beneficiaries" alone is not Medicare.
+- **Federal Who layer** (`app/federal/lens_text.py`). A federal bill is read
+  only in the sections that mention flood insurance, Medicare or small
+  employers/businesses; the block says "Read 3 of 912 sections ... Other
+  provisions were not analyzed". Entries keep the verified-quote rules. Only the
+  Who layer runs for federal bills (no Bill Says / Interpretation / Expected
+  Effect), only for delegation bills, and its input hash covers only the
+  relevant sections, so an unrelated change never regenerates it.
+- The prompt forbids stating or estimating dollar amounts or people affected
+  (layer 3 territory).
+- Still off until `LAYERS_WHO_IT_AFFECTS` is on (it is on in prod), and a
+  federal bill needs its text (needs CONGRESS_API_KEY).
+- Not built: the optional ACS context line (residents 65+ with margins of
+  error).
 
 ## Layer 3: attributed estimates (not built, by design)
 
