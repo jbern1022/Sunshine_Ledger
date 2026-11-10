@@ -31,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/map" className="hover:text-ledger-900">
                 {t("nav.map")}
               </Link>
+              <Link href="/districts" className="hover:text-ledger-900">
+                {t("nav.districts")}
+              </Link>
             </nav>
           </div>
         </header>
