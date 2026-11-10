@@ -133,6 +133,10 @@ class SiteSnapshot(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # apart from fetched_at (when we downloaded it).
     from_archive_timestamp: Mapped[str | None] = mapped_column(String(14))
     note: Mapped[str | None] = mapped_column(Text)
+    # Set once the extractor has read this snapshot (even if it found nothing),
+    # with the snapshot_text version its offsets refer to.
+    extracted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    extracted_text_version: Mapped[int | None] = mapped_column(Integer)
 
     site: Mapped["OfficialSite"] = relationship(back_populates="snapshots")
     items: Mapped[list["PromiseItem"]] = relationship(back_populates="snapshot", cascade="all, delete-orphan")

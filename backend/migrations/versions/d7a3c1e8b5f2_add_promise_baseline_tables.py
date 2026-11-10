@@ -76,6 +76,8 @@ def upgrade() -> None:
     sa.Column('storage_path', sa.Text(), nullable=True),
     sa.Column('from_archive_timestamp', sa.String(length=14), nullable=True),
     sa.Column('note', sa.Text(), nullable=True),
+    sa.Column('extracted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('extracted_text_version', sa.Integer(), nullable=True),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint("status IN ('ok', 'blocked_by_robots', 'unavailable', 'refused')", name='ck_site_snapshots_status'),
