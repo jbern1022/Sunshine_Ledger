@@ -230,3 +230,15 @@ def test_all_jurisdictions_hides_roll_call_only_federal_bills(client, db_session
     names = lambda url: {b["name"] for b in client.get(url).json()["items"]}
     assert names("/bills") == {"State bill", "Delegation bill"}
     assert names("/bills?jurisdiction_name=US") == {"Delegation bill", "Roll call only"}
+
+
+def test_session_and_status_facets_follow_the_same_scope_as_the_bill_list(client, db_session):
+    upsert_bill(db_session, congress=119, slug="hr", number=1, title="Delegation bill", delegation=True)
+    roll_call_only = upsert_bill(db_session, congress=119, slug="hr", number=2, title="Roll call only")
+    roll_call_only.bill.status = "Passed House"
+    db_session.flush()
+    sessions = {s["session"]: s["count"] for s in client.get("/bills/sessions").json()}
+    assert sessions == {"119th Congress": 1}
+    assert {s["session"]: s["count"] for s in client.get("/bills/sessions?jurisdiction_name=US").json()} == {"119th Congress": 2}
+    assert [s["status"] for s in client.get("/bills/statuses").json()] == ["Introduced"]
+    assert {s["status"] for s in client.get("/bills/statuses?jurisdiction_name=US").json()} == {"Introduced", "Passed House"}

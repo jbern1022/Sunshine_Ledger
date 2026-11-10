@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.bill_layers_admin import review_state
 from app.auth import require_admin
+from app.federal.policy import eligible_for_generation
 from app.db import get_db
 from app.models import (
     Bill,
@@ -304,6 +305,8 @@ def list_sessions(
     )
     if jurisdiction_name:
         stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+    else:
+        stmt = stmt.where(eligible_for_generation())  # same scope as the unfiltered bill list
     rows = sorted(db.execute(stmt).all(), key=lambda row: _session_order(row[0]))
     return [SessionCount(session=session, count=n) for session, n in rows]
 
@@ -334,6 +337,8 @@ def list_statuses(
     )
     if jurisdiction_name:
         stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+    else:
+        stmt = stmt.where(eligible_for_generation())
 
     return [StatusCount(status=status, count=n) for status, n in db.execute(stmt).all()]
 
