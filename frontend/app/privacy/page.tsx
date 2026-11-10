@@ -63,7 +63,7 @@ export default function PrivacyPage() {
         This check is optional and asks nothing until you choose to use it. If you answer, your
         role, the county and city, town or village (if you give one) of where you live, or, when a
         bill&apos;s rule is about them, of a property you own or rent out, or of your business or
-        workplace, and the property type are kept in your browser&apos;s session storage so the
+        workplace (more than one county, if you add them), and the property type are kept in your browser&apos;s session storage so the
         result stays put while you move between bills. These are counties and cities only, never
         an address. They are never sent to our servers: the only request the check makes asks for the bill&apos;s own
         criteria, and your answers are compared with them in your browser. Session storage is

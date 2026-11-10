@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ImpactLens from "./ImpactLens";
 import * as api from "@/lib/api";
@@ -261,5 +261,50 @@ describe("ImpactLens: role-specific locations", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByLabelText("In which Florida county is the property?");
     expect(screen.queryByRole("button", { name: /Same as where I live/ })).toBeNull();
+  });
+});
+
+describe("ImpactLens: several places of one kind", () => {
+  const duvalRule = (): ImpactLensResponse => {
+    const b = landlordBill();
+    b.entries[0] = entry("Landlords", crit({ audience: { kind: "attr", attr: "role", any_of: ["landlord"] },
+      requires: [{ attr: "jurisdiction", op: "in", values: ["county:Duval"], from: { kind: "condition", index: 0 } }] }));
+    // More than 8 options, so the question is a list even after the given county is removed.
+    const prop = b.questions.find((q) => q.key === "property_county")!;
+    prop.options = [...prop.options, { value: "Lake", label: "Lake County" }, { value: "Clay", label: "Clay County" }];
+    return b;
+  };
+
+  it("a landlord with an Orange rental can add a Duval rental, and a Duval rule then applies", async () => {
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({ role: "landlord", property_county: "Orange" }));
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(duvalRule());
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Does Not Appear to Apply"));
+
+    await user.click(await screen.findByRole("button", { name: "Add another county to Property County" }));
+    const select = await screen.findByLabelText("In which Florida county is the property?");
+    expect(within(select).queryByRole("option", { name: "Orange County" })).toBeNull(); // already given
+    await user.selectOptions(select, "Duval");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applies to You"));
+    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({
+      role: "landlord", property_county: ["Orange", "Duval"],
+    });
+    expect(screen.getByText(/Orange County, Duval County/)).toBeInTheDocument();
+  });
+
+  it("cancelling the add changes nothing, and a residence answer has no add control", async () => {
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({ role: "landlord", county: "Leon", property_county: "Orange" }));
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(duvalRule());
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await user.click(await screen.findByRole("button", { name: "Add another county to Property County" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({ role: "landlord", county: "Leon", property_county: "Orange" });
+    expect(screen.queryByRole("button", { name: /Add another county to County$/ })).toBeNull();
   });
 });

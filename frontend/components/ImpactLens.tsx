@@ -147,6 +147,8 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   // such step focus moves to the next question, else to the result.
   const rootRef = useRef<HTMLElement>(null);
   const focusPending = useRef(false);
+  // A property or workplace county the reader is adding to the one already given.
+  const [adding, setAdding] = useState<QuestionKey | null>(null);
 
   useEffect(() => {
     if (!open || data || error) return;
@@ -181,6 +183,15 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
     writeAnswers(next);
     focusPending.current = true;
   }
+  /** Add one more county of the same kind (rentals in two counties). Capped, de-duplicated. */
+  function addPlace(key: QuestionKey, v: string) {
+    const names = [...new Set([...placesOf(answers[key]), v])].slice(0, 10);
+    const next = { ...answers, [key]: names.length === 1 ? names[0] : names } as Answers;
+    setAnswers(next);
+    writeAnswers(next);
+    setAdding(null);
+    focusPending.current = true;
+  }
   function change(key: QuestionKey) {
     const next = { ...answers };
     delete next[key];
@@ -206,6 +217,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   }
   function clearAll() {
     setAnswers({});
+    setAdding(null);
     forgetAnswers();
     focusPending.current = true;
   }
@@ -256,16 +268,37 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
               {answeredChips.map((k, i) => (
                 <span key={k}>
                   {i > 0 && " · "}
-                  {byKey.get(k)?.label ?? k}: <strong>{labelFor(k, answers[k] as string)}</strong>{" "}
+                  {byKey.get(k)?.label ?? k}: <strong>{placesOf(answers[k]).map((v) => labelFor(k, v)).join(", ")}</strong>{" "}
                   <button type="button" className="underline text-sunshine-700" onClick={() => change(k)} aria-label={t("lens.changeAria", { label: byKey.get(k)?.label ?? k })}>
                     {t("lens.change")}
                   </button>
+                  {(k === "property_county" || k === "business_county") && placesOf(answers[k]).length < 10 && (
+                    <>
+                      {" "}
+                      <button type="button" className="underline text-sunshine-700" onClick={() => { setAdding(k); focusPending.current = true; }} aria-label={t("lens.addAnotherAria", { label: byKey.get(k)?.label ?? k })}>
+                        {t("lens.addAnother")}
+                      </button>
+                    </>
+                  )}
                 </span>
               ))}
             </p>
           )}
 
-          {result.ask.length > 0 &&
+          {adding && byKey.get(adding) && (
+            <div>
+              <QuestionBlock
+                q={{ ...byKey.get(adding)!, options: byKey.get(adding)!.options.filter((o) => o.value !== "none_of_these" && !placesOf(answers[adding]).includes(o.value)) }}
+                value={undefined}
+                onAnswer={addPlace}
+              />
+              <button type="button" onClick={() => setAdding(null)} className="mt-1 text-sm underline text-sunshine-700">
+                {t("lens.cancelAdd")}
+              </button>
+            </div>
+          )}
+
+          {!adding && result.ask.length > 0 &&
             result.ask.slice(0, 1).map((key) => {
               const q = byKey.get(key);
               if (!q) return null;
