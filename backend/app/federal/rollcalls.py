@@ -38,7 +38,7 @@ from app.federal.bills import TYPES, bill_key, parse_legis_num, upsert_bill
 from app.federal.sponsorships import CURRENT_CONGRESS, delegation_members
 from app.models import Entity, Event, Relationship, Source
 from app.pipeline.flsenate import USER_AGENT
-from app.pipeline.source_checks import record_check
+from app.pipeline.source_checks import record_check, record_partial
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ def _last_stored(db: Session, chamber: str, congress: int, year: int) -> int:
 
 
 def sync_chamber(db: Session, fetch: Fetch, *, chamber: str, congress: int, year: int, start: int | None = None,
-                 max_roll_calls: int = 1000) -> dict:
+                 max_roll_calls: int = 1000, deadline: float | None = None, clock=time.monotonic) -> dict:
     """Walk roll-call numbers from the first not yet seen until the chamber
     has no more. Progress is committed per roll call, so a stopped run
     resumes. (A roll call that fails the delegation or bill test is not
@@ -208,6 +208,9 @@ def sync_chamber(db: Session, fetch: Fetch, *, chamber: str, congress: int, year
     counts = {"stored": 0, "duplicate": 0, "no_bill": 0, "no_delegation_votes": 0, "fetched": 0}
     num = start or (_last_stored(db, chamber, congress, year) + 1)
     while num <= max_roll_calls:
+        if deadline is not None and clock() >= deadline:
+            counts["stopped_at_time_cap"] = True  # resumes at `num` next run
+            break
         url = (HOUSE_URL.format(year=year, num=num) if chamber == "house"
                else SENATE_URL.format(congress=congress, session=session, num=num))
         body = fetch(url)
@@ -221,12 +224,23 @@ def sync_chamber(db: Session, fetch: Fetch, *, chamber: str, congress: int, year
     return counts
 
 
-def sync_rollcalls(db: Session, fetch: Fetch, *, congress: int = CURRENT_CONGRESS, years: tuple[int, ...] = (2025, 2026)) -> dict:
+def sync_rollcalls(db: Session, fetch: Fetch, *, congress: int = CURRENT_CONGRESS, years: tuple[int, ...] = (2025, 2026),
+                   max_minutes: float | None = None, clock=time.monotonic) -> dict:
+    """Walk both chambers for the given years. `max_minutes` is a wall-clock
+    cap (the nightly sets one so a first backfill can never hold up the later
+    steps); what is left waits for the next run. The source's "last checked"
+    moves only when nothing was left over."""
+    deadline = None if max_minutes is None else clock() + max_minutes * 60
     totals = {}
     for chamber in ("house", "senate"):
         for year in years:
-            totals[f"{chamber}_{year}"] = sync_chamber(db, fetch, chamber=chamber, congress=congress, year=year)
-    record_check(db, "congress_rollcalls", "; ".join(f"{k}: {v['stored']} stored" for k, v in totals.items()))
+            totals[f"{chamber}_{year}"] = sync_chamber(
+                db, fetch, chamber=chamber, congress=congress, year=year, deadline=deadline, clock=clock)
+    summary = "; ".join(f"{k}: {v['stored']} stored" for k, v in totals.items())
+    if any(v.get("stopped_at_time_cap") for v in totals.values()):
+        record_partial(db, "congress_rollcalls", f"incomplete: time cap reached; {summary}")
+    else:
+        record_check(db, "congress_rollcalls", summary)
     return totals
 
 
@@ -234,10 +248,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--congress", type=int, default=CURRENT_CONGRESS)
     parser.add_argument("--year", type=int, action="append")
+    parser.add_argument("--max-minutes", type=float, help="stop after this long; the next run carries on")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     with SessionLocal() as db:
-        logger.info("roll calls: %s", sync_rollcalls(db, http_fetch(), congress=args.congress, years=tuple(args.year or (2025, 2026))))
+        logger.info("roll calls: %s", sync_rollcalls(db, http_fetch(), congress=args.congress, years=tuple(args.year or (2025, 2026)), max_minutes=args.max_minutes))
 
 
 if __name__ == "__main__":

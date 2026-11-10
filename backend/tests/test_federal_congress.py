@@ -242,3 +242,12 @@ def test_session_and_status_facets_follow_the_same_scope_as_the_bill_list(client
     assert {s["session"]: s["count"] for s in client.get("/bills/sessions?jurisdiction_name=US").json()} == {"119th Congress": 2}
     assert [s["status"] for s in client.get("/bills/statuses").json()] == ["Introduced"]
     assert {s["status"] for s in client.get("/bills/statuses?jurisdiction_name=US").json()} == {"Introduced", "Passed House"}
+
+
+def test_a_time_cap_stops_the_walk_and_a_later_run_carries_on(db_session, delegation):
+    from app.federal.rollcalls import sync_rollcalls
+
+    ticks = iter(range(0, 10_000, 100))          # each clock() call is 100 s later
+    pages = {"https://clerk.house.gov/evs/2025/roll100.xml": HOUSE}
+    out = sync_rollcalls(db_session, lambda url: pages.get(url), years=(2025,), max_minutes=1, clock=lambda: next(ticks))
+    assert out["house_2025"]["stopped_at_time_cap"] is True and out["house_2025"]["fetched"] == 0

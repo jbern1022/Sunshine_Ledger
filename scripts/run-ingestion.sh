@@ -125,7 +125,7 @@ step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_t
 # See docs/FEDERAL_CONGRESS.md.
 step "Federal roster" docker exec "$CONTAINER" python -m app.federal.roster
 step "Federal sponsorships" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.sponsorships; else echo "CONGRESS_API_KEY not set; skipped"; fi'
-step "Federal roll calls" docker exec "$CONTAINER" python -m app.federal.rollcalls
+step "Federal roll calls" docker exec "$CONTAINER" python -m app.federal.rollcalls --max-minutes 40
 step "Federal bill text and Florida places" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.texts --limit 50; else echo "CONGRESS_API_KEY not set; skipped"; fi'
 
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
