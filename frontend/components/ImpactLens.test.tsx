@@ -283,7 +283,7 @@ describe("ImpactLens: several places of one kind", () => {
     await user.click(screen.getByRole("button", { name: "Yes, check" }));
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Does Not Appear to Apply"));
 
-    await user.click(await screen.findByRole("button", { name: "Add another county to Property County" }));
+    await user.click(await screen.findByRole("button", { name: "Add another to Property County" }));
     const select = await screen.findByLabelText("In which Florida county is the property?");
     expect(within(select).queryByRole("option", { name: "Orange County" })).toBeNull(); // already given
     await user.selectOptions(select, "Duval");
@@ -302,9 +302,34 @@ describe("ImpactLens: several places of one kind", () => {
     const user = userEvent.setup();
     render(<ImpactLens billEntityId="b1" />);
     await user.click(screen.getByRole("button", { name: "Yes, check" }));
-    await user.click(await screen.findByRole("button", { name: "Add another county to Property County" }));
+    await user.click(await screen.findByRole("button", { name: "Add another to Property County" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}")).toEqual({ role: "landlord", county: "Leon", property_county: "Orange" });
-    expect(screen.queryByRole("button", { name: /Add another county to County$/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add another to County$/ })).toBeNull();
+  });
+});
+
+describe("ImpactLens: several roles", () => {
+  it("a landlord can add the employer role, and the second role's rule then applies", async () => {
+    const b = landlordBill();
+    b.role_locations = { ...ROLE_LOCATIONS, employer: "business" };
+    b.entries.push(entry("Employers", crit({ audience: { kind: "attr", attr: "role", any_of: ["employer"] },
+      requires: [{ attr: "jurisdiction", op: "in", values: ["county:Orange"], from: { kind: "condition", index: 0 } }] })));
+    b.questions[0].options = [{ value: "landlord", label: "Landlord" }, { value: "employer", label: "Employer" }, { value: "none_of_these", label: "None of These" }];
+    b.questions.push({ key: "business_county", label: "Business County", question: "In which Florida county is the business?", options: countyOptions });
+    window.sessionStorage.setItem("impactLens.answers.v2", JSON.stringify({ role: "landlord", property_county: "Leon", business_county: "Orange" }));
+    vi.mocked(api.fetchImpactLens).mockResolvedValue(b);
+    const user = userEvent.setup();
+    render(<ImpactLens billEntityId="b1" />);
+    await user.click(screen.getByRole("button", { name: "Yes, check" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Does Not Appear to Apply"));
+
+    await user.click(await screen.findByRole("button", { name: "Add another to Role" }));
+    expect(screen.queryByRole("radio", { name: "Landlord" })).toBeNull(); // already given
+    expect(screen.queryByRole("radio", { name: "None of These" })).toBeNull();
+    await user.click(screen.getByRole("radio", { name: "Employer" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applies to You"));
+    expect(JSON.parse(window.sessionStorage.getItem("impactLens.answers.v2") ?? "{}").role).toEqual(["landlord", "employer"]);
   });
 });

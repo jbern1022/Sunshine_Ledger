@@ -152,4 +152,4 @@ The matcher and stored answers accept **a list of places per kind** (`property_c
 
 `role` in the answers may be a list. With two or more roles each entry is evaluated once per role, with that role's own location kind; it holds if any role holds, is ruled out only if every role rules it out, and an ambiguous reading beats an unknown one. The questions to ask come from the roles that are still open. A list of one behaves like the plain role; `cleanAnswers` de-duplicates and caps at 10. Tests: `lib/impactLens.severalRoles.test.ts`.
 
-**Not built:** a control for choosing more than one role. The role question is still single-choice, so readers see no change. Which wording and layout to use (checkboxes on the role question, or "add another role" like the county control) is the remaining decision.
+**Control (built, behind `?lens=1`):** an "add another role" button in the answers line, like the county one; the roles already given and "none of these" are removed from the list. The wording is a proposal.

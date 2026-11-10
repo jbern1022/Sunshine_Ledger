@@ -272,11 +272,11 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
                   <button type="button" className="underline text-sunshine-700" onClick={() => change(k)} aria-label={t("lens.changeAria", { label: byKey.get(k)?.label ?? k })}>
                     {t("lens.change")}
                   </button>
-                  {(k === "property_county" || k === "business_county") && placesOf(answers[k]).length < 10 && (
+                  {(k === "property_county" || k === "business_county" || (k === "role" && !placesOf(answers.role).includes("none_of_these") && (byKey.get("role")?.options.length ?? 0) > placesOf(answers.role).length + 1)) && placesOf(answers[k]).length < 10 && (
                     <>
                       {" "}
                       <button type="button" className="underline text-sunshine-700" onClick={() => { setAdding(k); focusPending.current = true; }} aria-label={t("lens.addAnotherAria", { label: byKey.get(k)?.label ?? k })}>
-                        {t("lens.addAnother")}
+                        {k === "role" ? t("lens.addAnotherRole") : t("lens.addAnother")}
                       </button>
                     </>
                   )}
