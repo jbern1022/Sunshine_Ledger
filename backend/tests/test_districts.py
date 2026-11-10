@@ -261,3 +261,15 @@ def test_point_lookup_returns_every_district_that_covers_it(client, db_session):
     assert client.get("/districts/at?lat=30.5&lon=-85.5").json()["districts"][0]["code"] == "HD-102"
     assert client.get("/districts/at?lat=26.0&lon=-85.0").json()["districts"] == []
     assert client.get("/districts/at?lat=40.0&lon=-80.5").status_code == 422  # outside Florida
+
+
+def test_a_member_re_elected_to_the_same_seat_is_one_line(db_session):
+    plan = ensure_current_plan(db_session)
+    d = District(map_plan_id=plan.id, chamber="house", number=5, code="HD-005")
+    db_session.add(d)
+    pat = _person(db_session, "Pat Doe")
+    _tenure(db_session, pat, "fl_house", 5, date(2018, 11, 20), date(2020, 11, 3))
+    _tenure(db_session, pat, "fl_house", 5, date(2020, 11, 3), date(2022, 11, 22))
+    _tenure(db_session, pat, "fl_house", 5, date(2022, 11, 22))
+    got = members(db_session, d)
+    assert len(got) == 1 and got[0]["start_date"] == date(2018, 11, 20) and got[0]["end_date"] is None and got[0]["current"]

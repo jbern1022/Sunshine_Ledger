@@ -156,13 +156,21 @@ def members(db: Session, district: District) -> list[dict]:
         .where(OfficeTenure.office_type == _office(district.chamber), OfficeTenure.district == district.number)
         .order_by(OfficeTenure.start_date.desc())
     ).all()
-    for t, p in rows:
+    # Re-elections are separate terms in the data; a person who held the seat
+    # across them is one line, from the first term's start to the last term's end.
+    spans: dict = {}
+    for t, p in rows:  # newest first
         tenured.add(p.id)
-        out.append({
-            "person_entity_id": p.id, "name": p.name, "party": t.party or (p.attributes or {}).get("party"),
-            "start_date": t.start_date, "end_date": t.end_date, "end_reason": t.end_reason,
-            "current": t.end_date is None, "basis": "tenure",
-        })
+        cur = spans.get(p.id)
+        if cur is None:
+            spans[p.id] = {
+                "person_entity_id": p.id, "name": p.name, "party": t.party or (p.attributes or {}).get("party"),
+                "start_date": t.start_date, "end_date": t.end_date, "end_reason": t.end_reason,
+                "current": t.end_date is None, "basis": "tenure",
+            }
+        else:
+            cur["start_date"] = min(cur["start_date"], t.start_date)
+    out.extend(spans.values())
     has_state_tenure = select(OfficeTenure.person_entity_id).where(OfficeTenure.office_type.in_(_office_group(district.chamber)))
     roster = db.execute(
         select(Entity).where(
