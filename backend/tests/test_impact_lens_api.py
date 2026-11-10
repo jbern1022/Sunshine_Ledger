@@ -127,7 +127,7 @@ def test_only_the_current_layer_and_current_vocabulary_count(client, db_session,
     old = _layer(db_session, entity, [LANDLORD], version=1, superseded=True)
     _criteria(db_session, old, 0, LANDLORD_RAW)
     new = _layer(db_session, entity, [LANDLORD], version=2)
-    _criteria(db_session, new, 0, LANDLORD_RAW, vocab=VOCABULARY_VERSION - 1, method="impact_lens_criteria/1")
+    _criteria(db_session, new, 0, LANDLORD_RAW, vocab=1, method="impact_lens_criteria/1")  # an incompatible, older vocabulary
     body = client.get(f"/bills/{entity.id}/impact-lens").json()
     assert body["layer"]["version"] == 2
     assert body["entries"][0]["criteria"] is None and body["complete"] is False  # old-vocabulary rows are ignored
@@ -212,6 +212,7 @@ def test_every_role_has_a_location_kind_and_the_response_sends_the_table(client,
         "landlord": "property", "homeowner": "property", "property_developer": "property",
         "employer": "business", "business_owner": "business", "employee": "business",
         "healthcare_provider": "business",
+        "flood_insurance_policyholder": "property", "medicare_beneficiary": "residence", "small_employer": "business",
     }
     # A role added to the vocabulary must say which location it regulates.
     assert set(REGISTRY["role"].values) == set(expected)

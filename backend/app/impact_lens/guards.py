@@ -31,7 +31,26 @@ ROLE_WORDS = {
     "local_government": r"\b(counties|county|municipalit(y|ies)|local governments?|cit(y|ies)|towns?|villages?)\b",
     "insured": r"\b(insureds?|policyholders?|subscribers?|enrollees?)\b",
     "healthcare_provider": r"\b(physicians?|doctors?|health ?care providers?|hospitals?)\b",
+    # Federal categories. "Beneficiaries" alone could be Medicaid or Social
+    # Security, so Medicare must be named.
+    "flood_insurance_policyholder": r"\b(flood insurance policyholders?|policyholders? of flood insurance|NFIP policyholders?|National Flood Insurance Program policyholders?)\b",
+    "medicare_beneficiary": r"\b(medicare (?:beneficiar(?:y|ies)|enrollees?|recipients?|participants?))\b",
+    "small_employer": r"\b(small (?:employers?|businesses|business employers?))\b",
 }
+
+# A more specific role replaces the general one its words also match: a
+# "small employer" rule is not about every employer, and a Medicare enrollee
+# is not just any insured person.
+SPECIFIC_OVER = {
+    "small_employer": ("employer", "business_owner"),
+    "flood_insurance_policyholder": ("insured",),
+    "medicare_beneficiary": ("insured",),
+}
+
+
+def prefer_specific(roles: list[str]) -> list[str]:
+    drop = {general for specific in roles for general in SPECIFIC_OVER.get(specific, ())}
+    return [r for r in roles if r not in drop]
 
 PROPERTY_WORDS = {
     "single_family": r"single[- ]family",
@@ -100,19 +119,19 @@ def supported_roles(group: str, roles: list[str]) -> list[str]:
         # The exception is a government's own body: "Governing body of a county".
         if not _PREPOSITION.search(before) or (r == "local_government" and _is_government_body(before)):
             out.append(r)
-    return out
+    return prefer_specific(out)
 
 
 # People a rule can protect or burden. A role the model wrongly offered as the
 # audience moves to the affected side only if it is one of these AND the entry's
 # own words mention it (a county named in a taxing-authority rule stays out).
-PEOPLE_ROLES = ('insured', 'renter', 'homeowner', 'employee')
+PEOPLE_ROLES = ('insured', 'renter', 'homeowner', 'employee', 'medicare_beneficiary', 'flood_insurance_policyholder')
 
 
 def affected_roles(text: str, roles: list[str]) -> list[str]:
     """The roles an entry's own text mentions anywhere (not only as the group):
     who a rule protects or burdens ("disclose to every insured")."""
-    return [r for r in roles if r in ROLE_WORDS and re.search(ROLE_WORDS[r], text or "", re.IGNORECASE)]
+    return prefer_specific([r for r in roles if r in ROLE_WORDS and re.search(ROLE_WORDS[r], text or "", re.IGNORECASE)])
 
 
 def too_complex(text: str, quote: str) -> str | None:

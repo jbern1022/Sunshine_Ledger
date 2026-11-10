@@ -14,7 +14,13 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-VOCABULARY_VERSION = 2
+VOCABULARY_VERSION = 3
+# Version 3 only ADDED role values (flood_insurance_policyholder,
+# medicare_beneficiary, small_employer), so a criteria row mapped at version 2
+# is still exact under version 3 and keeps being served until the entry is
+# remapped. A later change that removes or reinterprets a value must drop the
+# older version from this list.
+COMPATIBLE_VERSIONS = (2, 3)
 
 # Dimensions the privacy boundary excludes from the anonymous Impact Lens.
 # Matched as substrings of an attribute key, so "immigration_status" and
@@ -81,7 +87,10 @@ ROLE = Attribute(
     type=CHOICE,
     question="Which best describes you in relation to this bill?",
     values=("renter", "landlord", "homeowner", "property_developer", "employer", "employee",
-            "business_owner", "local_government", "insured", "healthcare_provider"),
+            "business_owner", "local_government", "insured", "healthcare_provider",
+            # Nationwide categories for federal bills (owner-approved 2026-11-10).
+            # Answers stay in the browser; none is stored or sent.
+            "flood_insurance_policyholder", "medicare_beneficiary", "small_employer"),
     audience=True,
 )
 # One attribute for both levels so a single condition ("any county or city that
@@ -123,6 +132,9 @@ ROLE_LOCATIONS: dict[str, str] = {
     "business_owner": BUSINESS,
     "employee": BUSINESS,
     "healthcare_provider": BUSINESS,
+    "flood_insurance_policyholder": PROPERTY,  # the insured property
+    "medicare_beneficiary": RESIDENCE,
+    "small_employer": BUSINESS,
 }
 
 

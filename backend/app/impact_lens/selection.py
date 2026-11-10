@@ -12,18 +12,19 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.impact_lens.vocabulary import VOCABULARY_VERSION
+from app.impact_lens.vocabulary import COMPATIBLE_VERSIONS
 from app.models import BillLayer, BillLayerCriteria
 
 ReviewState = Literal["unreviewed", "approved", "rejected"]
 
 
 def served_rows(db: Session, layer: BillLayer) -> dict[int, BillLayerCriteria]:
-    """The newest row per entry at the CURRENT vocabulary version (any method
-    version); rows mapped against an older vocabulary are ignored."""
+    """The newest row per entry at the current vocabulary version or one
+    that is still exact under it (any method version); rows mapped against
+    an incompatible older vocabulary are ignored."""
     rows = db.execute(
         select(BillLayerCriteria)
-        .where(BillLayerCriteria.bill_layer_id == layer.id, BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION)
+        .where(BillLayerCriteria.bill_layer_id == layer.id, BillLayerCriteria.vocabulary_version.in_(COMPATIBLE_VERSIONS))
         .options(selectinload(BillLayerCriteria.reviews))
         .order_by(BillLayerCriteria.created_at, BillLayerCriteria.id)
     ).scalars().all()

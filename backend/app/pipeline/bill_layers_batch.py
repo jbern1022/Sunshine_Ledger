@@ -29,6 +29,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Source, StaffAnalysis
+from app.federal.lens_text import build_federal_who, selected_text as federal_selected_text
 from app.federal.policy import eligible_for_generation
 from app.pipeline import bill_layers as gen
 from app.pipeline.bill_layers_store import current_layer, layer_input_hash, store_layer_version
@@ -70,6 +71,16 @@ def _staff_input(section: str | None, analysis: StaffAnalysis) -> str:
 def plan_jobs(db: Session, entity: Entity, model: str) -> list[LayerJob]:
     bill = entity.bill
     candidates: list[tuple[str, str, str]] = []
+    if bill.source_system == "congress":
+        # Federal bills get only the Who-it-affects layer, and only from the
+        # sections that mention a nationwide category (app/federal/lens_text.py).
+        selected = federal_selected_text(bill.full_text) if bill.full_text else ""
+        if selected and settings.layers_who_it_affects:
+            h = layer_input_hash("who_it_affects", "sunshine_ledger_ai", selected, model)
+            current = current_layer(db, entity.id, "who_it_affects", "sunshine_ledger_ai")
+            if current is None or current.input_hash != h:
+                return [LayerJob("who_it_affects", "sunshine_ledger_ai", selected, h)]
+        return []
     if bill.full_text:
         for layer, origin in (
             ("bill_says", "bill_text"),
@@ -120,7 +131,8 @@ def _sources_for(entity: Entity, job: LayerJob, analysis: StaffAnalysis | None) 
     return [Source(
         url=version.get("url") or bill.full_text_url or "",
         document_reference=reference,
-        publisher="Florida Legislature" if official else f"{entity.jurisdiction_name or ''} via {bill.source_system}".strip(),
+        publisher=("Florida Legislature" if official else "Congress.gov (U.S. Government Publishing Office text)"
+                   if bill.source_system == "congress" else f"{entity.jurisdiction_name or ''} via {bill.source_system}".strip()),
         source_type=f"{bill.source_system}_bill_text",
         retrieved_at=now,
         metadata_json=metadata,
@@ -136,7 +148,8 @@ def run_job(db: Session, entity: Entity, job: LayerJob, client, analysis: StaffA
     elif (job.layer, job.origin) == ("expected_effect", "sunshine_ledger_ai"):
         result = gen.build_ai_expected_effect(bill.bill_number, entity.name, bill.full_text, client)
     elif (job.layer, job.origin) == ("who_it_affects", "sunshine_ledger_ai"):
-        result = gen.build_who_it_affects(bill.bill_number, entity.name, bill.full_text, client)
+        build = build_federal_who if bill.source_system == "congress" else gen.build_who_it_affects
+        result = build(bill.bill_number, entity.name, bill.full_text, client)
     elif (job.layer, job.origin) == ("interpretation", "legislative_staff"):
         result = gen.build_staff_interpretation(extract_effect_section(analysis.text), staff_label(analysis), client)
     else:
