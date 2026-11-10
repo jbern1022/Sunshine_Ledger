@@ -190,3 +190,13 @@ export async function getEarmarks(district: string, limit = 25): Promise<Earmark
     return null;
   }
 }
+
+/** Project-funding rows linked to one person (a Florida House member). Null when unavailable. */
+export async function getPersonEarmarks(personId: string, limit = 25): Promise<EarmarkList | null> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/earmarks?person_id=${encodeURIComponent(personId)}&limit=${limit}`, { next: { revalidate: 3600 } });
+    return res.ok ? res.json() : null;
+  } catch {
+    return null;
+  }
+}

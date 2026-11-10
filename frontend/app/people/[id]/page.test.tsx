@@ -7,6 +7,7 @@ import type { PersonDetail } from "@/lib/types";
 
 vi.mock("@/lib/server-api", () => ({
   getPerson: vi.fn(),
+  getPersonEarmarks: vi.fn(async () => null),
 }));
 
 const { notFoundMock } = vi.hoisted(() => ({

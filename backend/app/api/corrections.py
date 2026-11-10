@@ -125,7 +125,7 @@ def bill_accountability(db: Session, bill_entity_id) -> tuple[list[DisputeOut], 
     responses = [
         ResponseOut.model_validate(r)
         for r in db.execute(
-            select(Response).where(Response.bill_entity_id == bill_entity_id).order_by(Response.received_at)
+            select(Response).where(Response.bill_entity_id == bill_entity_id).order_by(Response.received_at, Response.created_at)
         ).scalars()
     ]
     return disputes, corrections, responses

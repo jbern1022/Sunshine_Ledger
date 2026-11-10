@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { t } from "@/lib/i18n";
-import { getPerson } from "@/lib/server-api";
+import { getPerson, getPersonEarmarks } from "@/lib/server-api";
+import Earmarks from "@/components/Earmarks";
 import PersonRecord from "@/components/PersonRecord";
 import { ALL_TOPICS, sponsorshipCounts } from "@/lib/votingRecord";
 
@@ -52,6 +53,7 @@ export default async function PersonPage({ params }: Props) {
   const { id } = await params;
   const person = await getPerson(id);
   if (!person) notFound();
+  const earmarks = await getPersonEarmarks(id);
   const isStateLegislator = person.jurisdiction_name === "FL" && !person.is_committee;
   const sponsorship = sponsorshipCounts(person.bills, ALL_TOPICS);
 
@@ -114,6 +116,8 @@ export default async function PersonPage({ params }: Props) {
           <p className="mt-4 text-xs text-slate-500">{t("person.noLocalVotes")}</p>
         )}
       </PersonRecord>
+
+      {earmarks && <Earmarks data={earmarks} district={earmarks.items[0]?.district ?? ""} />}
     </div>
   );
 }

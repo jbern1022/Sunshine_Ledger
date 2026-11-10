@@ -92,3 +92,62 @@ def test_api_labels_the_stage_and_filters(client, db_session):
     assert client.get("/earmarks?district=CD-001").json()["total"] == 0
     assert client.get("/earmarks?stage=enacted").json()["total"] == 0
     assert client.get("/earmarks?district=bad").status_code == 422
+
+
+def test_table_rows_attribute_only_unique_florida_requestors(db_session):
+    from app.federal.earmark_tables import TableRow
+
+    gim = person(db_session, "Carlos Gimenez", 28)
+    soto = person(db_session, "Darren Soto", 9)
+    rows = [
+        TableRow("Army Corps Construction Florida Keys Water; U.S. Army Corps of Engineers", "U.S. Army Corps of Engineers", 4333000, "FL", ("Gimenez",)),
+        TableRow("Army Corps Cook County, IL; U.S. Army Corps", "U.S. Army Corps", 2000000, "IL", ("Kelly (IL)", "Soto (VA)")),  # other states: none
+        TableRow("Shingle Creek, FL; U.S. Army Corps", "U.S. Army Corps", 600000, "FL", ("Soto", "Budzinski")),
+    ]
+    s = em.import_table_rows(db_session, rows, fiscal_year=2027, stage="included", subcommittee="Energy and Water Development", source_url="https://x/ew.pdf")
+    assert s["new"] == 2 and s["florida_requestors"] == 2
+    got = {(e.member_last, e.district, e.amount, e.stage, e.person_entity_id) for e in db_session.query(FederalEarmark)}
+    assert got == {("Gimenez", "CD-028", 4333000, "included", gim.id), ("Soto", "CD-009", 600000, "included", soto.id)}
+    again = em.import_table_rows(db_session, rows, fiscal_year=2027, stage="included", subcommittee="Energy and Water Development", source_url="https://x/ew.pdf")
+    assert again["new"] == 0 and again["existing"] == 2
+
+
+def test_two_florida_members_with_one_surname_are_not_guessed(db_session):
+    from app.federal.earmark_tables import TableRow
+
+    person(db_session, "Brian Scott", 3)
+    person(db_session, "Rick Scott", 4)
+    s = em.import_table_rows(db_session, [TableRow("P; R", "R", 1, "FL", ("Scott",))], fiscal_year=2027, stage="included", subcommittee="X", source_url="u")
+    assert s["new"] == 0 and s["ambiguous"] == 1
+    s = em.import_table_rows(db_session, [TableRow("P; R", "R", 1, "FL", ("Scott (FL)",))], fiscal_year=2027, stage="included", subcommittee="X", source_url="u")
+    assert s["ambiguous"] == 1  # the state suffix alone does not separate two Florida members; still refused
+
+
+def test_consolidated_awards_workbook_rows(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Appropriations Bill", "Agency", "Account", "State/Location", "Project", "Location/Recipient", "House Amount", "House Requestor(s)", "Party"])
+    ws.append(["Energy and Water", "Corps", "Construction", "Key West, FL", "Florida  Keys  Water", "Monroe County", 4333000, "Gimenez, Kelly (IL)", "R"])
+    ws.append(["Agriculture", "ARS", "B&F", "Lincoln, NE", "Lab", "U of Nebraska", 5000000, "Flood", "R"])
+    ws.append(["Agriculture", "ARS", "B&F", "X, NC", "no requestor", "R", 1, None, None])
+    f = tmp_path / "awards.xlsx"
+    wb.save(f)
+    rows = em.read_award_rows(f)
+    assert len(rows) == 2 and rows[0].requestors == ("Gimenez", "Kelly (IL)") and rows[0].project == "Florida Keys Water"
+    assert rows[0].state == "FL" and rows[0].amount == 4333000 and rows[0].subcommittee == "Energy and Water"
+    bad = tmp_path / "bad.xlsx"
+    wb2 = openpyxl.Workbook()
+    wb2.active.append(["a", "b"])
+    wb2.save(bad)
+    with pytest.raises(em.EarmarkImportError):
+        em.read_award_rows(bad)
+
+
+def test_awards_import_uses_the_rows_own_subcommittee(db_session):
+    from app.federal.earmark_tables import TableRow
+
+    person(db_session, "Carlos Gimenez", 28)
+    em.import_table_rows(db_session, [TableRow("Florida Keys Water", "Monroe County", 4333000, "FL", ("Gimenez",), "Energy and Water")],
+                         fiscal_year=2027, stage="included", subcommittee="", source_url="u")
+    assert db_session.query(FederalEarmark).one().subcommittee == "Energy and Water"
