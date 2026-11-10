@@ -25,7 +25,7 @@ are in the committee report, which is the earmark source below.
 
 Not covered, and said on the page: earmark tables, places without a state, images.
 
-## Earmarks (House requests: built on a local branch, not deployed; owner chose published project lists, 2026-11-10)
+## Earmarks (House requests: deployed; owner chose published project lists, 2026-11-10)
 
 Source found 2026-11-10: the House Appropriations Committee's FY27 Community Project Funding page
 (`appropriations.house.gov/fy27-information/fy27-community-project-funding`) publishes a "Consolidated Table of
@@ -34,9 +34,9 @@ Description, Recipient Address, Amount Requested, Member URL) and per-bill "Post
 parsed). `app/federal/earmarks.py` imports the workbook (or a CSV): only Florida districts are kept (483 rows in the
 FY27 file, at most 20 per member), each row is stored with its stage (`requested`, `included`, `enacted`) and linked to
 a member only when the seat and the last name both match exactly one tenure. `GET /earmarks` lists them with a label
-per stage; a request is never shown as funding. Table `federal_earmarks`, migration `b6d9a2f4c1e7`.
+per stage; a request is never shown as funding. Table `federal_earmarks`, migration `b6d9a2f4c1e7`. Deployed and loaded 2026-11-10 (482 Florida FY27 requests; 468 linked to a member; the 14 for CD-020 are unlinked because that seat is vacant in the roster). Shown on congressional district pages (`/districts/CD-###`).
 
-Not done: the Senate's Congressionally Directed Spending chart (an HTML table; its rows were not retrieved), the
+Not done: person-page section, the Senate's Congressionally Directed Spending chart (an HTML table; its rows were not retrieved), the
 "included" and "enacted" tables (PDF, image-based: need a table-extraction decision), a frontend, linking an earmark to
 the member's promises, and a reuse statement (neither committee site states one; the lists are published by Congress,
 but confirm before showing more than a link-back). Run: `python -m app.federal.earmarks FILE.xlsx --fiscal-year 2027

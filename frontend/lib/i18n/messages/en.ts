@@ -543,6 +543,12 @@ export const en = {
   "compare.currentLink": "current version ↗",
   "compare.unchanged.one": "{count} unchanged passage (show)",
   "compare.unchanged.other": "{count} unchanged passages (show)",
+  "earmarks.title": "Project funding requested by the member",
+  "earmarks.stage.requested": "Requested",
+  "earmarks.stage.included": "In a House bill",
+  "earmarks.stage.enacted": "Funded in law",
+  "earmarks.source": "Committee table",
+  "earmarks.more": "Showing {shown} of {total} for {district}.",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -1,4 +1,4 @@
-import type { BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, PersonListResponse, SourceStatus,
+import type { EarmarkList, BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, PersonListResponse, SourceStatus,
   PromiseList,
   DistrictList,
   DistrictDetail,
@@ -175,6 +175,16 @@ export async function getDistrict(code: string): Promise<DistrictDetail | null |
 export async function getFloridaPlaces(entityId: string): Promise<FloridaPlaces | null> {
   try {
     const res = await fetch(`${SERVER_API_URL}/bills/${entityId}/florida-places`, { next: { revalidate: 600 } });
+    return res.ok ? res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Community Project Funding rows for one congressional district. Null when unavailable. */
+export async function getEarmarks(district: string, limit = 25): Promise<EarmarkList | null> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/earmarks?district=${encodeURIComponent(district)}&limit=${limit}`, { next: { revalidate: 3600 } });
     return res.ok ? res.json() : null;
   } catch {
     return null;

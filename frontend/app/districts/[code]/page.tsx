@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getDistrict } from "@/lib/server-api";
+import { getDistrict, getEarmarks } from "@/lib/server-api";
+import Earmarks from "@/components/Earmarks";
 import { t } from "@/lib/i18n";
 import type { DistrictMetric } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export default async function DistrictPage({ params }: Props) {
   const d = await getDistrict(code);
   if (d === undefined) notFound();
   if (d === null) return <p className="text-sm text-slate-600">{t("districts.unavailable")}</p>;
+  const earmarks = d.code.startsWith("CD-") ? await getEarmarks(d.code) : null;
 
   return (
     <article>
@@ -86,6 +88,8 @@ export default async function DistrictPage({ params }: Props) {
           </p>
         )}
       </section>
+
+      {earmarks && <Earmarks data={earmarks} district={d.code} />}
 
       <section className="mt-6">
         <h2 className="text-lg font-semibold text-ledger-900">{t("districts.profile")}</h2>

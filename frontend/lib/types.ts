@@ -582,3 +582,27 @@ export interface FloridaPlaces {
   text_version: { type: string | null; date: string | null; source_url: string } | null;
   findings: FloridaPlaceFinding[];
 }
+
+export interface EarmarkItem {
+  id: string;
+  fiscal_year: number;
+  stage: "requested" | "included" | "enacted";
+  stage_label: string;
+  district: string;
+  person_id: string | null;
+  member: string;
+  party: string | null;
+  subcommittee: string;
+  recipient: string;
+  description: string;
+  recipient_address: string | null;
+  amount: number | null;
+  member_url: string | null;
+  source_url: string;
+}
+
+export interface EarmarkList {
+  note: string;
+  total: number;
+  items: EarmarkItem[];
+}
