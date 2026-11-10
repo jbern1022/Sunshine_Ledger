@@ -16,7 +16,7 @@ export default function CoverageSummary() {
       .then((statuses) =>
         // Local governments: a bill source tied to a place other than the state,
         // with records. A registered place with no rows yet isn't coverage.
-        setLocalCount(statuses.filter((s) => s.jurisdiction && s.jurisdiction !== "FL" && (s.bill_count ?? 0) > 0).length),
+        setLocalCount(statuses.filter((s) => s.jurisdiction && s.jurisdiction !== "FL" && s.jurisdiction !== "US" && (s.bill_count ?? 0) > 0).length),
       )
       .catch(() => setLocalCount(null));
   }, []);

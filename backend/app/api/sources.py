@@ -55,6 +55,13 @@ SOURCES: tuple[SourceInfo, ...] = (
         "full text, so Miami items have none.",
     ),
     SourceInfo(
+        "congress_rollcalls", "U.S. Congress (Florida delegation)", "US", "Nightly", 36, "congress",
+        "Roll-call votes of Florida's U.S. House and Senate members from the chambers' own published "
+        "records, and the bills Florida members sponsored or cosponsored from Congress.gov. Voice votes "
+        "have no member-by-member record and are not attributed. Other federal bills appear only as a "
+        "title, a status and a link.",
+    ),
+    SourceInfo(
         "gdelt", "News headlines (GDELT)", None, "Weekly", 8 * 24, None,
         "Recent headlines matched to bills by keyword. Not a measure of coverage or of the bill's effect.",
     ),

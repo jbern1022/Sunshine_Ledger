@@ -24,6 +24,7 @@ describe("CoverageSummary", () => {
       source("legistar_jaxcityc", "Jacksonville", 120),
       source("legistar_broward", "Broward County", 40),
       source("iqm2_miami", "Miami", 300),
+      source("congress_rollcalls", "US", 90),
       source("gdelt", null, null),
       source("census_bls", null, null),
     ]);
