@@ -28,6 +28,7 @@ from app.models.office_tenure import OfficeTenure
 from app.models.district import District, MapPlan
 from app.models.federal_text import FederalBillText, FederalPlaceFinding
 from app.models.entitlement import EntitlementGrant
+from app.models.account import AuthSession, User
 
 __all__ = [
     "Entity",
@@ -67,4 +68,6 @@ __all__ = [
     "FederalBillText",
     "FederalPlaceFinding",
     "EntitlementGrant",
+    "AuthSession",
+    "User",
 ]

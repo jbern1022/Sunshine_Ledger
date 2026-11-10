@@ -63,7 +63,7 @@ Provider revocation does **not** end our sessions on its own, so every event bel
 |---|---|
 | User signs out | revoke that session |
 | "Sign out everywhere" | revoke all of the user's sessions |
-| Password change or completed reset | revoke all sessions except none (the new sign-in creates one) |
+| Password change or completed reset | revoke all sessions (the next sign-in creates a new one) |
 | MFA enabled, disabled, or factor replaced | revoke all sessions; notify the verified email |
 | Approved recovery (factor reset) | revoke all sessions first; require replacement-factor enrollment before a normal session can be minted (see gate below) |
 | Suspension by an operator | set `status=suspended`, revoke all; every request checks status |

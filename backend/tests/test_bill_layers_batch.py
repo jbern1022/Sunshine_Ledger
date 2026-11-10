@@ -150,8 +150,11 @@ def test_max_minutes_stops_starting_new_bills_once_budget_elapsed(db_session, bi
 
     written, failed = process_bills(db_session, RoutingClient(), max_minutes=1, clock=fake_clock)
     assert failed == 0
-    assert written == 3  # only the first bill's three blocks got written
-    assert db_session.query(BillLayer).filter_by(bill_entity_id=second.id).count() == 0
+    assert written == 3  # only one bill's three blocks got written
+    # Which bill is "first" depends on the batch's ordering, which ties when both bills have the
+    # same activity date; the budget, not the order, is what this test pins.
+    counts = sorted(db_session.query(BillLayer).filter_by(bill_entity_id=b.id).count() for b in (first, second))
+    assert counts == [0, 3]
 
 
 def test_one_bad_bill_does_not_stop_the_batch(db_session, bill_factory):
