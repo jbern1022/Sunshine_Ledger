@@ -13,44 +13,42 @@ def row(n, member="Senator Scott", state="FL", **kw):
             "cds_website": "https://scott.senate.gov/fy27", **kw}
 
 
-def client(pages):
+def client(rows, total=None):
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         form = dict(x.split("=", 1) for x in request.content.decode().split("&"))
         calls.append(form)
-        rows = pages.get((form["search"], int(form["start"])), [])
-        total = sum(len(v) for (s, _), v in pages.items() if s == form["search"])
-        return httpx.Response(200, json={"RECORDSFILTERED": total, "RECORDSTOTAL": total, "DATA": rows})
+        start, length = int(form["start"]), int(form["length"])
+        n = total if total is not None else len(rows)
+        return httpx.Response(200, json={"RECORDSFILTERED": n, "RECORDSTOTAL": n, "DATA": rows[start:start + length]})
 
     return httpx.Client(transport=httpx.MockTransport(handler)), calls
 
 
-def test_fetch_keeps_only_florida_members_dedupes_and_pauses_between_requests():
-    pages = {("Scott", 0): [row(1), row(2, "Senator Scott", "SC")], ("Moody", 0): [row(3, "Senator Moody"), row(1)]}
-    c, calls = client(pages)
+def test_fetch_pages_the_whole_chart_keeps_only_florida_members_and_pauses():
+    rows = [row(i, "Senator Moody" if i % 2 else "Senator Scott", "FL" if i % 100 == 0 else "SC") for i in range(1, 1201)]
+    c, calls = client(rows)
     naps = []
-    got = sc.fetch_florida(2027, ["Scott", "Moody"], client=c, sleep=naps.append)
-    assert sorted(r["row"] for r in got) == [1, 3]
-    assert len(calls) == 2 and naps == [sc.PAUSE_SECONDS]
-    assert calls[0]["method"] == "getCDSTable27" and calls[0]["length"] == "50"
+    got = sc.fetch_florida(2027, client=c, sleep=naps.append)
+    assert sorted(r["row"] for r in got) == [i for i in range(1, 1201) if i % 100 == 0]
+    assert len(calls) == 3 and naps == [sc.PAUSE_SECONDS] * 2
+    assert calls[0]["method"] == "getCDSTable27" and calls[0]["length"] == "500" and calls[0]["search"] == ""
 
 
-def test_fetch_pages_through_a_long_result_and_obeys_the_request_cap():
-    big = {("Scott", 0): [row(i) for i in range(50)], ("Scott", 50): [row(i) for i in range(50, 60)]}
-    c, calls = client(big)
-    assert len(sc.fetch_florida(2027, ["Scott"], client=c, sleep=lambda s: None)) == 60 and len(calls) == 2
-    c2, calls2 = client(big)
-    sc.fetch_florida(2027, ["Scott"], client=c2, sleep=lambda s: None, max_requests=1)
-    assert len(calls2) == 1
+def test_the_request_cap_is_an_error_not_a_silent_partial_result():
+    c, calls = client([row(i, state="SC") for i in range(1, 2000)])
+    with pytest.raises(sc.SenateCdsError, match="stopped at"):
+        sc.fetch_florida(2027, client=c, sleep=lambda s: None, max_requests=2)
+    assert len(calls) == 2
 
 
 def test_unknown_year_and_unexpected_body_fail_clearly():
     with pytest.raises(sc.SenateCdsError):
-        sc.fetch_florida(2031, ["Scott"])
+        sc.fetch_florida(2031)
     c = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, json={"error": "x"})))
     with pytest.raises(sc.SenateCdsError):
-        sc.fetch_florida(2027, ["Scott"], client=c, sleep=lambda s: None)
+        sc.fetch_florida(2027, client=c, sleep=lambda s: None)
 
 
 def test_import_stores_requests_links_one_senator_and_is_idempotent(db_session):

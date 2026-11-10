@@ -1,11 +1,11 @@
 """Florida senators' Congressionally Directed Spending requests (Senate Appropriations Committee chart).
 
-    python -m app.federal.senate_cds --fiscal-year 2027 [--search Scott --search Moody]
+    python -m app.federal.senate_cds --fiscal-year 2027
 
 The committee's public chart (appropriations.senate.gov/congressionally-directed-spending-requests-fy2027)
 fills its table from the site's own data endpoint, the same request the page makes for every visitor. We
-ask it for the same thing, politely: one search per Florida senator's surname, 50 rows per request, a
-pause between requests, and a hard cap on requests. Nothing is fetched except what the chart shows. The
+ask it for the same thing, politely: the chart is paged through once at 500 rows per request with a pause
+between requests and a hard cap on requests (its search box matches project text, not the member). Nothing is fetched except what the chart shows. The
 site states no reuse licence for the list (checked 2026-11-10); the lists are published by Congress, but
 confirm before showing more than a link-back.
 
@@ -30,8 +30,8 @@ from app.models import Entity, FederalEarmark, OfficeTenure
 CHART_URL = "https://www.appropriations.senate.gov/congressionally-directed-spending-requests-fy{year}"
 ENDPOINT = "https://www.appropriations.senate.gov/cfc_extensions/data/cds_requests.cfc"
 METHOD_BY_YEAR = {2027: "getCDSTable27"}
-PAGE = 50
-MAX_REQUESTS = 12
+PAGE = 500
+MAX_REQUESTS = 40
 PAUSE_SECONDS = 6.0
 USER_AGENT = "sunshine-ledger-research/1.0"
 
@@ -41,37 +41,36 @@ class SenateCdsError(RuntimeError):
 
 
 def fetch_florida(
-    year: int, searches: list[str], *, client: httpx.Client | None = None, sleep=time.sleep, max_requests: int = MAX_REQUESTS,
+    year: int, *, client: httpx.Client | None = None, sleep=time.sleep, max_requests: int = MAX_REQUESTS,
 ) -> list[dict]:
-    """Rows whose member_state is FL, for the given surname searches. Stops at `max_requests`."""
+    """Rows whose member_state is FL. The endpoint's search box matches project text, not the member, so the
+    only way to find a state's senators is to page through the whole chart (about 13,400 rows in FY27): 500
+    rows per request, a pause between requests, and a cap on requests."""
     method = METHOD_BY_YEAR.get(year)
     if method is None:
         raise SenateCdsError(f"no known data method for fiscal year {year}; check the chart's page source")
-    client = client or httpx.Client(timeout=30.0, headers={"User-Agent": USER_AGENT})
+    client = client or httpx.Client(timeout=60.0, headers={"User-Agent": USER_AGENT})
     out: dict[int, dict] = {}
-    requests = 0
-    for term in searches:
-        start = 0
-        while True:
-            if requests >= max_requests:
-                return list(out.values())
-            if requests:
-                sleep(PAUSE_SECONDS)
-            requests += 1
-            resp = client.post(ENDPOINT, data={"method": method, "start": start, "length": PAGE, "search": term})
-            resp.raise_for_status()
-            body = resp.json()
-            rows = body.get("DATA")
-            if not isinstance(rows, list):
-                raise SenateCdsError(f"unexpected response: {str(body)[:200]}")
-            for r in rows:
-                if r.get("member_state") == "FL" and r.get("row") is not None:
-                    out[int(r["row"])] = r
-            total = int(body.get("RECORDSFILTERED") or 0)
-            start += PAGE
-            if not rows or start >= total:
-                break
-    return list(out.values())
+    start = requests = 0
+    while True:
+        if requests >= max_requests:
+            raise SenateCdsError(f"stopped at {max_requests} requests before reaching the end of the chart; raise the cap deliberately")
+        if requests:
+            sleep(PAUSE_SECONDS)
+        requests += 1
+        resp = client.post(ENDPOINT, data={"method": method, "start": start, "length": PAGE, "search": ""})
+        resp.raise_for_status()
+        body = resp.json()
+        rows = body.get("DATA")
+        if not isinstance(rows, list):
+            raise SenateCdsError(f"unexpected response: {str(body)[:200]}")
+        for r in rows:
+            if r.get("member_state") == "FL" and r.get("row") is not None:
+                out[int(r["row"])] = r
+        total = int(body.get("RECORDSFILTERED") or 0)
+        start += PAGE
+        if not rows or start >= total:
+            return list(out.values())
 
 
 def _senator_surname(member: str) -> str:
@@ -122,9 +121,8 @@ def main() -> None:
 
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--fiscal-year", type=int, required=True)
-    p.add_argument("--search", action="append", default=None, help="surname to search (repeatable); default: Scott, Moody")
     a = p.parse_args()
-    rows = fetch_florida(a.fiscal_year, a.search or ["Scott", "Moody"])
+    rows = fetch_florida(a.fiscal_year)
     db = SessionLocal()
     try:
         print(import_rows(db, rows, fiscal_year=a.fiscal_year))

@@ -151,3 +151,16 @@ def test_awards_import_uses_the_rows_own_subcommittee(db_session):
     em.import_table_rows(db_session, [TableRow("Florida Keys Water", "Monroe County", 4333000, "FL", ("Gimenez",), "Energy and Water")],
                          fiscal_year=2027, stage="included", subcommittee="", source_url="u")
     assert db_session.query(FederalEarmark).one().subcommittee == "Energy and Water"
+
+
+def test_a_project_listed_twice_in_one_file_is_stored_once(db_session):
+    from app.federal.earmark_tables import TableRow
+
+    person(db_session, "Carlos Gimenez", 28)
+    r = TableRow("Same project", "Same recipient", 1, "FL", ("Gimenez",), "Energy and Water")
+    s = em.import_table_rows(db_session, [r, r], fiscal_year=2027, stage="included", subcommittee="", source_url="u")
+    assert s["new"] == 1 and s["existing"] == 1 and db_session.query(FederalEarmark).count() == 1
+    person(db_session, "Jared Moskowitz", 23)
+    dup = rows()[:1] * 2
+    s2 = em.import_rows(db_session, dup, fiscal_year=2027, stage="requested", source_url="u")
+    assert s2["new"] == 1 and s2["existing"] == 1

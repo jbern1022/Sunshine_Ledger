@@ -107,6 +107,7 @@ def import_rows(db: Session, rows: list[dict], *, fiscal_year: int, stage: str, 
     if stage not in STAGES:
         raise EarmarkImportError(f"stage must be one of {STAGES}")
     stats = {"seen": len(rows), "florida": 0, "new": 0, "existing": 0, "linked": 0, "skipped": 0}
+    seen: set[tuple] = set()  # the same project can be listed twice in one file
     for r in rows:
         district = florida_district(r.get("district"))
         if district is None:
@@ -116,14 +117,16 @@ def import_rows(db: Session, rows: list[dict], *, fiscal_year: int, stage: str, 
         if not (last and subc and rec and desc):
             stats["skipped"] += 1
             continue
-        existing = db.execute(select(FederalEarmark).where(
+        key = (fiscal_year, stage, last, district, subc, rec[:300], desc)
+        existing = key in seen or db.execute(select(FederalEarmark.id).where(
             FederalEarmark.fiscal_year == fiscal_year, FederalEarmark.stage == stage, FederalEarmark.member_last == last,
-            FederalEarmark.district == district, FederalEarmark.subcommittee == subc, FederalEarmark.recipient == rec,
+            FederalEarmark.district == district, FederalEarmark.subcommittee == subc, FederalEarmark.recipient == rec[:300],
             FederalEarmark.description == desc,
-        )).scalar_one_or_none()
-        if existing is not None:
+        )).first() is not None
+        if existing:
             stats["existing"] += 1
             continue
+        seen.add(key)
         person = match_member(db, district, last)
         stats["linked"] += 1 if person else 0
         db.add(FederalEarmark(
@@ -193,6 +196,7 @@ def import_table_rows(db: Session, rows, *, fiscal_year: int, stage: str, subcom
         raise EarmarkImportError(f"stage must be one of {STAGES}")
     index = florida_member_index(db)
     stats = {"rows": len(rows), "florida_requestors": 0, "new": 0, "existing": 0, "ambiguous": 0}
+    seen: set[tuple] = set()  # the same project can be listed twice in one file
     for r in rows:
         for name in r.requestors:
             last, st = split_requestor(name)
@@ -207,14 +211,16 @@ def import_table_rows(db: Session, rows, *, fiscal_year: int, stage: str, subcom
             person_id, display, district = next(iter(cands.values()))
             stats["florida_requestors"] += 1
             desc = r.project[:2000]
-            exists = db.execute(select(FederalEarmark.id).where(
+            key = (fiscal_year, stage, last, district, r.subcommittee or subcommittee, (r.recipient or "(see table)")[:300], desc)
+            exists = key in seen or db.execute(select(FederalEarmark.id).where(
                 FederalEarmark.fiscal_year == fiscal_year, FederalEarmark.stage == stage, FederalEarmark.member_last == last,
                 FederalEarmark.district == district, FederalEarmark.subcommittee == (r.subcommittee or subcommittee),
                 FederalEarmark.recipient == (r.recipient or "(see table)")[:300], FederalEarmark.description == desc,
-            )).first()
+            )).first() is not None
             if exists:
                 stats["existing"] += 1
                 continue
+            seen.add(key)
             db.add(FederalEarmark(
                 fiscal_year=fiscal_year, stage=stage, chamber="house", member_last=last, member_first=None, district=district,
                 subcommittee=(r.subcommittee or subcommittee), recipient=(r.recipient or "(see table)")[:300], description=desc,
