@@ -174,6 +174,7 @@ def list_bills(
     sponsor_entity_id: uuid.UUID | None = Query(
         None, description="Only bills sponsored or co-sponsored by this legislator entity"
     ),
+    district: str | None = Query(None, description="e.g. 'HD-101' -- bills sponsored from that district while the sponsor held the seat"),
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -209,6 +210,13 @@ def list_bills(
             Relationship.relationship_type.in_(["sponsor", "co_sponsor"]),
         )
         stmt = stmt.where(Entity.id.in_(sponsored_bill_ids))
+    if district:
+        from app.districts.service import BadDistrictCode, sponsored_bill_ids
+
+        try:
+            stmt = stmt.where(Entity.id.in_(sponsored_bill_ids(district)))
+        except BadDistrictCode:
+            raise HTTPException(status_code=422, detail="district must look like HD-101 or SD-024")
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Entity.name.ilike(like), Bill.bill_number.ilike(like)))

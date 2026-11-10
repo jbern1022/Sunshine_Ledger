@@ -49,6 +49,7 @@ def list_people(
     q: str | None = Query(None, description="Free-text search over name and district"),
     jurisdiction_name: str | None = Query(None, description="e.g. FL"),
     kind: str | None = Query(None, pattern="^(legislator|committee)$", description="legislator | committee"),
+    district: str | None = Query(None, description="e.g. 'HD-101' -- current and past members of that district"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -82,6 +83,24 @@ def list_people(
         stmt = stmt.where(Entity.attributes.has_key("committee"))
     elif kind == "legislator":
         stmt = stmt.where(~Entity.attributes.has_key("committee"))
+    if district:
+        from app.districts.service import BadDistrictCode, STATE_OFFICES, _office, parse_code
+        from app.models import OfficeTenure
+
+        try:
+            chamber, number = parse_code(district)
+        except BadDistrictCode:
+            raise HTTPException(status_code=422, detail="district must look like HD-101 or SD-024")
+        held = select(OfficeTenure.person_entity_id).where(
+            OfficeTenure.office_type == _office(chamber), OfficeTenure.district == number
+        )
+        any_tenure = select(OfficeTenure.person_entity_id).where(OfficeTenure.office_type.in_(STATE_OFFICES))
+        stmt = stmt.where(
+            or_(
+                Entity.id.in_(held),
+                (Entity.attributes["district"].as_string() == district) & Entity.id.not_in(any_tenure),
+            )
+        )
     if q:
         like = f"%{q}%"
         stmt = stmt.where(

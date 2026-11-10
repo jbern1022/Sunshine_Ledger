@@ -4,7 +4,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from app.api import bill_layers_admin, bills, elections, flags, health as health_router, impact_lens as impact_lens_router, map as map_router, people, promises as promises_router
+from app.api import bill_layers_admin, bills, elections, flags, health as health_router, impact_lens as impact_lens_router, map as map_router, people, promises as promises_router, districts as districts_router
 from app.api import corrections as corrections_router
 from app.api import sources as sources_router
 from app.config import settings
@@ -36,6 +36,7 @@ app.include_router(bill_layers_admin.router)
 app.include_router(elections.router)
 app.include_router(people.router)
 app.include_router(promises_router.router)
+app.include_router(districts_router.router)
 app.include_router(health_router.router)
 app.include_router(sources_router.router)
 

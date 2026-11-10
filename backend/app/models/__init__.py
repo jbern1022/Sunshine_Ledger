@@ -25,6 +25,7 @@ from app.models.promise import (
 )
 from app.models.crawl_checkpoint import CrawlCheckpoint
 from app.models.office_tenure import OfficeTenure
+from app.models.district import District, MapPlan
 
 __all__ = [
     "Entity",
@@ -59,4 +60,6 @@ __all__ = [
     "PromiseReview",
     "CrawlCheckpoint",
     "OfficeTenure",
+    "MapPlan",
+    "District",
 ]
