@@ -1,4 +1,6 @@
-import type { BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, PersonListResponse, SourceStatus } from "./types";
+import type { BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, PersonListResponse, SourceStatus,
+  PromiseList,
+} from "./types";
 
 /** Server-side API base.
  *
@@ -124,6 +126,21 @@ export async function getCorrections(filters: { change_type?: string; severity?:
   if (filters.severity) qs.set("severity", filters.severity);
   try {
     const res = await fetch(`${SERVER_API_URL}/corrections?${qs}`, { next: { revalidate: 600 } });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** Collected promise statements. Null when the API can't be reached, so the
+ *  page says so instead of claiming nothing was collected. */
+export async function getPromises(filters: { chamber?: string; district?: number } = {}): Promise<PromiseList | null> {
+  const qs = new URLSearchParams({ limit: "100" });
+  if (filters.chamber) qs.set("chamber", filters.chamber);
+  if (filters.district) qs.set("district", String(filters.district));
+  try {
+    const res = await fetch(`${SERVER_API_URL}/promises?${qs}`, { next: { revalidate: 600 } });
     if (!res.ok) return null;
     return res.json();
   } catch {

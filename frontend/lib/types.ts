@@ -481,3 +481,29 @@ export interface ProvisionDate {
   scopes: string[];
   quote: string;
 }
+
+/** One collected statement from /promises: verbatim text plus where it came from. */
+export interface PromiseStatement {
+  id: string;
+  quote: string;
+  source_url: string;
+  captured_at: string;
+  review_state: "unreviewed" | "flagged" | "approved";
+  review_label: string;
+  automated_labels: { commitment_type?: string; topics?: string[]; automated?: boolean; overridden_by_reviewer?: boolean };
+  snapshot: { id: string; fetched_at: string; content_hash: string | null; internet_archive_capture: string | null };
+  official: {
+    name: string;
+    chamber: "house" | "senate";
+    district: number;
+    party: string | null;
+    result_status: "unofficial" | "certified";
+    office_status: string | null;
+  };
+}
+
+export interface PromiseList {
+  disclosure: string;
+  total: number;
+  items: PromiseStatement[];
+}

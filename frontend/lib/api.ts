@@ -137,3 +137,13 @@ export async function fetchSourceStatus(): Promise<SourceStatus[]> {
   if (!res.ok) throw new Error(`Failed to fetch source status: ${res.status}`);
   return res.json();
 }
+
+/** Flag a collected promise statement; flagged statements are reviewed first. */
+export async function flagPromise(id: string, reason_text: string): Promise<void> {
+  const res = await fetch(`${API_URL}/promises/${id}/flag`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason_text }),
+  });
+  if (!res.ok) throw new Error(`Failed to flag: ${res.status}`);
+}

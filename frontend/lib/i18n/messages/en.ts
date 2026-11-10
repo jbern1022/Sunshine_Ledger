@@ -413,6 +413,25 @@ export const en = {
   "layers.versionLine": "Version {version} · {date}",
   "layers.replaced": " – replaced {date}",
   "layers.fallbackLabel": "AI summary of the official description",
+  "promises.title": "Promises",
+  "promises.intro":
+    "What 2026 Florida legislature winners said they would do, in their own words. Each statement is copied exactly from a page the official published, with the date we saved it and a link to the source.",
+  "promises.none": "No statements have been collected yet.",
+  "promises.unavailable": "Statements couldn't be loaded. Try again later.",
+  "promises.source": "Source",
+  "promises.saved": "Saved {date}",
+  "promises.archive": "Internet Archive copy from {stamp}",
+  "promises.automatedLabels": "Automated draft labels: {labels}",
+  "promises.official": "{name}, {chamber} District {district}",
+  "promises.chamber.house": "House",
+  "promises.chamber.senate": "Senate",
+  "promises.certifiedNo": "Results not yet certified",
+  "promises.flag": "Flag this statement",
+  "promises.flagWhat": "What is wrong with it?",
+  "promises.flagSubmit": "Submit report",
+  "promises.flagSent": "Thank you. Flagged statements are reviewed first.",
+  "promises.flagError": "The report couldn't be sent. Try again.",
+  "promises.left": "Left office before outcome could be determined",
 } as const;
 
 export type MessageKey = keyof typeof en;
