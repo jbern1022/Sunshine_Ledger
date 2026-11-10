@@ -25,14 +25,22 @@ are in the committee report, which is the earmark source below.
 
 Not covered, and said on the page: earmark tables, places without a state, images.
 
-## Earmarks (not built; needs a data source)
+## Earmarks (House requests: built on a local branch, not deployed; owner chose published project lists, 2026-11-10)
 
-Community Project Funding (House) and Congressionally Directed Spending
-(Senate) are listed in the appropriations committees' reports and project
-tables, with requester, recipient and place. Linking each to the requesting
-member (a `sponsor`-like relationship plus the member's promises) needs that
-table ingested. Open: pick the source (committee report tables, or the
-committees' published project lists) and confirm its terms.
+Source found 2026-11-10: the House Appropriations Committee's FY27 Community Project Funding page
+(`appropriations.house.gov/fy27-information/fy27-community-project-funding`) publishes a "Consolidated Table of
+Requests" workbook (7,340 rows; columns Member Lastname/Firstname, District, Party, Subcommittee, Recipient, Project
+Description, Recipient Address, Amount Requested, Member URL) and per-bill "Posted/Final Table" PDFs (image-based, not
+parsed). `app/federal/earmarks.py` imports the workbook (or a CSV): only Florida districts are kept (483 rows in the
+FY27 file, at most 20 per member), each row is stored with its stage (`requested`, `included`, `enacted`) and linked to
+a member only when the seat and the last name both match exactly one tenure. `GET /earmarks` lists them with a label
+per stage; a request is never shown as funding. Table `federal_earmarks`, migration `b6d9a2f4c1e7`.
+
+Not done: the Senate's Congressionally Directed Spending chart (an HTML table; its rows were not retrieved), the
+"included" and "enacted" tables (PDF, image-based: need a table-extraction decision), a frontend, linking an earmark to
+the member's promises, and a reuse statement (neither committee site states one; the lists are published by Congress,
+but confirm before showing more than a link-back). Run: `python -m app.federal.earmarks FILE.xlsx --fiscal-year 2027
+--stage requested --source-url URL`.
 
 ## Layer 2: nationwide categories (built, owner-approved 2026-11-10)
 

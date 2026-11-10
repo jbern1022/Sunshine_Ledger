@@ -31,6 +31,7 @@ from app.models.entitlement import EntitlementGrant
 from app.models.account import AuthSession, User
 from app.models.watch import Watch
 from app.models.pending_alert import PendingAlert
+from app.models.earmark import FederalEarmark
 
 __all__ = [
     "Entity",
@@ -74,4 +75,5 @@ __all__ = [
     "User",
     "Watch",
     "PendingAlert",
+    "FederalEarmark",
 ]
