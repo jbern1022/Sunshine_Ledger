@@ -5,8 +5,7 @@ Provider-independent: deleting the identity at the provider (Cognito) is a calla
 passes in, so the order of events and the failure path are testable without AWS.
 
 What is held, and so what is exported or deleted: the account row (id, provider subject, verified
-email, status), its sessions, and its entitlement grants. Watchlists and notes will be added here
-when they exist. Impact Lens answers are never held (they stay in the browser) and so are not here.
+email, status), its sessions, and its entitlement grants. Notes will be added here when they exist. Impact Lens answers are never held (they stay in the browser) and so are not here.
 
 Retention periods are parameters, not decisions: the values in `Retention` are PROPOSALS from the ADR
 and are not approved. The owner sets them; nothing runs on a schedule yet.
@@ -23,7 +22,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app import sessions
-from app.models import AuthSession, EntitlementGrant, User
+from app.models import AuthSession, EntitlementGrant, User, Watch
 
 
 @dataclass(frozen=True)
@@ -57,6 +56,10 @@ def export_user(db: Session, user: User) -> dict:
             {"package": g.package, "starts_at": _iso(g.starts_at), "expires_at": _iso(g.expires_at),
              "granted_by": g.granted_by, "reason": g.reason, "revoked_at": _iso(g.revoked_at)}
             for g in grants
+        ],
+        "watchlist": [
+            {"kind": w.kind, "target": w.target, "jurisdiction": w.jurisdiction or None, "created_at": _iso(w.created_at)}
+            for w in db.execute(select(Watch).where(Watch.user_id == user.id).order_by(Watch.created_at)).scalars()
         ],
         "not_held": ["Impact Lens answers (they stay in your browser)", "your password (held by the identity provider)"],
     }
