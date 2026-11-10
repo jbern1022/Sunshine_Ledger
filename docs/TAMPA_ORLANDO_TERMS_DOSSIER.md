@@ -1,9 +1,8 @@
 # Tampa and Orlando: what the sources say about automated reading
 
 Status: facts gathered 2026-10-29 for the ruling in Todoist `6hm2FqXfHvxVR45G`. This is
-evidence for the decision, not the decision. **No terms-of-use text was read**: the guessed
-policy URLs on tampa.gov and orlando.gov returned 404, and a terms page for the two hosted
-products (Hyland OnBase Agenda Online, eSCRIBE) needs a browser session to locate.
+evidence for the decision, not the decision. The vendors' public terms pages were read on 2026-11-10 (see "Vendor terms read" below);
+the cities' own policy pages were not found (guessed URLs returned 404).
 
 ## Findings
 
@@ -42,6 +41,31 @@ only with the comment-card filter and a test for it.
 Email the Tampa and Orlando City Clerks (their offices publish the agendas). A short note
 stating the purpose (a public civic-records site), the schedule (nightly, low rate) and an
 offer to follow whatever pacing they name. Keep their reply in this folder.
+
+## Vendor terms read 2026-11-10 (still not a ruling)
+
+Read from the vendors' public terms pages with an ordinary fetch. Quoted, not interpreted
+beyond saying whose site each governs.
+
+- **Hyland** (`hyland.com/en/legal/terms-of-use`, the terms for hyland.com's own websites)
+  forbids to "Access or search the Site by any means other than our publicly supported
+  interfaces (for example, "scraping")", and to use "any robot, spider, site search/retrieval
+  application, or other manual or automatic device or process to retrieve, index, "data mine",
+  monitor, or in any way reproduce ... the Sites or the materials". "The Site" here is
+  Hyland's marketing and support website. Tampa's Agenda Online runs on a Hyland-hosted
+  instance (`tampagov.hylandcloud.com`) for the city; whether these website terms, a separate
+  product agreement with the city, or only the city's own policy govern that instance is **not
+  stated on the page**. Do not read this as permission or as a ban on the Tampa portal. Ask the
+  Tampa City Clerk (the city is the customer and publishes the agendas).
+- **eScribe** (`escribemeetings.com/terms-of-use`) is a short page about eScribe's own website
+  and trademarks. It contains no clause about automated access, scraping or robots. It says
+  nothing about customer portals such as Orlando's `pub-orlando.escribemeetings.com`.
+- Tampa's and Orlando's own website-policy pages were not found at the guessed URLs (404).
+
+So: no clause found that forbids reading a city's published agenda portal, and none that
+allows it. The one explicit anti-scraping clause found belongs to Hyland's own website.
+That leaves the decision where the dossier already put it: proceed politely with the pacing
+above, or ask the clerks first (recommended for Tampa given the Hyland wording).
 
 ## To finish before deciding
 
