@@ -58,7 +58,7 @@ describe("stored answers", () => {
   it("caps a list and ignores lists on keys that take one value", () => {
     const many = Array.from({ length: 30 }, (_, i) => `County${i}`);
     expect(placesOf(cleanAnswers({ county: many }).county)).toHaveLength(10);
-    expect(cleanAnswers({ role: ["landlord"], property_type: ["x"] })).toEqual({});
+    expect(cleanAnswers({ property_type: ["x"], property_county: [] })).toEqual({});
     expect(cleanAnswers({ county: [1, null, "Duval"] }).county).toBe("Duval");
   });
 });

@@ -147,3 +147,9 @@ Each slice ships behind the existing `?lens=1` flag.
 The matcher and stored answers accept **a list of places per kind** (`property_county: ["Leon", "Duval"]`). A requirement holds if any listed place matches; an exception holds only if it holds for **every** listed place; a list of one behaves exactly like the plain string; an empty list is unanswered. `cleanAnswers` keeps lists only on the six place keys, de-duplicates and caps at 10. Tests: `lib/impactLens.severalPlaces.test.ts`.
 
 **Control (built, behind `?lens=1`):** property and workplace counties get an "add another county" button in the answers line (not residence; capped at 10; the already-given and "none of these" options are removed from the list). Municipalities are still one per kind. The privacy page now says more than one county may be kept. Slice 3 (several roles) is untouched.
+
+## Status 2026-11-10: slice 3, matcher only
+
+`role` in the answers may be a list. With two or more roles each entry is evaluated once per role, with that role's own location kind; it holds if any role holds, is ruled out only if every role rules it out, and an ambiguous reading beats an unknown one. The questions to ask come from the roles that are still open. A list of one behaves like the plain role; `cleanAnswers` de-duplicates and caps at 10. Tests: `lib/impactLens.severalRoles.test.ts`.
+
+**Not built:** a control for choosing more than one role. The role question is still single-choice, so readers see no change. Which wording and layout to use (checkboxes on the role question, or "add another role" like the county control) is the remaining decision.

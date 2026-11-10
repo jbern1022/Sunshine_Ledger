@@ -91,7 +91,9 @@ export function placesOf(p: Place | undefined): string[] {
 
 /** What a reader has chosen to tell us. Interests are deliberately absent. */
 export interface Answers {
-  role?: Role;
+  /** One role, or several (a landlord who is also an employer). With several, each is
+   *  evaluated on its own with that role's location, and an entry holds if any one holds. */
+  role?: Role | Role[];
   /** Residence county name as in the vocabulary, e.g. "Duval". A reader with several
    *  places of one kind (rentals in two counties) gives a list: a place the bill names
    *  matches if ANY listed place matches. */
@@ -178,7 +180,7 @@ const negate = (t: Tri): Tri => (t === "true" ? "false" : t === "false" ? "true"
 
 function roleIn(test: RoleTest, answers: Answers): Tri {
   if (answers.role === undefined) return "unknown";
-  return tri(test.any_of.includes(answers.role));
+  return tri(placesOf(answers.role).some((r) => test.any_of.includes(r)));
 }
 
 /** The answer keys that hold a reader's county and municipality for each kind of location. */
@@ -212,8 +214,9 @@ function jurisdictionIn(values: (string | number)[], answers: Answers, kind: Loc
  *  Anything else (an unmapped or "anyone" audience, an affected-only reader, an
  *  unlisted role, an older API with no table) keeps today's meaning, residence. */
 function locationKindFor(relation: Relation, answers: Answers, roleLocations: LensBill["role_locations"]): LocationKind {
-  if (relation !== "bound" || answers.role === undefined) return "residence";
-  return roleLocations?.[answers.role] ?? "residence";
+  const role = placesOf(answers.role)[0]; // evaluateEntry is given one role at a time
+  if (relation !== "bound" || role === undefined) return "residence";
+  return roleLocations?.[role] ?? "residence";
 }
 
 function testCriterion(t: CriterionTest, answers: Answers, kind: LocationKind = "residence"): { r: Tri; missing: QuestionKey[] } {
@@ -265,6 +268,23 @@ function relationOf(c: Criteria, answers: Answers): { relation: Relation; missin
   // Not enough to say. If the reader has given a role, the gap is in the
   // criteria (an unmapped audience), not something a question could settle.
   return { relation: "unknown", missing: answers.role === undefined ? ["role"] : [] };
+}
+
+/** One entry for a reader with several roles: evaluated once per role, then combined.
+ *  It holds if any role makes it hold; it is ruled out only if every role rules it out;
+ *  otherwise an ambiguous reading beats an unknown one. Questions to ask come from every
+ *  role that is not settled. */
+function evaluateForRoles(
+  entry: LensEntry, index: number, answers: Answers, roleLocations: LensBill["role_locations"],
+): EntryEvaluation {
+  const roles = placesOf(answers.role);
+  if (roles.length < 2) return evaluateEntry(entry, index, answers, roleLocations);
+  const each = roles.map((r) => evaluateEntry(entry, index, { ...answers, role: r }, roleLocations));
+  const pick = (status: EntryStatus) => each.find((e) => e.status === status);
+  const chosen = pick("match") ?? pick("ambiguous") ?? pick("unknown") ?? each[0];
+  if (chosen.status === "match" || chosen.status === "no") return chosen;
+  const missing = [...new Set(each.filter((e) => e.status === chosen.status).flatMap((e) => e.missing))];
+  return { ...chosen, missing };
 }
 
 export function evaluateEntry(
@@ -360,7 +380,7 @@ function circumstances(answers: Answers): { key: QuestionKey; value: string }[] 
 
 
 export function matchBill(bill: LensBill, answers: Answers): LensResult {
-  const evaluations = bill.entries.map((e, i) => evaluateEntry(e, i, answers, bill.role_locations));
+  const evaluations = bill.entries.map((e, i) => evaluateForRoles(e, i, answers, bill.role_locations));
 
   const personal = evaluations.filter((e) => e.relation !== "everyone");
   const everyone = evaluations.filter((e) => e.relation === "everyone" && e.status === "match");
@@ -453,9 +473,10 @@ export function toLensBill(r: ImpactLensResponse): LensBill {
 export const ANSWER_KEYS: QuestionKey[] = QUESTION_KEYS;
 
 const PLACE_ANSWER_KEYS = new Set<QuestionKey>([
-  "county", "municipality", "property_county", "property_municipality", "business_county", "business_municipality",
+  "role", "county", "municipality", "property_county", "property_municipality", "business_county", "business_municipality",
 ]);
-const MAX_PLACES = 10;
+const MAX_PLACES = 10; // also the cap on roles
+
 
 export function cleanAnswers(raw: unknown): Answers {
   const out: Answers = {};
