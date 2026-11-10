@@ -107,3 +107,36 @@ def test_reset_confirms_then_reads_the_sub_and_delete_is_idempotent(setup):
     s.add_client_error("confirm_forgot_password", service_error_code="ExpiredCodeException")
     with s, pytest.raises(InvalidCredentials):
         p.confirm_password_reset("a@example.org", "old", "new")
+
+
+def test_sign_up_hides_an_existing_account_and_reports_a_weak_password(setup):
+    from app.identity import WeakPassword
+    c, s, p = setup
+    s.add_response("sign_up", {"UserConfirmed": False, "UserSub": "sub-1"}, {
+        "ClientId": CLIENT, "Username": "n@example.org", "Password": "longenough",
+        "UserAttributes": [{"Name": "email", "Value": "n@example.org"}]})
+    s.add_client_error("sign_up", service_error_code="UsernameExistsException")
+    s.add_client_error("sign_up", service_error_code="InvalidPasswordException")
+    with s:
+        p.sign_up("n@example.org", "longenough")
+        p.sign_up("n@example.org", "longenough")  # existing: silent
+        with pytest.raises(WeakPassword):
+            p.sign_up("n@example.org", "short")
+
+
+def test_confirm_resend_and_reset_request(setup):
+    c, s, p = setup
+    s.add_response("confirm_sign_up", {}, {"ClientId": CLIENT, "Username": "a@example.org", "ConfirmationCode": "111111"})
+    s.add_client_error("confirm_sign_up", service_error_code="CodeMismatchException")
+    s.add_client_error("resend_confirmation_code", service_error_code="UserNotFoundException")
+    s.add_client_error("forgot_password", service_error_code="UserNotFoundException")
+    s.add_client_error("forgot_password", service_error_code="InternalErrorException")
+    from botocore.exceptions import ClientError
+    with s:
+        p.confirm_sign_up("a@example.org", "111111")
+        with pytest.raises(InvalidCredentials):
+            p.confirm_sign_up("a@example.org", "000000")
+        p.resend_confirmation("nobody@example.org")  # silent
+        p.request_password_reset("nobody@example.org")  # silent
+        with pytest.raises(ClientError):
+            p.request_password_reset("a@example.org")  # a real fault is not swallowed

@@ -41,6 +41,12 @@ def require_enabled() -> None:
         raise HTTPException(status_code=404, detail="Not Found")
 
 
+def require_registration_open() -> None:
+    """Sign-up is a separate switch: accounts can be on for testers while public registration stays closed."""
+    if not settings.registration_open:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
 router = APIRouter(tags=["accounts"], dependencies=[Depends(require_enabled)])
 
 
@@ -70,6 +76,20 @@ class ResetConfirm(BaseModel):
     email: str = Field(max_length=320)
     code: str = Field(max_length=12, repr=False)
     new_password: str = Field(max_length=256, repr=False)
+
+
+class SignUp(BaseModel):
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=256, repr=False)
+
+
+class Confirm(BaseModel):
+    email: str = Field(max_length=320)
+    code: str = Field(max_length=12, repr=False)
+
+
+class EmailOnly(BaseModel):
+    email: str = Field(max_length=320)
 
 
 class WatchIn(BaseModel):
@@ -117,6 +137,41 @@ def _user(db: Session, row: AuthSession) -> User:
     if user is None:
         raise HTTPException(status_code=401, detail="not_signed_in")
     return user
+
+
+@router.post("/auth/sign-up", dependencies=[Depends(require_registration_open)])
+@limiter.limit("5/hour")
+def sign_up(request: Request, body: SignUp, provider: identity.IdentityProvider = Depends(get_identity_provider)) -> dict:
+    try:
+        identity.register(provider, body.email.strip(), body.password)
+    except identity.AuthFailed as exc:
+        raise HTTPException(status_code=422, detail=exc.code) from exc
+    # The same answer whether or not the address already had an account.
+    return {"check_your_email": True}
+
+
+@router.post("/auth/sign-up/confirm", dependencies=[Depends(require_registration_open)])
+@limiter.limit("10/hour")
+def confirm_sign_up(request: Request, body: Confirm, provider: identity.IdentityProvider = Depends(get_identity_provider)) -> dict:
+    try:
+        identity.confirm_registration(provider, body.email.strip(), body.code.strip())
+    except identity.AuthFailed as exc:
+        raise _fail(exc) from exc
+    return {"confirmed": True}
+
+
+@router.post("/auth/sign-up/resend", dependencies=[Depends(require_registration_open)])
+@limiter.limit("5/hour")
+def resend_confirmation(request: Request, body: EmailOnly, provider: identity.IdentityProvider = Depends(get_identity_provider)) -> dict:
+    provider.resend_confirmation(body.email.strip())
+    return {"check_your_email": True}
+
+
+@router.post("/auth/password-reset/request")
+@limiter.limit("5/hour")
+def password_reset_request(request: Request, body: EmailOnly, provider: identity.IdentityProvider = Depends(get_identity_provider)) -> dict:
+    identity.request_reset(provider, body.email.strip())
+    return {"check_your_email": True}
 
 
 @router.post("/auth/sign-in")

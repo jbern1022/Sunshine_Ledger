@@ -54,6 +54,14 @@ class IdentityProvider(Protocol):
     def verify_totp(self, challenge_token: str, code: str) -> ProviderOutcome: ...  # raises InvalidCredentials
     def confirm_password_reset(self, email: str, code: str, new_password: str) -> str: ...  # returns sub
     def delete_user(self, sub: str) -> None: ...
+    def sign_up(self, email: str, password: str) -> None: ...  # raises WeakPassword; an existing account is NOT an error
+    def confirm_sign_up(self, email: str, code: str) -> None: ...  # raises InvalidCredentials
+    def resend_confirmation(self, email: str) -> None: ...  # never raises for an unknown address
+    def request_password_reset(self, email: str) -> None: ...  # never raises for an unknown address
+
+
+class WeakPassword(Exception):
+    """The provider's password policy rejected the password. Safe to show: it says nothing about who has an account."""
 
 
 class InvalidCredentials(Exception):
@@ -124,6 +132,27 @@ def reset_password(db: Session, provider: IdentityProvider, email: str, code: st
     user = db.execute(select(User).where(User.cognito_sub == sub)).scalar_one_or_none()
     if user is not None:
         sessions.password_reset_completed(db, user)
+
+
+def register(provider: IdentityProvider, email: str, password: str) -> None:
+    """Start a sign-up. The caller always answers "check your email", whether or not the address already
+    had an account, so this cannot be used to find out who is registered. A weak password is reported."""
+    try:
+        provider.sign_up(email, password)
+    except WeakPassword as exc:
+        raise AuthFailed("weak_password") from exc
+
+
+def confirm_registration(provider: IdentityProvider, email: str, code: str) -> None:
+    try:
+        provider.confirm_sign_up(email, code)
+    except InvalidCredentials as exc:
+        raise AuthFailed("invalid_credentials") from exc
+
+
+def request_reset(provider: IdentityProvider, email: str) -> None:
+    """Ask the provider to email a reset code. Always looks the same to the caller."""
+    provider.request_password_reset(email)
 
 
 def sign_out(db: Session, token: str | None) -> None:

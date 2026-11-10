@@ -62,3 +62,8 @@ unless the site is built with `NEXT_PUBLIC_AUTH_ENABLED=true` (a build-time flag
 routes behind it are 404 unless `AUTH_ENABLED=true`. Not built: sign-up and email verification screens, MFA enrollment (QR
 and manual key), passkey registration, password-reset request screen, recovery screens, "follow" buttons on bills,
 officials and topics. Each of those needs the real user pool to be designed against.
+
+Also built behind `REGISTRATION_OPEN` (a separate switch from `AUTH_ENABLED`, default false; 404 while closed): `POST /auth/sign-up`
+(same answer whether or not the address exists; a sign-up never touches an existing account; weak passwords are reported),
+`/auth/sign-up/confirm`, `/auth/sign-up/resend`, and (under `AUTH_ENABLED` only) `/auth/password-reset/request`, which looks
+identical for known and unknown addresses. The Cognito calls are Stubber-tested only.

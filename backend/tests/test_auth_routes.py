@@ -150,3 +150,29 @@ def test_an_unconfigured_provider_is_a_503_not_a_crash(client, monkeypatch):
     for k in ("cognito_region", "cognito_user_pool_id", "cognito_client_id"):
         monkeypatch.setattr(settings, k, "")
     assert sign_in(client).status_code == 503
+
+
+def test_sign_up_is_closed_until_registration_is_opened(client, on):
+    assert client.post("/auth/sign-up", json={"email": "n@example.org", "password": "longenough"}).status_code == 404
+    assert client.post("/auth/sign-up/confirm", json={"email": "n@example.org", "code": "111111"}).status_code == 404
+
+
+def test_sign_up_confirm_sign_in_and_uniform_answers(client, on, monkeypatch, provider):
+    monkeypatch.setattr(settings, "registration_open", True)
+    new = client.post("/auth/sign-up", json={"email": "n@example.org", "password": "longenough"})
+    existing = client.post("/auth/sign-up", json={"email": "a@example.org", "password": "longenough"})
+    assert new.status_code == existing.status_code == 200 and new.json() == existing.json() == {"check_your_email": True}
+    assert provider.users["a@example.org"]["password"] == "pw-1"  # a sign-up never changes an existing account
+    weak = client.post("/auth/sign-up", json={"email": "w@example.org", "password": "short"})
+    assert weak.status_code == 422 and weak.json()["detail"] == "weak_password"
+    assert sign_in(client, "n@example.org", "longenough").json()["detail"] == "email_not_verified"  # unconfirmed: no session
+    assert client.post("/auth/sign-up/confirm", json={"email": "n@example.org", "code": "000000"}).status_code == 401
+    assert client.post("/auth/sign-up/confirm", json={"email": "n@example.org", "code": "111111"}).json() == {"confirmed": True}
+    assert sign_in(client, "n@example.org", "longenough").status_code == 200
+
+
+def test_reset_request_looks_the_same_for_unknown_and_known_addresses(client, on, provider):
+    a = client.post("/auth/password-reset/request", json={"email": "a@example.org"})
+    b = client.post("/auth/password-reset/request", json={"email": "nobody@example.org"})
+    assert a.status_code == b.status_code == 200 and a.json() == b.json() == {"check_your_email": True}
+    assert provider.reset_codes == {"a@example.org": "999"}

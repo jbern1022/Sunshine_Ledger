@@ -103,6 +103,8 @@ class Settings(BaseSettings):
     # Reader accounts (docs/ADR_READER_AUTH_COGNITO.md). Off: every /auth and /watchlist route answers 404.
     # Public registration additionally stays closed until the privacy, deletion, security and legal gates pass.
     auth_enabled: bool = False
+    # Public registration is a separate switch from accounts being on: it stays false until the gates pass.
+    registration_open: bool = False
     cognito_region: str = ""
     cognito_user_pool_id: str = ""
     cognito_client_id: str = ""

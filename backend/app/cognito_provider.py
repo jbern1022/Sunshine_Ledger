@@ -27,7 +27,7 @@ import hmac
 
 from botocore.exceptions import ClientError
 
-from app.identity import InvalidCredentials, ProviderOutcome
+from app.identity import InvalidCredentials, ProviderOutcome, WeakPassword
 
 # Errors that mean "these credentials or this code did not work". Anything else is a real fault and
 # propagates (the caller maps unexpected exceptions to a generic 5xx, never to a sign-in answer).
@@ -110,6 +110,39 @@ class CognitoProvider:
         if not sub:
             raise InvalidCredentials()
         return sub
+
+    def sign_up(self, email: str, password: str) -> None:
+        try:
+            self._c.sign_up(
+                ClientId=self._client_id, Username=email, Password=password,
+                UserAttributes=[{"Name": "email", "Value": email}], **self._secret_hash(email),
+            )
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code == "UsernameExistsException":
+                return  # indistinguishable from a new sign-up; the existing owner is not told
+            if code == "InvalidPasswordException":
+                raise WeakPassword() from exc
+            if code in _CREDENTIAL_ERRORS:
+                raise InvalidCredentials() from exc
+            raise
+
+    def confirm_sign_up(self, email: str, code: str) -> None:
+        self._call(self._c.confirm_sign_up, ClientId=self._client_id, Username=email, ConfirmationCode=code, **self._secret_hash(email))
+
+    def resend_confirmation(self, email: str) -> None:
+        try:
+            self._c.resend_confirmation_code(ClientId=self._client_id, Username=email, **self._secret_hash(email))
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") not in _CREDENTIAL_ERRORS | {"UsernameExistsException"}:
+                raise
+
+    def request_password_reset(self, email: str) -> None:
+        try:
+            self._c.forgot_password(ClientId=self._client_id, Username=email, **self._secret_hash(email))
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") not in _CREDENTIAL_ERRORS:
+                raise
 
     def delete_user(self, sub: str) -> None:
         # UNVERIFIED: admin calls accept the user's `sub` as Username in this pool configuration.
