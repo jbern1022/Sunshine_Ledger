@@ -33,3 +33,10 @@ The migration chain was run on a scratch database: up to head, down three, up ag
 
 Session lifetimes; whether anonymized grant rows survive deletion; retention periods; watchlist cap;
 whether `official` follows are enabled in the first public release (`watchlists.ENABLED_KINDS` is the switch).
+
+## Decisions recorded 2026-11-10 (owner agreed to the recommendations)
+
+* **Watchlists are free** for every account (no entitlement needed). Alerts, digests, saved searches, notes and exports stay professional features, free during the pilot.
+* Confirmed as proposed: session lifetimes (14 days idle, 90 days absolute, 10-minute re-authentication window), retention (unverified sign-ups 7 days, expired session rows 30 days), a 300-entry watchlist cap, anonymized grant rows kept after account deletion, and the Impact Lens nightly budget (60 minutes, 200 bills).
+* The Impact Lens `?lens=1` flag comes off when the hand-labeled baseline shows zero wrong mappings; the labeling is the owner's.
+* Still open: whether `official` follows are in the first public release (switch: `watchlists.ENABLED_KINDS`), and the Tampa/Orlando ruling.

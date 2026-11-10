@@ -56,3 +56,9 @@ def test_two_grants_combine_and_other_accounts_are_unaffected(db_session):
     ent.grant(db_session, "acct-1", "team", days=30, granted_by="joe")
     assert ent.has_capability(db_session, "acct-1", "team_workspace")
     assert not ent.has_capability(db_session, "acct-2", "alerts")
+
+
+def test_watchlists_are_free_for_everyone_and_in_no_package():
+    assert "watchlists" in ent.FREE
+    assert all("watchlists" not in caps for caps in ent.PACKAGES.values())
+    assert ent.validate_packages() == []

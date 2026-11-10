@@ -33,6 +33,9 @@ from app.models import EntitlementGrant
 
 FREE: frozenset[str] = frozenset({
     "browse", "findings", "corrections", "rss", "impact_lens", "methodology", "own_data_export",
+    # Decided 2026-11-10: watchlists are free for every account (the matrix's open question 8).
+    # Free means no entitlement is needed; it still needs an account to be saved on the server.
+    "watchlists",
 })
 
 NEVER_FOR_SALE: frozenset[str] = frozenset({
@@ -42,10 +45,10 @@ NEVER_FOR_SALE: frozenset[str] = frozenset({
 # Name -> capabilities, from the matrix. "Bulk or API access" is undecided and in no package.
 PACKAGES: dict[str, frozenset[str]] = {
     "research": frozenset({
-        "watchlists", "alerts", "digests", "saved_searches", "private_notes", "evidence_export", "briefing_export",
+        "alerts", "digests", "saved_searches", "private_notes", "evidence_export", "briefing_export",
     }),
     "team": frozenset({
-        "watchlists", "alerts", "digests", "saved_searches", "private_notes", "evidence_export", "briefing_export",
+        "alerts", "digests", "saved_searches", "private_notes", "evidence_export", "briefing_export",
         "team_workspace",
     }),
 }

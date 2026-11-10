@@ -37,7 +37,7 @@ or promised.** Final packaging waits for the step 3 and 4 pilot evidence.
 | 5 | Impact Lens ("may I be impacted?") | Free | Free | Free | built | Answers stay in the browser (principle 4) |
 | 6 | Methodology, data freshness, source list | Free | Free | Free | built | |
 | 7 | Reader account (email, password hash, delete account) | n/a | Pilot | Pilot | auth task `6hWPfQj65r54vP8G` | Needed for anything saved on the server; open decision on sign-in method |
-| 8 | Saved watchlists (bills, topics; people held until the legal review) | Free? | Pilot | Pilot | accounts | Basic watchlists may belong in Public; "?" |
+| 8 | Saved watchlists (bills, officials, topics) | **Free** (account needed to save) | Free | Free | accounts | **Decided free 2026-11-10.** Officials stay held for the scoped legal review |
 | 9 | Alerts on watchlist changes (email or push) | no | Pilot | Pilot | outbound email, accounts | Blocked on email infrastructure; idempotent, unsubscribe required |
 | 10 | Change digests (daily or weekly summary of watched items) | no | Pilot | Pilot | alerts | Monitoring convenience |
 | 11 | Saved searches and filters | no | Pilot | Pilot | accounts | Shareable URLs for filters are free (built or planned) |
@@ -66,7 +66,7 @@ or promised.** Final packaging waits for the step 3 and 4 pilot evidence.
 
 ## Open decisions (undecided; nothing is assumed)
 
-Prices; quota sizes; pilot length; whether basic watchlists (8) are Public; whether bulk or API access (15)
+Prices; quota sizes; pilot length; whether bulk or API access (15)
 is Research or Team; team role names; whether any early-user discount exists (the accepted direction does
 not promise one); payment provider and legal entity; sign-in method; whether email verification is required.
 
