@@ -1,0 +1,58 @@
+{
+ "pagination": {
+  "count": 305,
+  "next": "https://api.congress.gov/v3/member/B001257/sponsored-legislation?offset=3&limit=3&format=json"
+ },
+ "request": {
+  "bioguideId": "b001257",
+  "contentType": "application/json",
+  "format": "json"
+ },
+ "sponsoredLegislation": [
+  {
+   "congress": 119,
+   "introducedDate": "2026-10-19",
+   "latestAction": {
+    "actionDate": "2026-10-19",
+    "text": "Referred to the House Committee on Veterans' Affairs."
+   },
+   "number": "10840",
+   "policyArea": {
+    "name": "Armed Forces and National Security"
+   },
+   "title": "To direct the Comptroller General of the United States to complete a study and report on retention practices with respect to non-clinical personnel at health care facilities of the Department of Veterans Affairs.",
+   "type": "HR",
+   "url": "https://api.congress.gov/v3/bill/119/hr/10840?format=json"
+  },
+  {
+   "congress": 119,
+   "introducedDate": "2026-09-24",
+   "latestAction": {
+    "actionDate": "2026-09-24",
+    "text": "Referred to the House Committee on Oversight and Government Reform."
+   },
+   "number": "10532",
+   "policyArea": {
+    "name": "Health"
+   },
+   "title": "Beagle Liberation Act of 2026",
+   "type": "HR",
+   "url": "https://api.congress.gov/v3/bill/119/hr/10532?format=json"
+  },
+  {
+   "congress": 119,
+   "introducedDate": "2026-04-21",
+   "latestAction": {
+    "actionDate": "2026-04-21",
+    "text": "Referred to the House Committee on Foreign Affairs."
+   },
+   "number": "1203",
+   "policyArea": {
+    "name": "International Affairs"
+   },
+   "title": "Recognizing the 200th anniversary of the heroic Exodus of Missolonghi and commemorating its historical significance to the Greek War of Independence.",
+   "type": "HRES",
+   "url": "https://api.congress.gov/v3/bill/119/hres/1203?format=json"
+  }
+ ]
+}

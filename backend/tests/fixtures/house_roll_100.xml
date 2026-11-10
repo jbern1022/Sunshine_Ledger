@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rollcall-vote>
+  <vote-metadata>
+    <majority>R</majority>
+    <congress>119</congress>
+    <session>1st</session>
+    <chamber>U.S. House of Representatives</chamber>
+    <rollcall-num>100</rollcall-num>
+    <legis-num>H CON RES 14</legis-num>
+    <vote-question>On Motion to Concur in the Senate Amendment</vote-question>
+    <vote-type>YEA-AND-NAY</vote-type>
+    <vote-result>Passed</vote-result>
+    <action-date>10-Apr-2025</action-date>
+    <action-time time-etz="11:08">11:08 AM</action-time>
+    <vote-desc>Establishing the congressional budget for the United States Government for fiscal year 2025 and setting forth the appropriate budgetary levels for fiscal years 2026 through 2034</vote-desc>
+    <vote-totals>
+      <totals-by-party-header>
+        <party-header>Party</party-header>
+        <yea-header>Yeas</yea-header>
+        <nay-header>Nays</nay-header>
+        <present-header>Answered “Present”</present-header>
+        <not-voting-header>Not Voting</not-voting-header>
+      </totals-by-party-header>
+      <totals-by-party>
+        <party>Republican</party>
+        <yea-total>216</yea-total>
+        <nay-total>2</nay-total>
+        <present-total>0</present-total>
+        <not-voting-total>2</not-voting-total>
+      </totals-by-party>
+      <totals-by-party>
+        <party>Democratic</party>
+        <yea-total>0</yea-total>
+        <nay-total>212</nay-total>
+        <present-total>0</present-total>
+        <not-voting-total>1</not-voting-total>
+      </totals-by-party>
+      <totals-by-party>
+        <party>Independent</party>
+        <yea-total>0</yea-total>
+        <nay-total>0</nay-total>
+        <present-total>0</present-total>
+        <not-voting-total>0</not-voting-total>
+      </totals-by-party>
+      <totals-by-vote>
+        <total-stub>Totals</total-stub>
+        <yea-total>216</yea-total>
+        <nay-total>214</nay-total>
+        <present-total>0</present-total>
+        <not-voting-total>3</not-voting-total>
+      </totals-by-vote>
+    </vote-totals>
+  </vote-metadata>
+  <vote-data>
+    <recorded-vote>
+      <legislator name-id="A000370" sort-field="Adams" unaccented-name="Adams" party="D" state="NC" role="legislator">Adams</legislator>
+      <vote>Nay</vote>
+    </recorded-vote>
+    <recorded-vote>
+      <legislator name-id="A000055" sort-field="Aderholt" unaccented-name="Aderholt" party="R" state="AL" role="legislator">Aderholt</legislator>
+      <vote>Yea</vote>
+    </recorded-vote>
+    <recorded-vote>
+      <legislator name-id="B001257" sort-field="Bilirakis" unaccented-name="Bilirakis" party="R" state="FL" role="legislator">Bilirakis</legislator>
+      <vote>Yea</vote>
+    </recorded-vote>
+    </vote-data>
+</rollcall-vote>

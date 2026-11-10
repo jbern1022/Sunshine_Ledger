@@ -69,7 +69,7 @@ def _person_for(db: Session, member: dict) -> tuple[Entity, bool]:
     attributes = {k: v for k, v in attributes.items() if v}
     name = member["name"].get("official_full") or f"{member['name']['first']} {member['name']['last']}"
     ids = {"bioguide_id": bioguide}
-    for src, dst in (("govtrack", "govtrack_id"), ("opensecrets", "opensecrets_id"), ("fec", "fec_ids"), ("wikidata", "wikidata_id")):
+    for src, dst in (("govtrack", "govtrack_id"), ("opensecrets", "opensecrets_id"), ("fec", "fec_ids"), ("wikidata", "wikidata_id"), ("lis", "lis_id")):
         if member["id"].get(src):
             ids[dst] = member["id"][src]
     if existing:

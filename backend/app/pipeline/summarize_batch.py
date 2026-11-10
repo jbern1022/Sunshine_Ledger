@@ -35,6 +35,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Flag, Source
+from app.federal.policy import eligible_for_generation
 from app.pipeline.item_kind import item_kind
 from app.pipeline.summarize import (
     ITEM_FALLBACK_GENERATED_BY,
@@ -112,7 +113,7 @@ def select_bills_needing_summary(
     stmt = (
         select(Entity)
         .join(Bill, Bill.entity_id == Entity.id)
-        .where(Entity.entity_type == "bill")
+        .where(Entity.entity_type == "bill", eligible_for_generation())
         .options(selectinload(Entity.bill), selectinload(Entity.claims))
     )
 

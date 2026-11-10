@@ -29,6 +29,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Source, StaffAnalysis
+from app.federal.policy import eligible_for_generation
 from app.pipeline import bill_layers as gen
 from app.pipeline.bill_layers_store import current_layer, layer_input_hash, store_layer_version
 from app.pipeline.bill_layers_text import extract_effect_section, extract_fiscal_section
@@ -152,7 +153,7 @@ def run_job(db: Session, entity: Entity, job: LayerJob, client, analysis: StaffA
 def _bills(db: Session) -> list[Entity]:
     return list(db.execute(
         select(Entity).join(Bill, Bill.entity_id == Entity.id)
-        .where(Entity.entity_type == "bill").options(selectinload(Entity.bill))
+        .where(Entity.entity_type == "bill", eligible_for_generation()).options(selectinload(Entity.bill))
         .order_by(Bill.last_action_date.desc().nulls_last())
     ).scalars().all())
 

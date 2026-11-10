@@ -28,6 +28,7 @@ from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Source
+from app.federal.policy import eligible_for_generation
 from app.pipeline.rhetoric_gap import CLAIM_TYPE, rhetoric_gap_and_store
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ def select_bills_needing_rhetoric_gap_check(db, *, limit: int | None = None) -> 
     stmt = (
         select(Entity)
         .join(Bill, Bill.entity_id == Entity.id)
-        .where(Entity.entity_type == "bill", Bill.full_text.isnot(None))
+        .where(Entity.entity_type == "bill", Bill.full_text.isnot(None), eligible_for_generation())
         .options(selectinload(Entity.bill), selectinload(Entity.claims))
     )
 

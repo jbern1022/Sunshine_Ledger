@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.logging_setup import quiet_http_logging
 from app.models import Bill, Entity, Event, Source
+from app.federal.policy import eligible_for_generation
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +216,7 @@ def pull_headlines_for_all_bills(
     entities = db.execute(
         select(Entity)
         .join(Bill, Bill.entity_id == Entity.id)
-        .where(Entity.entity_type == "bill", Bill.last_action_date >= since)
+        .where(Entity.entity_type == "bill", Bill.last_action_date >= since, eligible_for_generation())
         .order_by(Bill.last_action_date.desc())
     ).scalars().all()
 

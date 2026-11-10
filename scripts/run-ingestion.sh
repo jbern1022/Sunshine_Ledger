@@ -119,6 +119,14 @@ step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_t
 
 # (Miami iQM2 is already running in the background; see the top of the run.)
 
+# Florida's congressional delegation: roster and tenures, sponsored and
+# cosponsored bills (needs CONGRESS_API_KEY in the container; skipped without
+# it), and roll-call votes from the House Clerk and the Senate (no key).
+# See docs/FEDERAL_CONGRESS.md.
+step "Federal roster" docker exec "$CONTAINER" python -m app.federal.roster
+step "Federal sponsorships" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.sponsorships; else echo "CONGRESS_API_KEY not set; skipped"; fi'
+step "Federal roll calls" docker exec "$CONTAINER" python -m app.federal.rollcalls
+
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
 
 # Bill page layers (Bill Says / Interpretation / Expected Effect). Only

@@ -44,6 +44,9 @@ class Settings(BaseSettings):
 
     ollama_host: str = "http://localhost:11434"
 
+    # Free key: https://api.congress.gov/sign-up/ . Limit 5,000 requests/hour.
+    congress_api_key: str = ""
+
     # Where promise snapshots (raw fetched pages) are stored, by content hash.
     snapshot_dir: str = "/data/snapshots"
     # Politeness for crawling candidates' own sites: seconds between requests
