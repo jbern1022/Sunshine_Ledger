@@ -42,7 +42,7 @@ def upgrade() -> None:
     sa.CheckConstraint('end_reason IS NULL OR end_date IS NOT NULL', name='ck_office_tenures_reason_needs_end'),
     sa.ForeignKeyConstraint(['person_entity_id'], ['entities.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('person_entity_id', 'office_type', 'district', 'start_date', name='uq_office_tenures_term')
+    sa.UniqueConstraint('person_entity_id', 'office_type', 'district', 'start_date', name='uq_office_tenures_term', postgresql_nulls_not_distinct=True)
     )
     op.create_index(op.f('ix_office_tenures_office_type'), 'office_tenures', ['office_type'], unique=False)
     op.create_index(op.f('ix_office_tenures_person_entity_id'), 'office_tenures', ['person_entity_id'], unique=False)

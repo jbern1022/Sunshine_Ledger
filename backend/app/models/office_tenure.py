@@ -29,7 +29,12 @@ class OfficeTenure(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __tablename__ = "office_tenures"
     __table_args__ = (
-        UniqueConstraint("person_entity_id", "office_type", "district", "start_date", name="uq_office_tenures_term"),
+        # NULLS NOT DISTINCT: a Senate tenure has no district, and two of them
+        # for the same person and start date must still collide.
+        UniqueConstraint(
+            "person_entity_id", "office_type", "district", "start_date",
+            name="uq_office_tenures_term", postgresql_nulls_not_distinct=True,
+        ),
         CheckConstraint(f"office_type IN {OFFICE_TYPES}", name="ck_office_tenures_office"),
         CheckConstraint(f"end_reason IS NULL OR end_reason IN {END_REASONS}", name="ck_office_tenures_reason"),
         CheckConstraint("end_reason IS NULL OR end_date IS NOT NULL", name="ck_office_tenures_reason_needs_end"),
