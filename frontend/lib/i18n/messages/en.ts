@@ -446,6 +446,7 @@ export const en = {
   "districts.unavailable": "Districts couldn't be loaded. Try again later.",
   "districts.plan": "Map plan: {name}, in force since {date}.",
   "districts.members": "Members",
+  "districts.peopleLink": "See them in the sponsor list",
   "districts.noMembers": "No member is on record for this seat yet.",
   "districts.current": "Current",
   "districts.former": "Former",

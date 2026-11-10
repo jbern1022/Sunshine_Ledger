@@ -39,6 +39,11 @@ export default async function DistrictPage({ params }: Props) {
 
       <section className="mt-6">
         <h2 className="text-lg font-semibold text-ledger-900">{t("districts.members")}</h2>
+        {d.members.length > 0 && (
+          <p className="mt-1 text-xs">
+            <Link href={`/people?district=${d.code}`} className="text-sunshine-700 underline">{t("districts.peopleLink")}</Link>
+          </p>
+        )}
         {d.members.length === 0 ? (
           <p className="mt-2 text-sm text-slate-600">{t("districts.noMembers")}</p>
         ) : (

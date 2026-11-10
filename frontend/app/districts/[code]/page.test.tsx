@@ -46,6 +46,7 @@ describe("DistrictPage", () => {
     expect(screen.getByText(/Low reliability/)).toBeInTheDocument();
     expect(screen.getByText(/Not shown: the margin of error is as large as the estimate/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "See all 30 in the bill list" })).toHaveAttribute("href", "/?district=HD-101");
+    expect(screen.getByRole("link", { name: "See them in the sponsor list" })).toHaveAttribute("href", "/people?district=HD-101");
   });
 
   it("404s an unknown district and says so when the API is down", async () => {
