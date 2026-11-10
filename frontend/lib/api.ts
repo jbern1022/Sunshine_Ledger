@@ -90,7 +90,7 @@ export async function fetchElections(state?: string): Promise<ElectionCalendar> 
 }
 
 export async function fetchPeople(
-  params: { q?: string; kind?: "legislator" | "committee"; limit?: number; offset?: number } = {},
+  params: { q?: string; kind?: "legislator" | "committee"; district?: string; limit?: number; offset?: number } = {},
 ): Promise<PersonListResponse> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {

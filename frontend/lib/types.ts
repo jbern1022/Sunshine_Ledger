@@ -385,7 +385,22 @@ export interface PersonVoteItem {
   tags?: BillTopic[];
 }
 
+export interface PersonTenure {
+  office: string;
+  district: number | null;
+  start_date: string;
+  scheduled_end: string | null;
+  end_date: string | null;
+  end_reason: string | null;
+  end_reason_source_url: string | null;
+  label: string | null;
+}
+
 export interface PersonDetail extends PersonListItem {
+  /** Dated terms in office; a finished one carries its "Former ..." label. */
+  tenures?: PersonTenure[];
+  /** Set when every recorded term has ended. */
+  former_label?: string | null;
   bills: PersonBillItem[];
   votes: PersonVoteItem[];
 }

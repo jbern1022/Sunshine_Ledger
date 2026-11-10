@@ -19,6 +19,8 @@ export const en = {
   "nav.sponsors": "Sponsors",
   "nav.map": "Map",
   "nav.districts": "Districts",
+  "person.districtLink": "See district {code}",
+  "person.reasonSource": "Source for the reason",
 
   "footer.about":
     "Bernal Labs · Sunshine Ledger MVP. Bill data from LegiScan (Florida) and each city's own legislative records system. Every claim links to a source. Informational only, not legal advice.",

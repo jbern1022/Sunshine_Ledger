@@ -68,6 +68,25 @@ export default async function PersonPage({ params }: Props) {
           .join(" · ")}
       </p>
 
+      {person.former_label && <p className="mt-2 text-sm font-medium text-slate-800">{person.former_label}</p>}
+      {(person.tenures ?? []).filter((x) => x.label && x.label !== person.former_label && x.end_reason_source_url).length > 0 && (
+        <ul className="mt-1 text-xs text-slate-500">
+          {(person.tenures ?? []).filter((x) => x.label && x.end_reason_source_url).map((x) => (
+            <li key={`${x.office}-${x.start_date}`}>
+              {x.label}{" · "}
+              <a href={x.end_reason_source_url!} className="text-sunshine-700 underline" rel="noopener noreferrer">{t("person.reasonSource")}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+      {/^(HD|SD|CD)-\d{3}$/.test(person.district ?? "") && (
+        <p className="mt-1 text-xs">
+          <Link href={`/districts/${person.district}`} className="text-sunshine-700 underline">
+            {t("person.districtLink", { code: person.district! })}
+          </Link>
+        </p>
+      )}
+
       {person.is_committee ? (
         <p className="mt-4 text-sm text-slate-600">
           {t("person.committeeNote", { count: person.sponsored_count })}

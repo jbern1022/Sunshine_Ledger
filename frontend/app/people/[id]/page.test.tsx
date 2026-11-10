@@ -161,3 +161,28 @@ describe("PersonPage generateMetadata", () => {
     expect(metadata.title).toBe("Jane Smith | Sunshine Ledger");
   });
 });
+
+describe("PersonPage: office history and district link", () => {
+  beforeEach(() => vi.mocked(serverApi.getPerson).mockReset());
+
+  it("shows the Former line with its source, and links a coded district", async () => {
+    vi.mocked(serverApi.getPerson).mockResolvedValue({
+      ...basePerson,
+      district: "HD-045",
+      former_label: "Former U.S. Representative, District 12, 2013-2025, lost the primary",
+      tenures: [{ office: "us_house", district: 12, start_date: "2013-01-03", scheduled_end: null, end_date: "2025-12-01",
+                  end_reason: "lost_primary", end_reason_source_url: "https://doe.example/cert",
+                  label: "Former U.S. Representative, District 12, 2013-2025, lost the primary" }],
+    });
+    await renderPersonPage();
+    expect(screen.getByText("Former U.S. Representative, District 12, 2013-2025, lost the primary", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See district HD-045" })).toHaveAttribute("href", "/districts/HD-045");
+  });
+
+  it("shows no Former line for a sitting member and no link for a free-text district", async () => {
+    vi.mocked(serverApi.getPerson).mockResolvedValue({ ...basePerson, former_label: null, tenures: [] });
+    await renderPersonPage();
+    expect(screen.queryByText(/Former/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /See district/ })).not.toBeInTheDocument();
+  });
+});
