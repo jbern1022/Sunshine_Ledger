@@ -50,6 +50,9 @@ FL_STATE_FIPS = "12"
 SLD_CHAMBER_GEOGRAPHY = {
     "HD": "state legislative district (lower chamber)",
     "SD": "state legislative district (upper chamber)",
+    # Census publishes congressional-district ACS tables itself (the 119th
+    # Congress's boundaries for the 2024 vintage): no home-grown apportionment.
+    "CD": "congressional district",
 }
 
 # Counties this app actually ingests local bills for (Miami, Jacksonville).
@@ -216,13 +219,16 @@ def _acs_table_and_variables(badge_slug: str) -> tuple[list[tuple[str, str, str]
     return table, variables
 
 
-def load_acs_district_overlays(db: Session, *, badge_slug: str, client: ACSClient | None = None) -> int:
-    """Load one ACS badge's table for every FL House and Senate district."""
+def load_acs_district_overlays(
+    db: Session, *, badge_slug: str, client: ACSClient | None = None, prefixes: tuple[str, ...] = ("HD", "SD")
+) -> int:
+    """Load one ACS badge's table for every FL House and Senate district
+    (`prefixes=("CD",)` loads the US congressional districts instead)."""
     table, variables = _acs_table_and_variables(badge_slug)
     client = client or ACSClient()
 
     count = 0
-    for prefix in ("HD", "SD"):
+    for prefix in prefixes:
         by_district = client.get_by_district(variables, chamber=prefix)
         for code, values in by_district.items():
             _store_overlay(
@@ -309,6 +315,10 @@ def load_all_overlays(db: Session, *, bls_year: str | None = None) -> dict[str, 
         "acs_district_housing": load_acs_district_overlays(db, badge_slug="housing"),
         "acs_district_infrastructure_transportation": load_acs_district_overlays(
             db, badge_slug="infrastructure_transportation"
+        ),
+        "acs_congressional_housing": load_acs_district_overlays(db, badge_slug="housing", prefixes=("CD",)),
+        "acs_congressional_infrastructure_transportation": load_acs_district_overlays(
+            db, badge_slug="infrastructure_transportation", prefixes=("CD",)
         ),
         "acs_county_housing": load_acs_county_overlays(db, badge_slug="housing"),
         "acs_county_infrastructure_transportation": load_acs_county_overlays(

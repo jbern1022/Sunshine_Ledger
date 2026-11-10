@@ -204,6 +204,69 @@ def load_tiger_shapefile(
     return count
 
 
+CONGRESSIONAL_SCOPE = "congress_district"
+TIGER_CONGRESSIONAL_URL = "https://www2.census.gov/geo/tiger/TIGER2024/CD/tl_2024_12_cd119.zip"
+
+
+def load_tiger_congressional(db: Session, shapefile_path: Path, *, state_fips: str = "12", replace: bool = True) -> int:
+    """Load US congressional district polygons from a TIGER/Line CD119 file.
+
+    Stored as scope_type "congress_district", named "CD-012", so they
+    never join the state-legislative map (`/map/districts` reads
+    scope_type "district" only). Districts with no number (TIGER's "ZZ" for
+    undistricted areas, "00" at-large) are skipped; Florida has neither.
+    """
+    reader = shapefile.Reader(str(shapefile_path))
+    fields = [f[0] for f in reader.fields[1:]]
+    if replace:
+        db.execute(
+            delete(SpatialContext).where(
+                SpatialContext.entity_id.is_(None),
+                SpatialContext.event_id.is_(None),
+                SpatialContext.scope_type == CONGRESSIONAL_SCOPE,
+            )
+        )
+    count = 0
+    for sr in reader.shapeRecords():
+        record = dict(zip(fields, sr.record))
+        if "STATEFP" in record and str(record["STATEFP"]) != state_fips:
+            continue
+        code = str(record.get("CD119FP") or record.get("CD118FP") or "").strip()
+        if not code.isdigit() or int(code) == 0:
+            continue
+        geom = _as_multipolygon(shapely_shape(sr.shape.__geo_interface__))
+        db.add(
+            SpatialContext(
+                scope_type=CONGRESSIONAL_SCOPE,
+                scope_name=f"CD-{code.zfill(3)}",
+                geom_source=f"US Census TIGER/Line ({shapefile_path.name})",
+                geom=from_shape(geom, srid=4326),
+            )
+        )
+        count += 1
+    db.commit()
+    logger.info("Loaded %d congressional districts from %s", count, shapefile_path)
+    return count
+
+
+def download_and_load_congressional(db: Session, *, state_fips: str = "12") -> int:
+    """Fetch the TIGER CD119 file and load it in one step (see the note on
+    container /tmp in download_and_load_districts)."""
+    import io
+    import tempfile
+    import zipfile
+
+    import httpx
+
+    logger.info("Downloading %s", TIGER_CONGRESSIONAL_URL)
+    resp = httpx.get(TIGER_CONGRESSIONAL_URL, timeout=120.0, follow_redirects=True)
+    resp.raise_for_status()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zipfile.ZipFile(io.BytesIO(resp.content)).extractall(tmpdir)
+        shp = next(Path(tmpdir).glob("*.shp"))
+        return load_tiger_congressional(db, shp, state_fips=state_fips)
+
+
 TIGER_DISTRICT_URLS = {
     "sldl": "https://www2.census.gov/geo/tiger/TIGER2024/SLDL/tl_2024_12_sldl.zip",
     "sldu": "https://www2.census.gov/geo/tiger/TIGER2024/SLDU/tl_2024_12_sldu.zip",
@@ -247,12 +310,19 @@ if __name__ == "__main__":
         action="store_true",
         help="Download and load TIGER state legislative districts (both chambers).",
     )
+    parser.add_argument(
+        "--congressional",
+        action="store_true",
+        help="Download and load TIGER US congressional districts (119th Congress).",
+    )
     parser.add_argument("--state-fips", default="12", help="Default 12 (Florida).")
     args = parser.parse_args()
 
     session = SessionLocal()
     try:
-        if args.districts:
+        if args.congressional:
+            print(f"Loaded {download_and_load_congressional(session, state_fips=args.state_fips)} congressional districts.")
+        elif args.districts:
             total = sum(
                 download_and_load_districts(session, chamber=c, state_fips=args.state_fips)
                 for c in ("sldl", "sldu")

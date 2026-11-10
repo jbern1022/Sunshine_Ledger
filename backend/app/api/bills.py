@@ -216,7 +216,7 @@ def list_bills(
         try:
             stmt = stmt.where(Entity.id.in_(sponsored_bill_ids(district)))
         except BadDistrictCode:
-            raise HTTPException(status_code=422, detail="district must look like HD-101 or SD-024")
+            raise HTTPException(status_code=422, detail="district must look like HD-101, SD-024 or CD-012")
     if q:
         like = f"%{q}%"
         stmt = stmt.where(or_(Entity.name.ilike(like), Bill.bill_number.ilike(like)))

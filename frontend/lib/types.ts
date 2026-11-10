@@ -508,9 +508,11 @@ export interface PromiseList {
   items: PromiseStatement[];
 }
 
-export interface DistrictListItem { code: string; chamber: "house" | "senate"; number: number }
+export type DistrictChamber = "house" | "senate" | "us_house";
+export interface DistrictListItem { code: string; chamber: DistrictChamber; number: number }
 export interface DistrictList {
   map_plan: { key: string; name: string; effective_from: string } | null;
+  congressional_map_plan?: { key: string; name: string; effective_from: string } | null;
   total: number;
   items: DistrictListItem[];
 }
@@ -524,7 +526,7 @@ export interface DistrictMetric {
 }
 export interface DistrictDetail {
   code: string;
-  chamber: "house" | "senate";
+  chamber: DistrictChamber;
   number: number;
   map_plan: { key: string; name: string; effective_from: string; effective_to: string | null };
   members: {

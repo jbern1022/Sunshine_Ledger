@@ -18,7 +18,7 @@ function BrowsePageInner() {
   const searchParams = useSearchParams();
   const geoFilter = searchParams.get("geo") ?? "";
   const sponsorFilter = searchParams.get("sponsor") ?? "";
-  const districtFilter = /^(HD|SD)-\d{3}$/.test(searchParams.get("district") ?? "") ? (searchParams.get("district") as string) : "";
+  const districtFilter = /^(HD|SD|CD)-\d{3}$/.test(searchParams.get("district") ?? "") ? (searchParams.get("district") as string) : "";
   const sponsorName = searchParams.get("sponsorName") ?? "";
 
   // Filters and the page live in the URL (lib/browse-params): the view can be

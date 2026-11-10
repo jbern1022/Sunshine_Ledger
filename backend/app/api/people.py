@@ -84,17 +84,17 @@ def list_people(
     elif kind == "legislator":
         stmt = stmt.where(~Entity.attributes.has_key("committee"))
     if district:
-        from app.districts.service import BadDistrictCode, STATE_OFFICES, _office, parse_code
+        from app.districts.service import BadDistrictCode, _office, _office_group, parse_code
         from app.models import OfficeTenure
 
         try:
             chamber, number = parse_code(district)
         except BadDistrictCode:
-            raise HTTPException(status_code=422, detail="district must look like HD-101 or SD-024")
+            raise HTTPException(status_code=422, detail="district must look like HD-101, SD-024 or CD-012")
         held = select(OfficeTenure.person_entity_id).where(
             OfficeTenure.office_type == _office(chamber), OfficeTenure.district == number
         )
-        any_tenure = select(OfficeTenure.person_entity_id).where(OfficeTenure.office_type.in_(STATE_OFFICES))
+        any_tenure = select(OfficeTenure.person_entity_id).where(OfficeTenure.office_type.in_(_office_group(chamber)))
         stmt = stmt.where(
             or_(
                 Entity.id.in_(held),

@@ -14,20 +14,24 @@ export default async function DistrictsPage() {
   const groups = [
     { key: "house" as const, title: t("districts.house") },
     { key: "senate" as const, title: t("districts.senate") },
+    { key: "us_house" as const, title: t("districts.congress") },
   ];
   return (
     <article>
       <h1 className="text-2xl font-bold text-ledger-900">{t("districts.title")}</h1>
       <p className="mt-1 text-sm text-slate-600">{t("districts.intro")}</p>
       {data === null && <p className="mt-6 text-sm text-slate-600">{t("districts.unavailable")}</p>}
-      {data?.map_plan && (
-        <p className="mt-2 text-xs text-slate-500">
-          {t("districts.plan", { name: data.map_plan.name, date: data.map_plan.effective_from })}
-        </p>
+      {[data?.map_plan, data?.congressional_map_plan].map(
+        (plan) =>
+          plan && (
+            <p key={plan.key} className="mt-2 text-xs text-slate-500">
+              {t("districts.plan", { name: plan.name, date: plan.effective_from })}
+            </p>
+          ),
       )}
       {data &&
         groups.map((g) => (
-          <section key={g.key} className="mt-6">
+          <section key={g.key} className="mt-6" hidden={!data.items.some((d) => d.chamber === g.key)}>
             <h2 className="text-lg font-semibold text-ledger-900">{g.title}</h2>
             <ul className="mt-2 flex flex-wrap gap-1.5 text-xs">
               {data.items

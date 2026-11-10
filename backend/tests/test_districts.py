@@ -156,3 +156,108 @@ def test_bill_and_people_lists_filter_by_district(client, db_session):
     assert client.get("/bills?district=nonsense").status_code == 422
     assert [p["name"] for p in client.get("/people?district=HD-005").json()["items"]] == ["Pat Doe"]
     assert client.get("/people?district=HD-006").json()["items"] == []
+
+
+# --- congressional districts ------------------------------------------------
+
+
+def test_congressional_boundaries_load_as_their_own_scope(db_session, tmp_path):
+    import shapefile
+
+    from app.pipeline.load_boundaries import CONGRESSIONAL_SCOPE, load_tiger_congressional
+
+    path = tmp_path / "cd"
+    with shapefile.Writer(str(path)) as w:
+        w.field("STATEFP", "C", size=2)
+        w.field("CD119FP", "C", size=2)
+        w.poly([[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]])
+        w.record("12", "07")
+        w.poly([[[2, 2], [2, 3], [3, 3], [3, 2], [2, 2]]])
+        w.record("12", "ZZ")  # undistricted: skipped
+        w.poly([[[4, 4], [4, 5], [5, 5], [5, 4], [4, 4]]])
+        w.record("13", "01")  # Georgia: skipped
+    assert load_tiger_congressional(db_session, path.with_suffix(".shp")) == 1
+    ctx = db_session.execute(select(SpatialContext)).scalar_one()
+    assert (ctx.scope_type, ctx.scope_name) == (CONGRESSIONAL_SCOPE, "CD-007")
+    assert load_tiger_congressional(db_session, path.with_suffix(".shp")) == 1  # replaces, no duplicates
+    assert len(db_session.execute(select(SpatialContext)).scalars().all()) == 1
+
+
+def test_sync_builds_both_plans_without_mixing_scopes(db_session):
+    poly = MultiPolygon([Polygon([(0, 0), (1, 0), (1, 1), (0, 0)])])
+    db_session.add(SpatialContext(scope_type="district", scope_name="HD-101", geom=from_shape(poly, srid=4326)))
+    db_session.add(SpatialContext(scope_type="congress_district", scope_name="CD-012", geom=from_shape(poly, srid=4326)))
+    db_session.flush()
+    assert sync_districts(db_session)["created"] == 2
+    rows = {d.code: d for d in db_session.execute(select(District)).scalars()}
+    assert rows["CD-012"].chamber == "us_house" and rows["HD-101"].chamber == "house"
+    assert rows["CD-012"].map_plan_id != rows["HD-101"].map_plan_id
+    assert plan_on(db_session, date(2025, 1, 1), "congress").key == "fl-congress-2022"
+    assert plan_on(db_session, date(2025, 1, 1)).key == "fl-state-2022"  # two plans in force, each found by scope
+
+
+def test_congressional_page_lists_members_from_tenures_and_labels_residents(client, db_session):
+    from app.federal.roster import import_roster
+    import json
+    from pathlib import Path
+
+    sample = json.loads((Path(__file__).parent / "fixtures" / "congress_legislators_sample.json").read_text())
+    import_roster(db_session, sample, today=date(2026, 11, 10))
+    poly = MultiPolygon([Polygon([(0, 0), (1, 0), (1, 1), (0, 0)])])
+    db_session.add(SpatialContext(scope_type="congress_district", scope_name="CD-012", geom=from_shape(poly, srid=4326)))
+    db_session.add(Tag(slug="housing", label="Housing"))
+    db_session.add(DemographicOverlay(
+        geography_type="district", geography_id="CD-012", badge_slug="housing", source="acs", as_of="2024",
+        metrics=[{"label": "Renter households", "estimate": 90000, "margin_of_error": 2000, "unit": "households"}],
+    ))
+    db_session.flush()
+    sync_districts(db_session)
+    body = client.get("/districts/CD-012").json()
+    assert body["chamber"] == "us_house" and body["map_plan"]["key"] == "fl-congress-2022"
+    assert any(m["name"] == "Gus M. Bilirakis" and m["basis"] == "tenure" and m["current"] for m in body["members"])
+    # his earlier tenure in District 9 is not listed on CD-012
+    assert sum(1 for m in body["members"] if m["name"] == "Gus M. Bilirakis") >= 1
+    assert "not voters or the electorate" in body["census_profile"]["label"]
+    assert body["census_profile"]["profile"][0]["metrics"][0]["margin_of_error"] == 2000
+    listing = client.get("/districts").json()
+    assert listing["congressional_map_plan"]["key"] == "fl-congress-2022"
+    assert [i["code"] for i in client.get("/districts?chamber=us_house").json()["items"]] == ["CD-012"]
+    assert [p["name"] for p in client.get("/people?district=CD-012").json()["items"]] in ([], ["Gus M. Bilirakis"])
+
+
+def test_acs_congressional_overlays_use_cd_prefix_and_leave_state_loader_alone(db_session):
+    from app.pipeline.demographic_overlay import load_acs_district_overlays
+
+    class Fake:
+        def __init__(self):
+            self.calls = []
+
+        def get_by_district(self, variables, *, chamber):
+            self.calls.append(chamber)
+            return {"12": {v: "100" for v in variables}}
+
+    f = Fake()
+    assert load_acs_district_overlays(db_session, badge_slug="housing", client=f, prefixes=("CD",)) == 1
+    assert f.calls == ["CD"]
+    assert db_session.execute(select(DemographicOverlay)).scalar_one().geography_id == "CD-012"
+
+
+def test_point_lookup_returns_every_district_that_covers_it(client, db_session):
+    def square(x0, y0, x1, y1):
+        return from_shape(MultiPolygon([Polygon([(x0, y0), (x1, y0), (x1, y1), (x0, y1)])]), srid=4326)
+
+    # one state House district, one state Senate, one congressional, one elsewhere
+    for scope, name, geom in (
+        ("district", "HD-101", square(-81, 28, -80, 29)),
+        ("district", "SD-024", square(-82, 27, -79.9, 30)),
+        ("congress_district", "CD-012", square(-81.5, 27.5, -79.95, 29.5)),
+        ("district", "HD-102", square(-86, 30, -85, 31)),
+    ):
+        db_session.add(SpatialContext(scope_type=scope, scope_name=name, geom=geom))
+    db_session.flush()
+    sync_districts(db_session)
+    got = client.get("/districts/at?lat=28.5&lon=-80.5").json()["districts"]
+    assert {d["code"] for d in got} == {"HD-101", "SD-024", "CD-012"}
+    assert client.get("/districts/at?lat=30.5&lon=-85.5").json()["districts"][0]["code"] == "HD-102"
+    assert client.get("/districts/at?lat=26.0&lon=-85.0").json()["districts"] == []
+    assert client.get("/districts/at?lat=40.0&lon=-80.5").status_code == 422  # outside Florida

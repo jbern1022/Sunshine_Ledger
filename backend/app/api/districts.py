@@ -16,9 +16,9 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.districts.service import (
-    BadDistrictCode, members, parse_code, plan_on, sponsored_bill_ids,
+    BadDistrictCode, SCOPE_OF_CHAMBER, members, parse_code, plan_on, sponsored_bill_ids,
 )
-from app.models import Bill, DemographicOverlay, District, Entity, MapPlan, Tag
+from app.models import Bill, DemographicOverlay, District, Entity, MapPlan, SpatialContext, Tag
 
 router = APIRouter(prefix="/districts", tags=["districts"])
 
@@ -46,10 +46,10 @@ def metric_reliability(estimate: float | None, moe: float | None) -> dict:
 
 def _get_district(db: Session, code: str, on: date | None = None) -> District:
     try:
-        parse_code(code)
+        chamber, _ = parse_code(code)
     except BadDistrictCode:
         raise HTTPException(status_code=404, detail="District not found")
-    plan = plan_on(db, on or date.today())
+    plan = plan_on(db, on or date.today(), SCOPE_OF_CHAMBER[chamber])
     stmt = select(District).where(District.code == code)
     if plan:
         stmt = stmt.where(District.map_plan_id == plan.id)
@@ -60,19 +60,55 @@ def _get_district(db: Session, code: str, on: date | None = None) -> District:
 
 
 @router.get("")
-def list_districts(chamber: str | None = Query(None, pattern="^(house|senate)$"), db: Session = Depends(get_db)) -> dict:
-    plan = plan_on(db, date.today())
-    stmt = select(District).order_by(District.chamber.desc(), District.number)
-    if plan:
-        stmt = stmt.where(District.map_plan_id == plan.id)
+def list_districts(
+    chamber: str | None = Query(None, pattern="^(house|senate|us_house)$"), db: Session = Depends(get_db)
+) -> dict:
+    today = date.today()
+    plans = {scope: plan_on(db, today, scope) for scope in ("state_legislature", "congress")}
+    plan_ids = [p.id for p in plans.values() if p]
+    stmt = select(District).where(District.map_plan_id.in_(plan_ids)).order_by(District.chamber.desc(), District.number)
     if chamber:
         stmt = stmt.where(District.chamber == chamber)
     rows = db.execute(stmt).scalars().all()
+
+    def plan_out(p):
+        return {"key": p.key, "name": p.name, "effective_from": p.effective_from} if p else None
+
     return {
-        "map_plan": {"key": plan.key, "name": plan.name, "effective_from": plan.effective_from} if plan else None,
+        # `map_plan` is the state legislative plan (the original shape);
+        # `congressional_map_plan` is the plan for the US House districts.
+        "map_plan": plan_out(plans["state_legislature"]),
+        "congressional_map_plan": plan_out(plans["congress"]),
         "total": len(rows),
         "items": [{"code": d.code, "chamber": d.chamber, "number": d.number} for d in rows],
     }
+
+
+@router.get("/at")
+def districts_at_point(
+    lat: float = Query(..., ge=24.0, le=31.5, description="Latitude (Florida)"),
+    lon: float = Query(..., ge=-88.0, le=-79.5, description="Longitude (Florida)"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """The state House, state Senate and US House districts that contain a
+    point. Pure geometry against boundaries we already hold: nothing is sent
+    to another service, stored or logged. Turning a street address into a
+    point is a separate step (it would send the address to a geocoder) and is
+    not offered here.
+    """
+    from geoalchemy2 import Geometry
+    from sqlalchemy import cast
+
+    point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
+    today = date.today()
+    plan_ids = [p.id for p in (plan_on(db, today, sc) for sc in ("state_legislature", "congress")) if p]
+    rows = db.execute(
+        select(District)
+        .join(SpatialContext, SpatialContext.id == District.spatial_context_id)
+        .where(District.map_plan_id.in_(plan_ids), func.ST_Covers(SpatialContext.geom, cast(point, Geometry("POINT", 4326))))
+        .order_by(District.chamber.desc())
+    ).scalars().all()
+    return {"districts": [{"code": d.code, "chamber": d.chamber, "number": d.number} for d in rows]}
 
 
 @router.get("/{code}")

@@ -21,6 +21,8 @@ class MapPlan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     key: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)  # e.g. "fl-state-2022"
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     state: Mapped[str] = mapped_column(String(2), nullable=False, default="FL")
+    # Which set of districts the plan draws; several plans are in force at once.
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, default="state_legislature", server_default="state_legislature")
     effective_from: Mapped[date] = mapped_column(Date, nullable=False)
     effective_to: Mapped[date | None] = mapped_column(Date)  # None = still in force
     source_url: Mapped[str | None] = mapped_column(Text)
@@ -33,7 +35,7 @@ class District(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "districts"
     __table_args__ = (
         UniqueConstraint("map_plan_id", "code", name="uq_districts_plan_code"),
-        CheckConstraint("chamber IN ('house', 'senate')", name="ck_districts_chamber"),
+        CheckConstraint("chamber IN ('house', 'senate', 'us_house')", name="ck_districts_chamber"),
     )
 
     map_plan_id: Mapped[uuid.UUID] = mapped_column(
@@ -50,5 +52,8 @@ class District(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     map_plan: Mapped["MapPlan"] = relationship(back_populates="districts")
 
 
+_PREFIX = {"house": "HD", "senate": "SD", "us_house": "CD"}
+
+
 def district_code(chamber: str, number: int) -> str:
-    return f"{'HD' if chamber == 'house' else 'SD'}-{number:03d}"
+    return f"{_PREFIX[chamber]}-{number:03d}"

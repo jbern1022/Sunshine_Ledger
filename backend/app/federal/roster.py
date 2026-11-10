@@ -64,7 +64,7 @@ def _person_for(db: Session, member: dict) -> tuple[Entity, bool]:
         "role": "Rep" if current["type"] == "rep" else "Sen",
         "party": current.get("party"),
         "chamber": "us_house" if current["type"] == "rep" else "us_senate",
-        **({"district": f"CD-{current['district']}"} if current["type"] == "rep" and current.get("district") else {}),
+        **({"district": f"CD-{int(current['district']):03d}"} if current["type"] == "rep" and current.get("district") else {}),
     }
     attributes = {k: v for k, v in attributes.items() if v}
     name = member["name"].get("official_full") or f"{member['name']['first']} {member['name']['last']}"
