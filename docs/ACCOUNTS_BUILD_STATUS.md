@@ -40,3 +40,15 @@ whether `official` follows are enabled in the first public release (`watchlists.
 * Confirmed as proposed: session lifetimes (14 days idle, 90 days absolute, 10-minute re-authentication window), retention (unverified sign-ups 7 days, expired session rows 30 days), a 300-entry watchlist cap, anonymized grant rows kept after account deletion, and the Impact Lens nightly budget (60 minutes, 200 bills).
 * The Impact Lens `?lens=1` flag comes off when the hand-labeled baseline shows zero wrong mappings; the labeling is the owner's.
 * Still open: whether `official` follows are in the first public release (switch: `watchlists.ENABLED_KINDS`), and the Tampa/Orlando ruling.
+
+## Update 2026-11-10 (evening): routes are built, switched off
+
+`app/api/auth.py` adds `POST /auth/sign-in`, `/auth/totp`, `/auth/password-reset/confirm`, `/auth/sign-out`,
+`/auth/sign-out-all`, `GET /auth/me`, `/auth/me/export`, `POST /auth/me/delete`, and `GET/POST /watchlist` (+ `/{id}/remove`).
+**Every route answers 404 while `AUTH_ENABLED` is false (the default)**, so deploying them exposes nothing. When on: the
+session is an opaque HttpOnly SameSite=Lax cookie; state-changing calls need the double-submit `X-CSRF-Token` and a trusted
+`Origin`; failures at sign-in are one uniform 401; deleting the account needs a sign-in in the last 10 minutes; a restricted
+(recovery) session can do nothing else; passwords and codes are never logged (a test captures logs). Provider: Cognito from
+`COGNITO_REGION/USER_POOL_ID/CLIENT_ID[/CLIENT_SECRET]`, else 503. New settings: `AUTH_ENABLED`, `SESSION_COOKIE_DOMAIN`,
+`SESSION_COOKIE_SECURE`. Still needed to go live: a real user pool (AWS), the screens, SES, the privacy-page change, and the
+gates in `6hCMm7FWfJ47jCgp`.

@@ -100,6 +100,17 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = ""
 
+    # Reader accounts (docs/ADR_READER_AUTH_COGNITO.md). Off: every /auth and /watchlist route answers 404.
+    # Public registration additionally stays closed until the privacy, deletion, security and legal gates pass.
+    auth_enabled: bool = False
+    cognito_region: str = ""
+    cognito_user_pool_id: str = ""
+    cognito_client_id: str = ""
+    cognito_client_secret: str = ""
+    # Host-only cookie unless a parent domain is set (the site and API are separate subdomains today).
+    session_cookie_domain: str = ""
+    session_cookie_secure: bool = True
+
     @property
     def legistar_client_list(self) -> list[str]:
         return [c.strip() for c in self.legistar_clients.split(",") if c.strip()]
