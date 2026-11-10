@@ -74,7 +74,7 @@ stays off. C wastes the pipeline's one advantage, which is that rerunning is fre
    ("N entries are waiting for review"). The matcher already treats `criteria: null` as unknown.
    Tests: held row never yields "Does Not Appear to Apply"; approving it releases it; rejecting it
    still wins; `simple` rows are unaffected.
-2. **A review queue listing.** `app.impact_lens.review` lists one bill. Add `--queue` to list held
+2. **A review queue listing (built: `review --queue`).** It lists, read-only, the held
    entries across bills, ordered by bill activity, so a reviewer works the newest first.
 3. **The nightly line.** In `scripts/run-ingestion.sh`, after Bill layers (it maps the layers that
    step produces) and before the Federal steps:

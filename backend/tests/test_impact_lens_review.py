@@ -101,3 +101,20 @@ def test_describe_shows_a_rejected_mapping(db_session, bill_factory):
     bill = db_session.get(Bill, layer.bill_entity_id)
     lines = review.describe(bill, layer, review.criteria_rows(db_session, layer))
     assert "rejected" in lines[1] and "not approved" not in lines[1]
+
+
+def test_queue_lists_needs_review_rows_without_a_decision_and_drops_decided_ones(db_session, bill_factory):
+    layer = _mapped_layer(db_session, bill_factory, [ENTRY])  # an exclusion makes it needs_review
+    queue = review.review_queue(db_session)
+    assert [(i, g) for _b, _l, i, g in queue] == [(0, ENTRY["group"])]
+    assert review.review_queue(db_session, limit=0) == []
+
+    row = review.criteria_rows(db_session, layer)[0]
+    review.approve(db_session, row, reviewer="joe")
+    assert review.review_queue(db_session) == []
+
+
+def test_queue_drops_a_rejected_row(db_session, bill_factory):
+    layer = _mapped_layer(db_session, bill_factory, [ENTRY])
+    review.reject(db_session, review.criteria_rows(db_session, layer)[0], reviewer="joe")
+    assert review.review_queue(db_session) == []
