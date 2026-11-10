@@ -78,19 +78,30 @@ export interface LensBill {
 /** Which of a reader's locations a criterion is about. */
 export type LocationKind = "residence" | "property" | "business";
 
+/** One place name, or several of the same kind. */
+export type Place = string | string[];
+
+/** The names in a place answer; empty when it was not answered. */
+export function placesOf(p: Place | undefined): string[] {
+  if (p === undefined) return [];
+  return Array.isArray(p) ? p : p ? [p] : [];
+}
+
 /** What a reader has chosen to tell us. Interests are deliberately absent. */
 export interface Answers {
   role?: Role;
-  /** Residence county name as in the vocabulary, e.g. "Duval". */
-  county?: string;
+  /** Residence county name as in the vocabulary, e.g. "Duval". A reader with several
+   *  places of one kind (rentals in two counties) gives a list: a place the bill names
+   *  matches if ANY listed place matches. */
+  county?: Place;
   /** Residence municipality, e.g. "Jacksonville". Optional, asked after county. */
-  municipality?: string;
+  municipality?: Place;
   /** County and municipality of the property a landlord, owner or developer is asked about. */
-  property_county?: string;
-  property_municipality?: string;
+  property_county?: Place;
+  property_municipality?: Place;
   /** County and municipality of the business or workplace. */
-  business_county?: string;
-  business_municipality?: string;
+  business_county?: Place;
+  business_municipality?: Place;
   property_type?: string;
 }
 
@@ -177,18 +188,18 @@ const PLACE_KEYS: Record<LocationKind, { county: "county" | "property_county" | 
 
 function jurisdictionIn(values: (string | number)[], answers: Answers, kind: LocationKind): Tri {
   const keys = PLACE_KEYS[kind];
-  const county = answers[keys.county];
-  const municipality = answers[keys.municipality];
+  const counties = placesOf(answers[keys.county]);
+  const municipalities = placesOf(answers[keys.municipality]);
   let sawUnknown = false;
   for (const raw of values) {
     const [valueKind, ...rest] = String(raw).split(":");
     const name = rest.join(":");
     if (valueKind === "county") {
-      if (county === undefined) sawUnknown = true;
-      else if (county === name) return "true";
+      if (counties.length === 0) sawUnknown = true;
+      else if (counties.includes(name)) return "true";
     } else if (valueKind === "municipality") {
-      if (municipality === undefined) sawUnknown = true;
-      else if (municipality === name) return "true";
+      if (municipalities.length === 0) sawUnknown = true;
+      else if (municipalities.includes(name)) return "true";
     }
   }
   return sawUnknown ? "unknown" : "false";
@@ -210,7 +221,7 @@ function testCriterion(t: CriterionTest, answers: Answers, kind: LocationKind = 
     const missing: QuestionKey[] = [];
     if (r === "unknown") {
       const keys = PLACE_KEYS[kind];
-      if (answers[keys.county] === undefined) missing.push(keys.county);
+      if (placesOf(answers[keys.county]).length === 0) missing.push(keys.county);
       else if (t.values.some((v) => String(v).startsWith("municipality:"))) missing.push(keys.municipality);
     }
     return { r, missing };
@@ -223,6 +234,19 @@ function testCriterion(t: CriterionTest, answers: Answers, kind: LocationKind = 
   }
   // An attribute this version of the matcher does not know cannot be tested.
   return { r: "unknown", missing: [] };
+}
+
+/** An exception holds for a reader with several places of one kind only if it holds
+ *  for every one of them (an exception that covers Duval does not cover the Leon rental).
+ *  Requirements are the other way round and are tested on the whole list. */
+function testExclusion(t: CriterionTest, answers: Answers, kind: LocationKind): { r: Tri; missing: QuestionKey[] } {
+  const countyKey = PLACE_KEYS[kind].county;
+  const counties = placesOf(answers[countyKey]);
+  if (t.attr !== "jurisdiction" || counties.length < 2) return testCriterion(t, answers, kind);
+  const each = counties.map((c) => testCriterion(t, { ...answers, [countyKey]: c }, kind));
+  if (each.every((e) => e.r === "true")) return { r: "true", missing: [] };
+  if (each.some((e) => e.r === "false")) return { r: "false", missing: [] };
+  return { r: "unknown", missing: each.flatMap((e) => e.missing) };
 }
 
 // ---- one entry ------------------------------------------------------------
@@ -280,7 +304,7 @@ export function evaluateEntry(
     }
   }
   for (const t of c.excludes) {
-    const { r, missing: m } = testCriterion(t, answers, kind);
+    const { r, missing: m } = testExclusion(t, answers, kind);
     if (r === "true") {
       return make("no", relation, `An exception the bill states applies to you: ${entry.exceptions[t.from.index]?.text ?? "an exception"}.`);
     }
@@ -327,7 +351,7 @@ function circumstances(answers: Answers): { key: QuestionKey; value: string }[] 
   const out: { key: QuestionKey; value: string }[] = [];
   for (const key of QUESTION_KEYS) {
     const value = answers[key];
-    if (value !== undefined) out.push({ key, value });
+    if (value !== undefined) out.push({ key, value: Array.isArray(value) ? value.join(", ") : value });
   }
   return out;
 }
@@ -426,12 +450,24 @@ export function toLensBill(r: ImpactLensResponse): LensBill {
 /** Answers are only ever these keys (one per question); anything else in storage is dropped. */
 export const ANSWER_KEYS: QuestionKey[] = QUESTION_KEYS;
 
+const PLACE_ANSWER_KEYS = new Set<QuestionKey>([
+  "county", "municipality", "property_county", "property_municipality", "business_county", "business_municipality",
+]);
+const MAX_PLACES = 10;
+
 export function cleanAnswers(raw: unknown): Answers {
   const out: Answers = {};
   if (raw && typeof raw === "object") {
     for (const k of ANSWER_KEYS) {
       const v = (raw as Record<string, unknown>)[k];
-      if (typeof v === "string" && v) out[k] = v;
+      if (typeof v === "string" && v) (out as Record<string, unknown>)[k] = v;
+      else if (Array.isArray(v) && PLACE_ANSWER_KEYS.has(k)) {
+        // Several places of one kind. Only the six place keys take a list; a list is
+        // de-duplicated, capped, and a single name is stored as the plain string.
+        const names = [...new Set(v.filter((x): x is string => typeof x === "string" && x !== ""))].slice(0, MAX_PLACES);
+        if (names.length === 1) (out as Record<string, unknown>)[k] = names[0];
+        else if (names.length > 1) (out as Record<string, unknown>)[k] = names;
+      }
     }
   }
   return out;

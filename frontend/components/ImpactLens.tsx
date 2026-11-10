@@ -13,6 +13,7 @@ import {
   type LensQuestion,
   type QuestionKey,
   type ResultKind,
+  placesOf,
 } from "@/lib/impactLens";
 
 /** "Do you want to see if you may be impacted?" Optional and opt-in: nothing is
@@ -193,10 +194,10 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
    *  (and city, if they gave one). */
   function sameAsResidence(key: QuestionKey) {
     if (answers.county === undefined) return;
-    const next: Answers = { ...answers, [key]: answers.county };
+    const next: Answers = { ...answers, [key]: answers.county } as Answers;
     const city = CITY_OF[key];
     if (city) {
-      if (answers.municipality !== undefined) next[city] = answers.municipality;
+      if (answers.municipality !== undefined) (next as Record<string, unknown>)[city] = answers.municipality;
       else delete next[city];
     }
     setAnswers(next);
@@ -270,11 +271,12 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
               if (!q) return null;
               // A property or workplace is often where the reader lives. If they have
               // already told us their county, let them reuse it rather than answer twice.
-              const residence = answers.county;
+              // The question flow stores one place per kind; a list only comes from storage.
+              const residence = placesOf(answers.county)[0];
               const canReuse = (key === "property_county" || key === "business_county") && residence !== undefined;
               return (
                 <div key={key}>
-                  <QuestionBlock q={q} value={answers[key]} onAnswer={answer} />
+                  <QuestionBlock q={q} value={placesOf(answers[key])[0]} onAnswer={answer} />
                   {canReuse && (
                     <button type="button" onClick={() => sameAsResidence(key)} className="mt-1 text-sm underline text-sunshine-700">
                       {t("lens.sameAsResidence", { place: q.options.find((o) => o.value === residence)?.label ?? residence })}

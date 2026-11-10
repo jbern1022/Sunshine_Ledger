@@ -141,3 +141,9 @@ Each slice ships behind the existing `?lens=1` flag.
    several roles after?
 4. **Shortcut copy** for "same as where I live": acceptable wording and
    behavior?
+
+## Status 2026-11-10: slice 2, matcher only (local branch feat/local-2026-11-10-offline)
+
+The matcher and stored answers accept **a list of places per kind** (`property_county: ["Leon", "Duval"]`). A requirement holds if any listed place matches; an exception holds only if it holds for **every** listed place; a list of one behaves exactly like the plain string; an empty list is unanswered. `cleanAnswers` keeps lists only on the six place keys, de-duplicates and caps at 10. Tests: `lib/impactLens.severalPlaces.test.ts`.
+
+**Not built:** the control that lets a reader enter more than one place. The question flow still stores one place per kind, so nothing changes for readers until that control exists (a UI and wording decision, and the privacy page lists the stored fields). Slice 3 (several roles) is untouched.
