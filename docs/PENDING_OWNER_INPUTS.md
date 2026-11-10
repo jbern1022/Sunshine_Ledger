@@ -55,11 +55,20 @@ Access Ledger, Pattern and Tenant Ledger, Judicial Sentencing Matrix, Phase 3 an
 eviction, floor-speech video pipeline, vetted-contributor quotes. Not Sunshine scope: the duplicate
 `C:\OllamaModels` folder and Ollama auto-start after reboot (needs Powerstation access).
 
-## What is deliberately not built, and why
+## What is built but switched off, and what is deliberately not built
 
-* Auth/watchlist/alert **routes and screens**: they need the Cognito pool to be real, and each route is an
-  exposure to review. Everything underneath is built and tested.
-* **Enacted-stage earmarks**: need the joint explanatory statement tables; and the lists' reuse terms first.
-* **News analysis in production**: no articles, no human labels, no frozen thresholds exist, and public labels are
-  gated on them.
-* **Layer 3 of the Federal Impact Lens**: attributed estimates only when CBO/an agency publishes a Florida figure.
+Built, tested, deployed, and **dark** (404 until you flip a flag): reader accounts (`AUTH_ENABLED`, and
+`NEXT_PUBLIC_AUTH_ENABLED` for the screens), public sign-up (`REGISTRATION_OPEN`, and
+`NEXT_PUBLIC_REGISTRATION_OPEN`), sessions, the MFA gate, export and deletion, watchlists, the Follow button, alerts
+and digests (queue only), entitlements. See `docs/ACCOUNTS_BUILD_STATUS.md`. Turning them on needs a real user pool
+(section 1), the privacy-page change, SES, and the gates in Todoist `6hCMm7FWfJ47jCgp`.
+
+Not built, because it needs the real pool or an input first:
+
+* **MFA enrollment** (QR and manual key), **passkey registration**, and the **recovery request** screens: Cognito's
+  token and challenge behavior must be observed in a dev pool before the flow is fixed.
+* **Alert sending**: needs SES, a verified sender, unsubscribe and bounce handling.
+* **Enacted-stage earmarks**: need the enacted laws' joint explanatory statement tables, and the lists' reuse terms.
+* **News analysis in production**: no articles, no human labels, no frozen thresholds exist; public labels are gated.
+* **Layer 3 of the Federal Impact Lens**: attributed estimates only when CBO or an agency publishes a Florida figure.
+* **Topic follow buttons and official follow buttons**: topics wait on where to place them; officials on the legal review.
