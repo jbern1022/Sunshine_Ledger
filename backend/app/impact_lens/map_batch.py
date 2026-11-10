@@ -16,8 +16,9 @@ decide when the review-by-risk step can start.
 supported, uncapped Who layer that still has unmapped entries (the same
 completeness rule the read endpoint uses), newest bill activity first, and
 stops starting new bills once --limit bills or --max-minutes have been used.
-It is not wired into run-ingestion.sh: turning it on publishes automatic
-mappings on every bill, which waits on the hand-labeled baseline.
+It runs in run-ingestion.sh after Bill layers (option B in
+docs/IMPACT_LENS_NIGHTLY_MAPPING.md): mappings are stored every night, and the
+read endpoint holds the ones that need review until a person approves them.
 """
 
 from __future__ import annotations
@@ -196,7 +197,15 @@ if __name__ == "__main__":
             stored, failed, bills = process_pending(
                 db, client, generated_by=f"llm:{settings.ollama_layers_model}", limit=args.limit, max_minutes=args.max_minutes
             )
-            print(f"{bills} bills: stored {stored}, failed {failed}")
+            remaining = len(pending_who_layers(db))
+            print(f"{bills} bills: stored {stored}, failed {failed}; {remaining} bills still have unmapped entries")
+            # Freshness note for the runbook and /sources/status-style checks. "last checked" moves
+            # only when nothing is left pending, as with the crawls; no public source entry.
+            from app.pipeline.source_checks import record_check, record_partial
+            if remaining == 0 and not failed:
+                record_check(db, "impact_lens_mapping", f"stored {stored}")
+            else:
+                record_partial(db, "impact_lens_mapping", f"incomplete: {remaining} bills pending, {failed} entries failed")
             sys.exit(1 if failed and not stored else 0)
         pairs = current_who_layers(db, args.bill)
         missing = set(args.bill) - {b.bill_number for b, _ in pairs}

@@ -20,6 +20,7 @@ from app.impact_lens.vocabulary import (
     BUSINESS, FLORIDA_COUNTIES, MUNICIPALITY_COUNTIES, PROPERTY, REGISTRY, RESIDENCE, ROLE_LOCATIONS,
     VOCABULARY_VERSION, jurisdiction_label,
 )
+from app.impact_lens.criteria import review_tier
 from app.impact_lens.selection import review_state, served_rows
 from app.models import BillLayer, Entity
 from app.schemas.impact_lens import (
@@ -180,6 +181,9 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
     for i, item in enumerate(layer.items):
         row = mapped.get(i)
         state = review_state(row) if row else None
+        # Option B (docs/IMPACT_LENS_NIGHTLY_MAPPING.md): a mapping where a wrong reading could
+        # flip a result unnoticed waits for a person. Held reads as unmapped, never as "no".
+        held = bool(row) and state == "unreviewed" and review_tier(row.criteria) == "needs_review"
         entries.append(LensEntryOut(
             group=str(item.get("group") or ""),
             text=str(item.get("text") or ""),
@@ -187,9 +191,10 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
             conditions=[LensItemOut(text=str(c.get("text") or ""), quote=str(c.get("quote") or "")) for c in item.get("conditions") or []],
             exceptions=[LensItemOut(text=str(c.get("text") or ""), quote=str(c.get("quote") or "")) for c in item.get("exceptions") or []],
             # A rejected mapping is withheld: the entry reads as unmapped, never as a quiet miss.
-            criteria=row.criteria if row and state != "rejected" else None,
+            criteria=row.criteria if row and state != "rejected" and not held else None,
             reviewed=state == "approved",
             withdrawn=state == "rejected",
+            held=held,
         ))
 
     reasons: list[str] = []
@@ -200,9 +205,12 @@ def get_impact_lens(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> Impa
     if not layer.items:
         reasons.append("The analysis has no entries.")
     withdrawn = sum(1 for e in entries if e.withdrawn)
-    unmapped = sum(1 for e in entries if e.criteria is None and not e.withdrawn)
+    held_count = sum(1 for e in entries if e.held)
+    unmapped = sum(1 for e in entries if e.criteria is None and not e.withdrawn and not e.held)
     if unmapped:
         reasons.append(f"{unmapped} of {len(entries)} entries have no questions mapped yet.")
+    if held_count:
+        reasons.append(f"{held_count} of {len(entries)} entries are waiting for a person to review their questions.")
     if withdrawn:
         reasons.append(f"{withdrawn} of {len(entries)} entries had their questions withdrawn after review.")
 

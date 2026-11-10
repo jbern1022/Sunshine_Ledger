@@ -57,6 +57,8 @@ export interface LensEntry {
   criteria: Criteria | null;
   /** true once a person has approved this mapping. */
   reviewed?: boolean;
+  /** Mapped but held back until a person approves it; `criteria` is null and the entry reads as unmapped. */
+  held?: boolean;
 }
 
 export interface LensBill {

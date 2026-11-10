@@ -1,6 +1,6 @@
 # Impact Lens: wiring the mapping step into the nightly
 
-Status: **design, nothing wired.** Written 2026-11-10 on a local branch. Companion to
+Status: **option B chosen by the owner 2026-11-10 and built on a local branch (not deployed).** Items 1 to 5 below are done: serve-time hold (`held` on each entry), `review --queue`, the nightly line in `scripts/run-ingestion.sh`, the "N bills still pending" log, and a `source_checks` row `impact_lens_mapping` (no public source entry, since the lens is behind `?lens=1`). Written 2026-11-10. Companion to
 `IMPACT_LENS_REVIEW_LIFECYCLE.md` (what a reviewed, approved or rejected row does) and
 `IMPACT_LENS_ROLE_LOCATIONS.md`. This note answers: what would it take to make
 `python -m app.impact_lens.map_batch --pending` run every night, and what must be decided first.

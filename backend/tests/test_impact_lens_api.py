@@ -27,7 +27,7 @@ def _layer(db, entity, items, *, version=1, superseded=False, state="supported",
     return row
 
 
-def _criteria(db, layer, index, raw, *, vocab=VOCABULARY_VERSION, method="impact_lens_criteria/8"):
+def _criteria(db, layer, index, raw, *, vocab=VOCABULARY_VERSION, method="impact_lens_criteria/8", approve=False):
     item = layer.items[index]
     crit = validate_criteria(
         raw, entry_index=index, n_conditions=len(item.get("conditions") or []),
@@ -37,6 +37,9 @@ def _criteria(db, layer, index, raw, *, vocab=VOCABULARY_VERSION, method="impact
                             method_version=method, generated_by="llm:test", criteria=crit)
     db.add(row)
     db.commit()
+    if approve:
+        db.add(BillLayerCriteriaReview(criteria_id=row.id, decision="approved", reviewer="test"))
+        db.commit()
     return row
 
 
@@ -45,6 +48,11 @@ LANDLORD_RAW = {
     "requires": [{"attr": "jurisdiction", "op": "in", "values": ["county:Duval"], "from": {"kind": "condition", "index": 0}}],
     "excludes": [{"attr": "property_type", "op": "in", "values": ["single_family"], "from": {"kind": "exception", "index": 0}}],
 }
+# No exclusions, only plain "is one of" tests: tier "simple", so it is served before a person approves it.
+SIMPLE_RAW = {
+    "audience": {"kind": "attr", "attr": "role", "any_of": ["landlord"]},
+    "requires": [{"attr": "jurisdiction", "op": "in", "values": ["municipality:Jacksonville"], "from": {"kind": "condition", "index": 0}}],
+}  # maps the DISTRICTS item, which has no exceptions
 
 
 def test_unknown_or_non_bill_is_404(client, bill_factory):
@@ -64,11 +72,11 @@ def test_a_bill_without_a_who_layer_is_unavailable_not_an_error(client, bill_fac
 def test_a_fully_mapped_supported_layer_is_complete_with_the_slice_it_needs(client, db_session, bill_factory):
     entity = bill_factory()
     layer = _layer(db_session, entity, [LANDLORD])
-    _criteria(db_session, layer, 0, LANDLORD_RAW)
+    _criteria(db_session, layer, 0, LANDLORD_RAW, approve=True)
     body = client.get(f"/bills/{entity.id}/impact-lens").json()
     assert body["available"] and body["complete"] is True and body["incomplete_reasons"] == []
     e = body["entries"][0]
-    assert e["group"] == "Landlords" and e["reviewed"] is False
+    assert e["group"] == "Landlords" and e["reviewed"] is True
     assert e["criteria"]["audience"]["any_of"] == ["landlord"]
     assert e["conditions"][0]["text"] == "Applies in Duval County."
     keys = [q["key"] for q in body["questions"]]
@@ -102,7 +110,7 @@ def test_municipalities_only_the_places_the_bill_names(client, db_session, bill_
 def test_an_entry_with_no_mapping_makes_the_layer_incomplete(client, db_session, bill_factory):
     entity = bill_factory()
     layer = _layer(db_session, entity, [LANDLORD, DISTRICTS])
-    _criteria(db_session, layer, 0, LANDLORD_RAW)
+    _criteria(db_session, layer, 0, LANDLORD_RAW, approve=True)
     body = client.get(f"/bills/{entity.id}/impact-lens").json()
     assert body["complete"] is False
     assert body["incomplete_reasons"] == ["1 of 2 entries have no questions mapped yet."]
@@ -112,13 +120,13 @@ def test_an_entry_with_no_mapping_makes_the_layer_incomplete(client, db_session,
 def test_a_capped_or_unsupported_layer_is_incomplete(client, db_session, bill_factory):
     entity = bill_factory()
     layer = _layer(db_session, entity, [LANDLORD], scope="Bill text · first 20 of 31 entries")
-    _criteria(db_session, layer, 0, LANDLORD_RAW)
+    _criteria(db_session, layer, 0, LANDLORD_RAW, approve=True)
     body = client.get(f"/bills/{entity.id}/impact-lens").json()
     assert body["complete"] is False and body["incomplete_reasons"] == ["The analysis lists only the first entries of a longer list."]
 
     other = bill_factory(bill_number="HB 2")
     weak = _layer(db_session, other, [LANDLORD], state="insufficient_evidence")
-    _criteria(db_session, weak, 0, LANDLORD_RAW)
+    _criteria(db_session, weak, 0, LANDLORD_RAW, approve=True)
     assert "not marked supported" in client.get(f"/bills/{other.id}/impact-lens").json()["incomplete_reasons"][0]
 
 
@@ -135,9 +143,9 @@ def test_only_the_current_layer_and_current_vocabulary_count(client, db_session,
 
 def test_the_newest_mapping_wins_and_review_follows_the_row(client, db_session, bill_factory):
     entity = bill_factory()
-    layer = _layer(db_session, entity, [LANDLORD])
+    layer = _layer(db_session, entity, [DISTRICTS])
     first = _criteria(db_session, layer, 0, {}, method="impact_lens_criteria/7")  # nothing mapped
-    second = _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/8")
+    second = _criteria(db_session, layer, 0, SIMPLE_RAW, method="impact_lens_criteria/8")
     db_session.add(BillLayerCriteriaReview(criteria_id=first.id, decision="approved", reviewer="joe", note="secret"))
     db_session.commit()
     resp = client.get(f"/bills/{entity.id}/impact-lens")
@@ -180,11 +188,11 @@ def test_rejection_beats_an_earlier_approval(client, db_session, bill_factory):
 
 def test_a_remapped_entry_replaces_a_withdrawn_one_and_starts_unreviewed(client, db_session, bill_factory):
     entity = bill_factory()
-    layer = _layer(db_session, entity, [LANDLORD])
+    layer = _layer(db_session, entity, [DISTRICTS])
     old = _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/7")
     db_session.add(BillLayerCriteriaReview(criteria_id=old.id, decision="rejected", reviewer="joe"))
     db_session.commit()
-    _criteria(db_session, layer, 0, LANDLORD_RAW, method="impact_lens_criteria/8")
+    _criteria(db_session, layer, 0, SIMPLE_RAW, method="impact_lens_criteria/8")
     body = client.get(f"/bills/{entity.id}/impact-lens").json()
     e = body["entries"][0]
     assert e["criteria"] is not None and e["withdrawn"] is False and e["reviewed"] is False
@@ -224,7 +232,7 @@ def test_every_role_has_a_location_kind_and_the_response_sends_the_table(client,
 def test_a_landlord_bill_asks_where_the_property_is_not_where_the_reader_lives(client, db_session, bill_factory):
     entity = bill_factory()
     layer = _layer(db_session, entity, [LANDLORD])
-    _criteria(db_session, layer, 0, LANDLORD_RAW)  # landlord, requires county:Duval
+    _criteria(db_session, layer, 0, LANDLORD_RAW, approve=True)  # landlord, requires county:Duval
     questions = {q["key"]: q for q in client.get(f"/bills/{entity.id}/impact-lens").json()["questions"]}
     assert "county" not in questions
     prop = questions["property_county"]
@@ -274,3 +282,33 @@ def test_a_bill_with_several_kinds_asks_each_location_once(client, db_session, b
 def test_an_anyone_provision_asks_where_the_reader_lives(client, db_session, bill_factory):
     keys = _question_keys(client, db_session, bill_factory, _entry("Anyone", None, "county:Duval"))
     assert keys == ["county"]
+
+
+def test_a_needs_review_mapping_is_held_until_a_person_approves_it(client, db_session, bill_factory):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [LANDLORD])
+    row = _criteria(db_session, layer, 0, LANDLORD_RAW)  # an exclusion makes it needs_review
+    body = client.get(f"/bills/{entity.id}/impact-lens").json()
+    e = body["entries"][0]
+    assert e["criteria"] is None and e["held"] is True and e["withdrawn"] is False and e["reviewed"] is False
+    assert body["complete"] is False
+    assert body["incomplete_reasons"] == ["1 of 1 entries are waiting for a person to review their questions."]
+    assert body["questions"] == []  # a held mapping asks nothing
+
+    db_session.add(BillLayerCriteriaReview(criteria_id=row.id, decision="approved", reviewer="joe"))
+    db_session.commit()
+    body = client.get(f"/bills/{entity.id}/impact-lens").json()
+    e = body["entries"][0]
+    assert e["criteria"] is not None and e["held"] is False and e["reviewed"] is True and body["complete"] is True
+
+
+def test_a_simple_mapping_is_served_unreviewed_and_a_rejected_held_row_is_withdrawn_not_held(client, db_session, bill_factory):
+    entity = bill_factory()
+    layer = _layer(db_session, entity, [DISTRICTS, LANDLORD])
+    _criteria(db_session, layer, 0, SIMPLE_RAW)
+    bad = _criteria(db_session, layer, 1, LANDLORD_RAW)
+    db_session.add(BillLayerCriteriaReview(criteria_id=bad.id, decision="rejected", reviewer="joe"))
+    db_session.commit()
+    entries = client.get(f"/bills/{entity.id}/impact-lens").json()["entries"]
+    assert entries[0]["criteria"] is not None and entries[0]["held"] is False and entries[0]["reviewed"] is False
+    assert entries[1]["criteria"] is None and entries[1]["withdrawn"] is True and entries[1]["held"] is False

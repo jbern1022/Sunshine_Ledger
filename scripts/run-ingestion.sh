@@ -137,6 +137,12 @@ step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeli
 # 150 bills in 31 min (2026-09-25), so 400 should take ~85 min.
 step "Bill layers" docker exec "$CONTAINER" python -m app.pipeline.bill_layers_batch --limit 400 --max-minutes 180
 
+# Impact Lens: map the Who-it-affects entries Bill layers just produced to questions.
+# Stored only; mappings that need review are held back from readers until approved
+# (docs/IMPACT_LENS_NIGHTLY_MAPPING.md). Bounded by bills and wall clock; a method or
+# vocabulary bump drains its backlog over several nights, newest bills first.
+step "Impact Lens mapping" docker exec "$CONTAINER" python -m app.impact_lens.map_batch --pending --limit 200 --max-minutes 60
+
 step "Miami iQM2 scrape (finish)" miami_finish
 
 # Not ingestion, but it needs to run daily and this is the daily job. Keeps

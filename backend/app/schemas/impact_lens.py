@@ -26,6 +26,8 @@ class LensEntryOut(BaseModel):
     # A person rejected the mapping: `criteria` is withheld (null) and the entry
     # counts as unmapped. See docs/IMPACT_LENS_REVIEW_LIFECYCLE.md.
     withdrawn: bool = False
+    # Mapped, but held back until a person approves it (a mapping where a wrong reading is risky).
+    held: bool = False
 
 
 class LensOptionOut(BaseModel):
