@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { parseChangeMarkers } from "@/lib/changeMarkers";
 
 /** Bill text with its inline `[deleted: …]` / `[added: …]` markers shown as
@@ -10,8 +11,8 @@ export default function MarkedText({ text }: { text: string }) {
       {parseChangeMarkers(text).map((segment, i) => {
         if (segment.kind === "deleted") {
           return (
-            <del key={i} title="removed" className="text-red-700 decoration-red-400">
-              <span className="sr-only">[removed: </span>
+            <del key={i} title={t("marked.removed")} className="text-red-700 decoration-red-400">
+              <span className="sr-only">[{t("marked.removed")}: </span>
               {segment.text}
               <span className="sr-only">]</span>
             </del>
@@ -19,8 +20,8 @@ export default function MarkedText({ text }: { text: string }) {
         }
         if (segment.kind === "added") {
           return (
-            <ins key={i} title="added" className="bg-emerald-50 text-emerald-900 decoration-emerald-500">
-              <span className="sr-only">[added: </span>
+            <ins key={i} title={t("marked.added")} className="bg-emerald-50 text-emerald-900 decoration-emerald-500">
+              <span className="sr-only">[{t("marked.added")}: </span>
               {segment.text}
               <span className="sr-only">]</span>
             </ins>

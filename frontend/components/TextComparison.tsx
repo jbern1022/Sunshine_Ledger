@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 
+import { t } from "@/lib/i18n";
 import { fetchFiledText } from "@/lib/api";
 import { lawAsAmended } from "@/lib/changeMarkers";
 import { MAX_COMPARE_CHARS, compareTexts, type CompareBlock } from "@/lib/textCompare";
@@ -23,7 +24,7 @@ function SameBlock({ clauses }: { clauses: string[] }) {
       onClick={() => setOpen(true)}
       className="block text-left text-xs italic text-slate-500 underline hover:text-slate-700"
     >
-      … {clauses.length} unchanged passages (show) …
+      … {t("compare.unchanged", { count: clauses.length })} …
     </button>
   );
 }
@@ -78,7 +79,7 @@ export default function TextComparison({
       setError(null);
       fetchFiledText(entityId)
         .then((f) => setFiledText(f.text))
-        .catch(() => setError("Couldn't load the filed text. Try again later."));
+        .catch(() => setError(t("compare.loadError")));
     }
   };
 
@@ -86,13 +87,13 @@ export default function TextComparison({
     <>
       {versions.filed.url && (
         <a href={versions.filed.url} target="_blank" rel="noreferrer" className="underline">
-          filed version ↗
+          {t("compare.filedLink")}
         </a>
       )}
       {versions.filed.url && versions.current.url && " · "}
       {versions.current.url && (
         <a href={versions.current.url} target="_blank" rel="noreferrer" className="underline">
-          current version ↗
+          {t("compare.currentLink")}
         </a>
       )}
     </>
@@ -101,15 +102,18 @@ export default function TextComparison({
   return (
     <section className="mt-4" aria-labelledby="text-changes-heading">
       <h2 id="text-changes-heading" className="text-sm font-semibold text-ledger-900">
-        How the text changed
+        {t("compare.title")}
       </h2>
       <p className="text-sm text-slate-700">
-        Filed: {describe(versions.filed, "filed version")} · Current: {describe(versions.current, "current version")}
+        {t("compare.versions", {
+          filed: describe(versions.filed, t("compare.filedFallback")),
+          current: describe(versions.current, t("compare.currentFallback")),
+        })}
       </p>
 
       {tooLarge ? (
         <p className="mt-1 text-xs text-slate-500">
-          Too long to compare here. Official texts: {links}
+          {t("compare.tooLarge")} {links}
         </p>
       ) : (
         <>
@@ -120,32 +124,30 @@ export default function TextComparison({
             aria-controls="text-comparison"
             className="mt-1 text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
           >
-            {open ? "Hide the comparison" : "Compare the filed and current text"}
+            {open ? t("compare.hide") : t("compare.show")}
           </button>
 
           {open && (
             <div id="text-comparison" className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
               {error && <p className="text-red-700">{error}</p>}
-              {!error && !comparison && <p className="text-slate-500">Loading the filed text…</p>}
+              {!error && !comparison && <p className="text-slate-500">{t("compare.loading")}</p>}
               {comparison && (
                 <>
                   <p className="font-medium text-ledger-900">
-                    About {Math.round((1 - comparison.similarity) * 100)}% of the wording changed.
+                    {t("compare.percent", { pct: Math.round((1 - comparison.similarity) * 100) })}
                   </p>
                   <p className="mb-3 text-[11px] text-slate-500">
-                    Compared by Sunshine Ledger from the official texts, as the law would read (the bill&apos;s own
-                    strike-through and underlining resolved; line breaks ignored). Added wording is underlined,
-                    removed wording struck through. Official texts: {links}
+                    {t("compare.method")} {links}
                   </p>
                   {comparison.rewritten ? (
                     <>
                       <p className="mb-2 text-slate-700">
-                        Substantially rewritten from the filed version, so the two texts are shown side by side.
+                        {t("compare.rewritten")}
                       </p>
                       <div className="grid gap-3 md:grid-cols-2">
                         {[
-                          { title: "As filed", text: lawAsAmended(filedText ?? "") },
-                          { title: "Current", text: lawAsAmended(currentText) },
+                          { title: t("compare.asFiled"), text: lawAsAmended(filedText ?? "") },
+                          { title: t("compare.current"), text: lawAsAmended(currentText) },
                         ].map((col) => (
                           <div key={col.title}>
                             <h3 className="text-xs font-semibold text-ledger-900">{col.title}</h3>

@@ -50,3 +50,7 @@ Not yet converted: about 301 strings across 24 files (this branch converts the h
 - Library (`next-intl` or the small helper) and URL strategy (`/es/...` prefix recommended).
 - Any translation. No Spanish or Haitian Creole text exists or has been reviewed.
 - Dates: `formatChecked` now uses the locale tag; other hand-formatted dates (bill page, timeline) still use `en-US` directly.
+
+## Update 2026-11-10 (local branch feat/local-2026-11-10-offline)
+
+The table above is stale. Every public page and component now reads from the catalogue **except** `app/privacy/page.tsx` and `app/methodology/page.tsx` (deliberately last: long legal-sounding prose that needs the fluent reviewer), `app/admin/promises/page.tsx` (internal, English only) and the text-free `TagBadges` and `PersonRecord`. This branch converted `app/corrections/page.tsx`, `AmendmentDiff`, `MarkedText` and `TextComparison`.

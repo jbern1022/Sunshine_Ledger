@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { diffWordsWithSpace } from "diff";
+import { t } from "@/lib/i18n";
 import { lawAsAmended } from "@/lib/changeMarkers";
 
 /** Word-level diff between the bill's stored full text and one amendment's
@@ -32,14 +33,12 @@ export default function AmendmentDiff({ baseText, amendedText }: { baseText: str
         onClick={() => setExpanded((v) => !v)}
         className="text-xs font-medium text-sunshine-700 underline hover:text-sunshine-800"
       >
-        {expanded ? "Hide changes" : "View changes"}
+        {expanded ? t("diff.hide") : t("diff.view")}
       </button>
       {expanded && (
         <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3">
           <p className="mb-2 text-[11px] text-slate-500">
-            Diffed against the bill&apos;s current stored text, not necessarily the version
-            immediately before this amendment — see caveat in source. Added text is highlighted,
-            removed text is struck through.
+            {t("diff.caveat")}
           </p>
           <p className="whitespace-pre-wrap font-mono text-xs leading-relaxed">
             {parts.map((part, i) => (
