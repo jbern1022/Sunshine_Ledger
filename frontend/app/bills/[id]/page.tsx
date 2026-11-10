@@ -17,6 +17,7 @@ import FloridaPlaces from "@/components/FloridaPlaces";
 import { FlagThis } from "@/components/ChallengeForm";
 import { AccountabilityNotes, CorrectionsSection } from "@/components/Accountability";
 import { forTarget } from "@/lib/accountability";
+import FollowButton from "@/components/FollowButton";
 import { hasAnyLayer } from "@/lib/layers";
 import { effectiveLabel, provisionDateLabel } from "@/lib/billStatus";
 
@@ -112,6 +113,7 @@ export default async function BillPage({ params, searchParams }: Props) {
         </div>
         <h1 className="mt-1 text-2xl font-bold text-ledger-900">{bill.bill_number}</h1>
         <p className="mt-1 text-sm text-slate-600">{bill.name.trim() === "*" ? t("bill.untitled") : bill.name}</p>
+        <div className="mt-2"><FollowButton kind="bill" target={bill.entity_id} label={bill.bill_number} /></div>
         {!isLegislation && (
           <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             {t("bill.agendaNotice", {

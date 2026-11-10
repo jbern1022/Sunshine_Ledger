@@ -7,12 +7,14 @@ import * as acct from "@/lib/account";
 vi.mock("@/lib/account", () => ({
   getMe: vi.fn(), getWatchlist: vi.fn(), signIn: vi.fn(), answerTotp: vi.fn(), signOut: vi.fn(), signOutEverywhere: vi.fn(),
   deleteAccount: vi.fn(), exportData: vi.fn(), removeWatch: vi.fn(),
+  signUp: vi.fn(), confirmSignUp: vi.fn(), resendConfirmation: vi.fn(), requestPasswordReset: vi.fn(), confirmPasswordReset: vi.fn(),
+  REGISTRATION_OPEN: false,
 }));
 const m = vi.mocked(acct);
 const me = { id: "u1", email: "a@example.org", second_factor_required: false, restricted: false, factors: ["pwd"] };
 
 beforeEach(() => {
-  Object.values(m).forEach((f) => (f as ReturnType<typeof vi.fn>).mockReset());
+  Object.values(m).forEach((f) => typeof f === "function" && (f as ReturnType<typeof vi.fn>).mockReset());
   m.getWatchlist.mockResolvedValue([]);
 });
 
@@ -91,5 +93,44 @@ describe("AccountPanel", () => {
     render(<AccountPanel />);
     await user.click(await screen.findByRole("button", { name: "Stop following" }));
     await waitFor(() => expect(screen.getByText("You aren't following anything yet.")).toBeInTheDocument());
+  });
+});
+
+
+describe("AccountPanel: reset and registration", () => {
+  it("has no sign-up link while registration is closed, and walks a password reset", async () => {
+    m.getMe.mockResolvedValue(null);
+    m.requestPasswordReset.mockResolvedValue({ ok: true });
+    m.confirmPasswordReset.mockResolvedValue({ ok: true });
+    const user = userEvent.setup();
+    render(<AccountPanel />);
+    expect(await screen.findByRole("button", { name: "Forgot your password?" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create an account" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Forgot your password?" }));
+    await user.type(screen.getByLabelText("Email address"), "a@example.org");
+    await user.click(screen.getByRole("button", { name: "Send the code" }));
+    expect(m.requestPasswordReset).toHaveBeenCalledWith("a@example.org");
+    expect(await screen.findByLabelText("Email address")).toHaveValue("a@example.org"); // kept from the first step
+    await user.type(screen.getByLabelText("Code from the email"), "999");
+    await user.type(screen.getByLabelText("Choose a password"), "a-new-long-password");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(m.confirmPasswordReset).toHaveBeenCalledWith("a@example.org", "999", "a-new-long-password");
+    expect(await screen.findByRole("status")).toHaveTextContent("signed out everywhere");
+    expect(screen.getByLabelText("Password")).toHaveValue("");
+  });
+
+  it("shows a weak-password message and does not move on", async () => {
+    m.getMe.mockResolvedValue(null);
+    m.requestPasswordReset.mockResolvedValue({ ok: true });
+    m.confirmPasswordReset.mockResolvedValue({ ok: false, code: "invalid_credentials" });
+    const user = userEvent.setup();
+    render(<AccountPanel />);
+    await user.click(await screen.findByRole("button", { name: "Forgot your password?" }));
+    await user.type(screen.getByLabelText("Email address"), "a@example.org");
+    await user.click(screen.getByRole("button", { name: "Send the code" }));
+    await user.type(await screen.findByLabelText("Code from the email"), "000");
+    await user.type(screen.getByLabelText("Choose a password"), "x");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That didn't work");
   });
 });

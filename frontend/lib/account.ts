@@ -7,6 +7,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 /** Accounts are off unless the build says otherwise; with the flag off the pages are 404 and nothing here runs. */
 export const ACCOUNTS_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === "true";
+/** Public registration is its own switch (the API's REGISTRATION_OPEN); until both are on there is no sign-up link. */
+export const REGISTRATION_OPEN = ACCOUNTS_ENABLED && process.env.NEXT_PUBLIC_REGISTRATION_OPEN === "true";
 
 export interface Me {
   id: string;
@@ -85,6 +87,22 @@ export async function answerTotp(challengeToken: string, code: string): Promise<
     return { kind: "failed", code: "unavailable" };
   }
 }
+
+type Outcome = { ok: boolean; code?: string };
+
+async function postJson(path: string, body: unknown): Promise<Outcome> {
+  try {
+    const res = await call(path, { method: "POST", body });
+    return res.ok ? { ok: true } : { ok: false, code: await failureCode(res) };
+  } catch {
+    return { ok: false, code: "unavailable" };
+  }
+}
+
+export const signUp = (email: string, password: string) => postJson("/auth/sign-up", { email, password });
+export const confirmSignUp = (email: string, code: string) => postJson("/auth/sign-up/confirm", { email, code });
+export const resendConfirmation = (email: string) => postJson("/auth/sign-up/resend", { email });
+export const requestPasswordReset = (email: string) => postJson("/auth/password-reset/request", { email });
 
 export async function confirmPasswordReset(email: string, code: string, newPassword: string): Promise<{ ok: boolean; code?: string }> {
   try {

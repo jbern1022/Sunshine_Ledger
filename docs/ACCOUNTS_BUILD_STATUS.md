@@ -67,3 +67,10 @@ Also built behind `REGISTRATION_OPEN` (a separate switch from `AUTH_ENABLED`, de
 (same answer whether or not the address exists; a sign-up never touches an existing account; weak passwords are reported),
 `/auth/sign-up/confirm`, `/auth/sign-up/resend`, and (under `AUTH_ENABLED` only) `/auth/password-reset/request`, which looks
 identical for known and unknown addresses. The Cognito calls are Stubber-tested only.
+
+Screens also built (all dark unless the site is built with `NEXT_PUBLIC_AUTH_ENABLED=true`; sign-up also needs
+`NEXT_PUBLIC_REGISTRATION_OPEN=true`): create an account, confirm the address, resend the code, request and confirm a
+password reset (all messages identical for known and unknown addresses), and a **Follow** button on bill pages
+(bills only for now: official-following waits for the scoped legal review; topic buttons are not placed yet).
+Still not built: MFA enrollment (QR and manual key) and passkey registration, which need the user pool, and the
+recovery request screens.
