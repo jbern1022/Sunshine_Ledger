@@ -30,6 +30,7 @@ from app.models.federal_text import FederalBillText, FederalPlaceFinding
 from app.models.entitlement import EntitlementGrant
 from app.models.account import AuthSession, User
 from app.models.watch import Watch
+from app.models.pending_alert import PendingAlert
 
 __all__ = [
     "Entity",
@@ -72,4 +73,5 @@ __all__ = [
     "AuthSession",
     "User",
     "Watch",
+    "PendingAlert",
 ]
