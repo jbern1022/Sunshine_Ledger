@@ -26,6 +26,7 @@ export interface BillSearchParams {
   geo_scope_name?: string;
   tag?: string;
   sponsor_entity_id?: string;
+  district?: string;
   limit?: number;
   offset?: number;
 }

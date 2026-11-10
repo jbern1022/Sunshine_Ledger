@@ -18,6 +18,7 @@ function BrowsePageInner() {
   const searchParams = useSearchParams();
   const geoFilter = searchParams.get("geo") ?? "";
   const sponsorFilter = searchParams.get("sponsor") ?? "";
+  const districtFilter = /^(HD|SD)-\d{3}$/.test(searchParams.get("district") ?? "") ? (searchParams.get("district") as string) : "";
   const sponsorName = searchParams.get("sponsorName") ?? "";
 
   // Filters and the page live in the URL (lib/browse-params): the view can be
@@ -139,6 +140,7 @@ function BrowsePageInner() {
       tag: tag || undefined,
       geo_scope_name: geoFilter || undefined,
       sponsor_entity_id: sponsorFilter || undefined,
+      district: districtFilter || undefined,
       limit: PAGE_SIZE,
       offset,
     })
@@ -157,7 +159,7 @@ function BrowsePageInner() {
     return () => {
       cancelled = true;
     };
-  }, [urlQ, jurisdiction, status, session, tag, geoFilter, sponsorFilter, offset, reloadKey]);
+  }, [urlQ, jurisdiction, status, session, tag, geoFilter, sponsorFilter, districtFilter, offset, reloadKey]);
 
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
@@ -182,6 +184,14 @@ function BrowsePageInner() {
             <>
               {" "}
               {tRich("browse.filteredGeo", { geo: <span className="font-medium text-ledger-900">{geoFilter}</span> })}
+            </>
+          )}
+          {districtFilter && (
+            <>
+              {" "}
+              {tRich("browse.filteredDistrict", {
+                district: <span className="font-medium text-ledger-900">{districtFilter}</span>,
+              })}
             </>
           )}
           {sponsorFilter && (

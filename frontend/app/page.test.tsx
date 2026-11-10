@@ -331,6 +331,21 @@ describe("BrowsePage URL state", () => {
     expect(nav.get().get("sponsorName")).toBe("Jane Doe");
   });
 
+  it("filters by a valid district in the URL, and ignores a malformed one", async () => {
+    vi.mocked(api.fetchBills).mockResolvedValue({ total: 1, items: [makeBill("HB 1")] });
+    nav.set(new URLSearchParams("district=HD-101"));
+    const { unmount } = render(<BrowsePage />);
+    await screen.findByText("HB 1");
+    expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ district: "HD-101" }));
+    expect(screen.getByText("HD-101")).toBeInTheDocument();
+    unmount();
+
+    nav.set(new URLSearchParams("district=nonsense"));
+    render(<BrowsePage />);
+    await screen.findByText("HB 1");
+    expect(api.fetchBills).toHaveBeenLastCalledWith(expect.objectContaining({ district: undefined }));
+  });
+
   it("puts the search text in the URL after typing pauses", async () => {
     vi.mocked(api.fetchBills).mockResolvedValue({ total: 1, items: [makeBill("HB 1")] });
     const user = userEvent.setup();

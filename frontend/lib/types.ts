@@ -507,3 +507,45 @@ export interface PromiseList {
   total: number;
   items: PromiseStatement[];
 }
+
+export interface DistrictListItem { code: string; chamber: "house" | "senate"; number: number }
+export interface DistrictList {
+  map_plan: { key: string; name: string; effective_from: string } | null;
+  total: number;
+  items: DistrictListItem[];
+}
+export interface DistrictMetric {
+  label: string;
+  unit: string | null;
+  estimate: number | null;
+  margin_of_error: number | null;
+  reliability: "ok" | "high_moe" | "suppressed" | "unknown";
+  suppressed: boolean;
+}
+export interface DistrictDetail {
+  code: string;
+  chamber: "house" | "senate";
+  number: number;
+  map_plan: { key: string; name: string; effective_from: string; effective_to: string | null };
+  members: {
+    person_entity_id: string;
+    name: string;
+    party: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    end_reason: string | null;
+    current: boolean;
+    basis: "tenure" | "current_roster";
+  }[];
+  sponsored_bills: {
+    total: number;
+    note: string;
+    items: { entity_id: string; bill_number: string; name: string; status: string; last_action_date: string | null }[];
+  };
+  census_profile: {
+    population: "residents";
+    label: string;
+    source: string;
+    profile: { badge_slug: string; badge_label: string; vintage: string; metrics: DistrictMetric[] }[];
+  };
+}

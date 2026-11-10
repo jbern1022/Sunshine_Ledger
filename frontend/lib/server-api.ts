@@ -1,5 +1,7 @@
 import type { BillDetail, BillListResponse, CorrectionLogEntry, PersonDetail, PersonListResponse, SourceStatus,
   PromiseList,
+  DistrictList,
+  DistrictDetail,
 } from "./types";
 
 /** Server-side API base.
@@ -143,6 +145,26 @@ export async function getPromises(filters: { chamber?: string; district?: number
     const res = await fetch(`${SERVER_API_URL}/promises?${qs}`, { next: { revalidate: 600 } });
     if (!res.ok) return null;
     return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getDistricts(): Promise<DistrictList | null> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/districts`, { next: { revalidate: 3600 } });
+    return res.ok ? res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One district. Null when the API can't be reached; undefined when it says the district does not exist. */
+export async function getDistrict(code: string): Promise<DistrictDetail | null | undefined> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/districts/${encodeURIComponent(code)}`, { next: { revalidate: 600 } });
+    if (res.status === 404) return undefined;
+    return res.ok ? res.json() : null;
   } catch {
     return null;
   }
