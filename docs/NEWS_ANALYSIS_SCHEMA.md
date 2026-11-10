@@ -111,3 +111,15 @@ independent records. Headline-only limits above. `model_estimate` must be true. 
 * Which text may be stored or quoted, from the access findings.
 * The tone rubric's reviewers' notes: whether `mixed` tone needs a stricter definition after the pilot.
 * Whether stance is also recorded toward the bill's sponsor. Not in v1: it risks motive inference.
+
+## Runner (built 2026-11-10, internal only)
+
+`app/news_analysis/analyze.py` turns one article and one bill target into a validated record using the same
+`generate(prompt, json_mode=True)` client interface as the Impact Lens mapper. The model is not trusted for
+anything checkable: it quotes passages, and the code finds each quote in the article itself and sets the offsets.
+A quote that is not in the text verbatim is dropped, never repaired. A stance or tone left with no supporting
+passage becomes `insufficient_evidence`; an argument with no real quote is dropped; a headline-only article is
+capped at `descriptive`; a quoted speaker without a name is not kept. If the final record cannot pass
+`schema.validate` the runner raises and nothing is produced. It fetches nothing, stores nothing, and has no
+schedule: the data route (access findings) and the frozen benchmark come first. Tested with a fake model only;
+**no real model output has been evaluated**.
