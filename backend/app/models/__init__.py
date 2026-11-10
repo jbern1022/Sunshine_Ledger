@@ -15,6 +15,14 @@ from app.models.bill_layer_criteria import BillLayerCriteria, BillLayerCriteriaR
 from app.models.source_check import SourceCheck
 from app.models.bill_text_version import BillTextVersion
 from app.models.legiscan_call import LegiScanCallCount
+from app.models.promise import (
+    ElectionWinner,
+    OfficialSite,
+    PromiseFlag,
+    PromiseItem,
+    PromiseReview,
+    SiteSnapshot,
+)
 
 __all__ = [
     "Entity",
@@ -41,4 +49,10 @@ __all__ = [
     "SourceCheck",
     "BillTextVersion",
     "LegiScanCallCount",
+    "ElectionWinner",
+    "OfficialSite",
+    "SiteSnapshot",
+    "PromiseItem",
+    "PromiseFlag",
+    "PromiseReview",
 ]
