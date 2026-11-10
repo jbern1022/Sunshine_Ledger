@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchImpactLens } from "@/lib/api";
+import { t, type MessageKey } from "@/lib/i18n";
 import {
   QUESTION_KEYS,
   cleanAnswers,
@@ -66,14 +67,13 @@ const TONE: Record<ResultKind, string> = {
   everyone_only: "border-emerald-300 bg-emerald-50 text-emerald-900",
 };
 
-const SCOPE: Record<ResultKind, string> = {
-  applies: "This is based on the provisions below and the answers you gave.",
-  may_affect: "This is a possible, indirect effect based on the answers you gave, not an established fact.",
-  ambiguous: "The text of the bill leaves a question open that decides whether it reaches you. We do not guess.",
-  cant_determine: "We do not have enough, from the bill or from your answers, to say either way.",
-  does_not_appear:
-    "Based only on the provisions we have analyzed and the answers you gave. This is not a guarantee that the bill has no effect on you.",
-  everyone_only: "Every provision we found applies to everyone.",
+const SCOPE: Record<ResultKind, MessageKey> = {
+  applies: "lens.scope.applies",
+  may_affect: "lens.scope.may_affect",
+  ambiguous: "lens.scope.ambiguous",
+  cant_determine: "lens.scope.cant_determine",
+  does_not_appear: "lens.scope.does_not_appear",
+  everyone_only: "lens.scope.everyone_only",
 };
 
 const input = "h-4 w-4 accent-sunshine-700";
@@ -109,7 +109,7 @@ function QuestionBlock({
           {q.question}
         </label>
         <select id={id} className={field} value={choice} onChange={(e) => setChoice(e.target.value)}>
-          <option value="">Choose one</option>
+          <option value="">{t("lens.chooseOne")}</option>
           {q.options.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
@@ -221,13 +221,13 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
   return (
     <section ref={rootRef} className="mt-4 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="impact-lens-heading">
       <h2 id="impact-lens-heading" tabIndex={-1} className="text-sm font-semibold text-ledger-900 focus:outline-none">
-        Does this affect you?
+        {t("lens.title")}
       </h2>
 
       {!open && (
         <div className="mt-2">
-          <p className="text-sm text-slate-700">Do you want to see if you may be impacted?</p>
-          <p className="mt-1 text-xs text-slate-500">Optional. We ask only what this bill needs. Your answers stay in this browser.</p>
+          <p className="text-sm text-slate-700">{t("lens.prompt")}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("lens.optional")}</p>
           <button
             type="button"
             onClick={() => {
@@ -236,28 +236,28 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
             }}
             className="mt-2 rounded-md border border-sunshine-700 px-3 py-1.5 text-sm font-medium text-sunshine-700 hover:bg-sunshine-50"
           >
-            Yes, check
+            {t("lens.yesCheck")}
           </button>
         </div>
       )}
 
-      {open && error && <p className="mt-2 text-sm text-red-700">We could not load this bill&apos;s questions. Try again later.</p>}
-      {open && !error && !data && <p className="mt-2 text-sm text-slate-600">Loading…</p>}
+      {open && error && <p className="mt-2 text-sm text-red-700">{t("lens.loadError")}</p>}
+      {open && !error && !data && <p className="mt-2 text-sm text-slate-600">{t("lens.loading")}</p>}
       {open && data && !data.available && (
-        <p className="mt-2 text-sm text-slate-700">{data.unavailable_reason ?? "This bill has not been analyzed for this yet."}</p>
+        <p className="mt-2 text-sm text-slate-700">{data.unavailable_reason ?? t("lens.notAnalyzed")}</p>
       )}
 
       {open && data?.available && result && (
         <div className="mt-2">
           {answeredChips.length > 0 && (
             <p className="text-xs text-slate-600">
-              Your answers:{" "}
+              {t("lens.yourAnswers")}{" "}
               {answeredChips.map((k, i) => (
                 <span key={k}>
                   {i > 0 && " · "}
                   {byKey.get(k)?.label ?? k}: <strong>{labelFor(k, answers[k] as string)}</strong>{" "}
-                  <button type="button" className="underline text-sunshine-700" onClick={() => change(k)} aria-label={`Change ${byKey.get(k)?.label ?? k}`}>
-                    change
+                  <button type="button" className="underline text-sunshine-700" onClick={() => change(k)} aria-label={t("lens.changeAria", { label: byKey.get(k)?.label ?? k })}>
+                    {t("lens.change")}
                   </button>
                 </span>
               ))}
@@ -277,7 +277,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
                   <QuestionBlock q={q} value={answers[key]} onAnswer={answer} />
                   {canReuse && (
                     <button type="button" onClick={() => sameAsResidence(key)} className="mt-1 text-sm underline text-sunshine-700">
-                      Same as where I live ({q.options.find((o) => o.value === residence)?.label ?? residence})
+                      {t("lens.sameAsResidence", { place: q.options.find((o) => o.value === residence)?.label ?? residence })}
                     </button>
                   )}
                 </div>
@@ -286,19 +286,19 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
 
           <div role="status" aria-live="polite" tabIndex={-1} data-lens-result className={`mt-3 rounded-md border px-3 py-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sunshine-700 ${TONE[result.result]}`}>
             <p className="text-base font-semibold">{result.label}</p>
-            <p className="mt-0.5 text-xs">{SCOPE[result.result]}</p>
-            {result.ask.length > 0 && <p className="mt-0.5 text-xs">Answer the question above to narrow this down.</p>}
+            <p className="mt-0.5 text-xs">{t(SCOPE[result.result])}</p>
+            {result.ask.length > 0 && <p className="mt-0.5 text-xs">{t("lens.answerAbove")}</p>}
           </div>
 
           {result.ambiguity && (
             <p className="mt-2 text-sm text-slate-800">
-              <strong>The open question:</strong> {result.ambiguity.question} <q className="italic">{result.ambiguity.quote}</q>
+              <strong>{t("lens.openQuestion")}</strong> {result.ambiguity.question} <q className="italic">{result.ambiguity.quote}</q>
             </p>
           )}
 
           {result.why.length > 0 && result.result !== "ambiguous" && (
             <details className="mt-2 text-sm" open>
-              <summary className="cursor-pointer font-medium text-ledger-900">Why we say this</summary>
+              <summary className="cursor-pointer font-medium text-ledger-900">{t("lens.why")}</summary>
               <ol className="mt-1 list-decimal space-y-2 pl-5 text-slate-800">
                 {result.why.map((w, i) => (
                   <li key={i}>
@@ -313,7 +313,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
 
           {result.everyone.length > 0 && result.result !== "everyone_only" && (
             <div className="mt-3 text-sm text-slate-800">
-              <p className="font-medium text-ledger-900">Applies to everyone</p>
+              <p className="font-medium text-ledger-900">{t("lens.appliesToEveryone")}</p>
               <ul className="mt-1 list-disc space-y-1 pl-5">
                 {result.everyone.map((e) => (
                   <li key={e.index}>
@@ -325,17 +325,17 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
           )}
 
           {(result.unreviewed && result.basis.length > 0) && (
-            <p className="mt-3 text-xs text-slate-600">Automatically mapped, not yet reviewed by a person.</p>
+            <p className="mt-3 text-xs text-slate-600">{t("lens.unreviewed")}</p>
           )}
           {!data.complete && (
             <p className="mt-1 text-xs text-slate-600">
-              This list of provisions may not be complete: {data.incomplete_reasons.join(" ")}
+              {t("lens.incomplete", { reasons: data.incomplete_reasons.join(" ") })}
             </p>
           )}
           <p className="mt-3 text-xs text-slate-500">
-            This is about relevance, not legal or financial advice, and it does not change the bill&apos;s record.{" "}
+            {t("lens.disclaimer")}{" "}
             <button type="button" className="underline text-sunshine-700" onClick={clearAll}>
-              Clear my answers
+              {t("lens.clear")}
             </button>
           </p>
         </div>

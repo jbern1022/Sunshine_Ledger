@@ -10,7 +10,7 @@ Mechanism: `frontend/lib/i18n` (`t`, `tRich`, a typed English catalogue, plural 
 | `app/privacy/page.tsx` | 44 | 0 | no |
 | `app/bills/[id]/page.tsx` | 26 | 0 | no |
 | `app/page.tsx` | 19 | 6 | no |
-| `components/ImpactLens.tsx` | 20 | 0 | no |
+| `components/ImpactLens.tsx` | 20 | 0 | yes (2026-11-10; the question wording itself is sent by the API and is not converted) |
 | `app/people/page.tsx` | 9 | 3 | no |
 | `components/Accountability.tsx` | 12 | 0 | no |
 | `components/ChallengeForm.tsx` | 10 | 2 | no |
