@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     legistar_clients: str = "miamifl,jaxcityc"
 
     ollama_host: str = "http://localhost:11434"
+
+    # Where promise snapshots (raw fetched pages) are stored, by content hash.
+    snapshot_dir: str = "/data/snapshots"
+    # Politeness for crawling candidates' own sites: seconds between requests
+    # to one host (the approved iQM2 default is 60), and a cap per run.
+    crawl_pace_seconds: float = 60.0
+    crawl_max_requests: int = 400
     ollama_model: str = "llama3.1"
 
     # Optional cheaper model for the summary fields that measured as

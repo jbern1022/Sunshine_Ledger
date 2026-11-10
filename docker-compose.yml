@@ -33,6 +33,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Promise snapshots (raw pages, stored by content hash). Survives
+      # rebuilds; back up with the database dumps.
+      - snapshots:/data/snapshots
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   frontend:
@@ -83,3 +87,4 @@ services:
 
 volumes:
   db_data:
+  snapshots:
