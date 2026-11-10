@@ -21,6 +21,7 @@ export interface JurisdictionOption {
 const BASE: JurisdictionOption[] = [
   { label: "All jurisdictions", value: "" },
   { label: "Florida (state)", value: "FL" },
+  { label: "United States (Congress)", value: "US" },
 ];
 
 /** Homepage jurisdiction dropdown: every city the site actually ingests (from
@@ -33,7 +34,7 @@ export function jurisdictionOptions(statuses: SourceStatus[] | null): Jurisdicti
  *  source list when available, else the fallback list. */
 export function localJurisdictions(statuses: SourceStatus[] | null): string[] {
   const names = statuses
-    ? statuses.map((s) => s.jurisdiction).filter((j): j is string => !!j && j !== "FL")
+    ? statuses.map((s) => s.jurisdiction).filter((j): j is string => !!j && j !== "FL" && j !== "US")
     : [...LOCAL_JURISDICTIONS];
   return Array.from(new Set(names)).sort();
 }

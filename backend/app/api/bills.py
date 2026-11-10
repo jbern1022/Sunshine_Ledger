@@ -188,6 +188,14 @@ def list_bills(
 
     if jurisdiction_name:
         stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
+    elif not sponsor_entity_id:
+        # "All jurisdictions" leaves out federal bills that only appeared
+        # because of a roll call; a few hundred of them would bury the
+        # state and local bills. Choose the United States, or follow a
+        # sponsor, to see them.
+        from app.federal.policy import eligible_for_generation
+
+        stmt = stmt.where(eligible_for_generation())
     if jurisdiction_level:
         stmt = stmt.where(Entity.jurisdiction_level == jurisdiction_level)
     if status:

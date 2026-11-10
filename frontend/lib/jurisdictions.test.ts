@@ -18,11 +18,11 @@ describe("jurisdictionOptions", () => {
       status("iqm2_miami", "Miami"),
       status("gdelt", null),
     ]);
-    expect(opts.map((o) => o.value)).toEqual(["", "FL", "Fort Lauderdale", "Jacksonville", "Miami"]);
+    expect(opts.map((o) => o.value)).toEqual(["", "FL", "US", "Fort Lauderdale", "Jacksonville", "Miami"]);
   });
 
   it("falls back to the known cities when the status list is unavailable", () => {
-    expect(jurisdictionOptions(null).map((o) => o.value)).toEqual(["", "FL", ...[...LOCAL_JURISDICTIONS].sort()]);
+    expect(jurisdictionOptions(null).map((o) => o.value)).toEqual(["", "FL", "US", ...[...LOCAL_JURISDICTIONS].sort()]);
   });
 });
 

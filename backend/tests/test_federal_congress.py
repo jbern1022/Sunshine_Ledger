@@ -217,3 +217,16 @@ def test_rate_limit_is_a_clear_error_and_a_renamed_list_key_is_still_read():
     with pytest.raises(CongressApiError, match="rate limit"):
         c.get("/limited")
     assert list(c.paged("/x", "expectedKey")) == [{"n": 1}]
+
+
+def test_all_jurisdictions_hides_roll_call_only_federal_bills(client, db_session):
+    state = Entity(entity_type="bill", name="State bill", jurisdiction_level="state", jurisdiction_name="FL", external_ids={}, attributes={})
+    db_session.add(state)
+    db_session.flush()
+    db_session.add(Bill(entity_id=state.id, bill_number="HB 1", session="2026", status="Introduced", source_system="legiscan"))
+    upsert_bill(db_session, congress=119, slug="hr", number=1, title="Delegation bill", delegation=True)
+    upsert_bill(db_session, congress=119, slug="hr", number=2, title="Roll call only")
+    db_session.flush()
+    names = lambda url: {b["name"] for b in client.get(url).json()["items"]}
+    assert names("/bills") == {"State bill", "Delegation bill"}
+    assert names("/bills?jurisdiction_name=US") == {"Delegation bill", "Roll call only"}
