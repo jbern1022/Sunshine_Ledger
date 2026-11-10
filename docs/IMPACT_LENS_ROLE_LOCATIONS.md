@@ -146,4 +146,4 @@ Each slice ships behind the existing `?lens=1` flag.
 
 The matcher and stored answers accept **a list of places per kind** (`property_county: ["Leon", "Duval"]`). A requirement holds if any listed place matches; an exception holds only if it holds for **every** listed place; a list of one behaves exactly like the plain string; an empty list is unanswered. `cleanAnswers` keeps lists only on the six place keys, de-duplicates and caps at 10. Tests: `lib/impactLens.severalPlaces.test.ts`.
 
-**Not built:** the control that lets a reader enter more than one place. The question flow still stores one place per kind, so nothing changes for readers until that control exists (a UI and wording decision, and the privacy page lists the stored fields). Slice 3 (several roles) is untouched.
+**Control (built, behind `?lens=1`):** property and workplace counties get an "add another county" button in the answers line (not residence; capped at 10; the already-given and "none of these" options are removed from the list). Municipalities are still one per kind. The privacy page now says more than one county may be kept. Slice 3 (several roles) is untouched.
