@@ -17,8 +17,9 @@ STAGE_LABELS = {
     "enacted": "Funded in an enacted law.",
 }
 NOTE = (
-    "From the House Appropriations Committee's published Community Project Funding tables. Senate "
-    "Congressionally Directed Spending is not included yet. A project can appear at more than one stage."
+    "From the House Appropriations Committee's published Community Project Funding tables and the Senate "
+    "Appropriations Committee's Congressionally Directed Spending requests. Senate enacted awards are not included yet. "
+    "A project can appear at more than one stage."
 )
 
 
@@ -51,7 +52,7 @@ def list_earmarks(
         "total": total,
         "items": [
             {
-                "id": str(e.id), "fiscal_year": e.fiscal_year, "stage": e.stage, "stage_label": STAGE_LABELS[e.stage],
+                "id": str(e.id), "chamber": e.chamber, "fiscal_year": e.fiscal_year, "stage": e.stage, "stage_label": STAGE_LABELS[e.stage],
                 "district": e.district, "person_id": str(e.person_entity_id) if e.person_entity_id else None,
                 "member": f"{e.member_first + ' ' if e.member_first else ''}{e.member_last}", "party": e.party,
                 "subcommittee": e.subcommittee, "recipient": e.recipient, "description": e.description,

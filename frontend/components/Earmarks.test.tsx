@@ -4,7 +4,7 @@ import Earmarks from "./Earmarks";
 import type { EarmarkList } from "@/lib/types";
 
 const item = (over = {}) => ({
-  id: "1", fiscal_year: 2027, stage: "requested" as const, stage_label: "A member's request. Not funding: it may never be included in a bill.",
+  id: "1", chamber: "house" as const, fiscal_year: 2027, stage: "requested" as const, stage_label: "A member's request. Not funding: it may never be included in a bill.",
   district: "CD-012", person_id: "p1", member: "Gus Bilirakis", party: "R", subcommittee: "Agriculture",
   recipient: "School Board of Pasco County", description: "Sustainable Futures Program", recipient_address: null, amount: 5000000,
   member_url: null, source_url: "https://appropriations.house.gov/x.xlsx", ...over,

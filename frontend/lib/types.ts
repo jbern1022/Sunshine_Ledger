@@ -585,6 +585,7 @@ export interface FloridaPlaces {
 
 export interface EarmarkItem {
   id: string;
+  chamber: "house" | "senate";
   fiscal_year: number;
   stage: "requested" | "included" | "enacted";
   stage_label: string;

@@ -21,7 +21,7 @@ export default function Earmarks({ data, district }: { data: EarmarkList; distri
             </p>
             <p className="mt-1 text-slate-800">{e.description}</p>
             <p className="mt-1 text-xs text-slate-500">
-              FY{e.fiscal_year} · {e.subcommittee} · {e.member}
+              FY{e.fiscal_year} · {e.chamber === "senate" ? "Senate" : "House"} · {e.subcommittee} · {e.member}
               {e.party ? ` (${e.party})` : ""} · <a href={e.source_url} className="text-sunshine-700 underline" rel="noopener noreferrer">{t("earmarks.source")}</a>
             </p>
             <p className="mt-1 text-xs text-slate-500">{e.stage_label}</p>

@@ -84,7 +84,7 @@ def test_api_labels_the_stage_and_filters(client, db_session):
     p = person(db_session, "Jared Moskowitz", 23)
     em.import_rows(db_session, rows()[:1], fiscal_year=2027, stage="requested", source_url="https://x/y.xlsx")
     body = client.get("/earmarks?district=CD-023").json()
-    assert body["total"] == 1 and "Senate" in body["note"]
+    assert body["total"] == 1 and "Senate" in body["note"] and body["items"][0]["chamber"] == "house"
     item = body["items"][0]
     assert item["stage"] == "requested" and item["stage_label"].startswith("A member's request. Not funding")
     assert item["member"] == "Jared Moskowitz" and item["person_id"] == str(p.id)
