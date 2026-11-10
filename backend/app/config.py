@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     # to one host (the approved iQM2 default is 60), and a cap per run.
     crawl_pace_seconds: float = 60.0
     crawl_max_requests: int = 400
+    # iQM2 portals publish `Crawl-delay: 60`; that is also our default and a
+    # floor. A run stops at whichever cap it hits first and resumes next time.
+    iqm2_pace_seconds: float = 60.0
+    iqm2_max_requests_per_run: int = 150
+    iqm2_max_minutes_per_run: int = 150
     ollama_model: str = "llama3.1"
 
     # Optional cheaper model for the summary fields that measured as

@@ -299,6 +299,19 @@ ingest_local_bills(db, client_name='jaxcityc', limit=200)
 "
 
 # Real Miami bills (scraped from iQM2, not Legistar -- see gotcha below)
+# Paced at the portal's Crawl-delay (60 s/request), so one run covers ~150
+# requests / 150 min at most and RESUMES from the `crawl_checkpoints` row
+# "iqm2:miamifl" next time. Flags: --max-requests, --max-minutes, --pace
+# (cannot go below the portal's Crawl-delay; faster needs written permission
+# from the portal). `source_checks` (the site's "last checked") moves only
+# when a whole cycle finishes; a stopped run writes "incomplete: ..." into
+# its last_result instead. To start a cycle over: delete that checkpoint row.
+# The nightly runs this in the background, alongside the other steps, and its
+# new items are summarized the following night. Any other iQM2 portal added
+# later (Okeechobee has one) must use IQM2Client so the same policy applies.
+# A deploy waits up to 30 min for a running pipeline job; this one may be
+# mid-cycle, which is fine to stop: docker stop is safe, the checkpoint
+# is committed after every record.
 docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.miami_iqm2
 
 # Backfill amendments and roll-call votes for state bills already ingested

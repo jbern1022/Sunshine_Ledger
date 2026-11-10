@@ -8,7 +8,7 @@
 #
 # Steps, in order: pull new/changed state bills (LegiScan), pull new
 # local matters (Legistar: Jacksonville only -- Miami's Legistar client
-# is stale, see docs/RUNBOOK.md), scrape Miami's real source (iQM2),
+# is stale, see docs/RUNBOOK.md), scrape Miami's real source (iQM2, paced, in the background),
 # summarize anything new, update bill page layers, purge expired flag
 # reporter emails.
 #
@@ -68,6 +68,27 @@ fi
 
 echo "[$(date)] Starting scheduled ingestion run."
 
+# Miami's iQM2 portal asks for one request a minute (robots.txt Crawl-delay:
+# 60; policy approved 2026-10-29), so its step takes hours. It runs alongside
+# everything else, on its own host, so it never delays another jurisdiction.
+# It stops itself at its request or time cap (MIAMI_IQM2_MAX_MINUTES, default
+# 150) and resumes from its checkpoint the next night. Its new items are
+# summarized the following night. The exit code is read at the end.
+MIAMI_LOG="$(mktemp -t miami-iqm2.XXXXXX)"
+echo "[$(date)] Miami iQM2 scrape started in the background (log: ${MIAMI_LOG})"
+( docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2 \
+      --max-minutes "${MIAMI_IQM2_MAX_MINUTES:-150}" >"$MIAMI_LOG" 2>&1; echo $? >"${MIAMI_LOG}.rc" ) &
+MIAMI_PID=$!
+
+miami_finish() {
+    wait "$MIAMI_PID" 2>/dev/null
+    cat "$MIAMI_LOG"
+    local rc
+    rc="$(cat "${MIAMI_LOG}.rc" 2>/dev/null || echo 1)"
+    rm -f "$MIAMI_LOG" "${MIAMI_LOG}.rc"
+    return "$rc"
+}
+
 # LegiScan's free tier is 10,000 calls/month from 2026-10-01. The nightly
 # sync imports the session dataset when it changes (2 calls), fetches only
 # bills changed since, takes new text documents from flsenate.gov, and stops
@@ -96,7 +117,7 @@ step "Legistar (nightly cities)" docker exec "$CONTAINER" python -m app.pipeline
 # every 14 days, not every night. Runs before the summarizer so new text is used.
 step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_text --source legistar --limit 100
 
-step "Miami iQM2 scrape" docker exec "$CONTAINER" python -m app.pipeline.miami_iqm2
+# (Miami iQM2 is already running in the background; see the top of the run.)
 
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
 
@@ -106,6 +127,8 @@ step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeli
 # can't run into the morning. The first nightly run did
 # 150 bills in 31 min (2026-09-25), so 400 should take ~85 min.
 step "Bill layers" docker exec "$CONTAINER" python -m app.pipeline.bill_layers_batch --limit 400 --max-minutes 180
+
+step "Miami iQM2 scrape (finish)" miami_finish
 
 # Not ingestion, but it needs to run daily and this is the daily job. Keeps
 # the privacy page's promise: reporter emails on flags resolved 90+ days ago

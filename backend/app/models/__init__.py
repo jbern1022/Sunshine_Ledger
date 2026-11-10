@@ -23,6 +23,7 @@ from app.models.promise import (
     PromiseReview,
     SiteSnapshot,
 )
+from app.models.crawl_checkpoint import CrawlCheckpoint
 
 __all__ = [
     "Entity",
@@ -55,4 +56,5 @@ __all__ = [
     "PromiseItem",
     "PromiseFlag",
     "PromiseReview",
+    "CrawlCheckpoint",
 ]

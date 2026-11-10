@@ -26,3 +26,14 @@ def record_check(db: Session, source_key: str, result: str | None = None) -> Non
         )
     )
     db.commit()
+
+
+def record_partial(db: Session, source_key: str, result: str) -> None:
+    """Note that a step ran but did not finish, WITHOUT moving
+    `last_checked_at`: the source was not fully checked, and the site's
+    "last checked" note must not say it was. A source that has never
+    completed has no row to annotate, so nothing is written."""
+    row = db.query(SourceCheck).filter(SourceCheck.source_key == source_key).one_or_none()
+    if row is not None:
+        row.last_result = result[:200]
+        db.commit()
