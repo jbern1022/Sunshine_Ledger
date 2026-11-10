@@ -76,6 +76,18 @@ ACS_TABLES: dict[str, list[tuple[str, str, str]]] = {
 }
 
 
+# "Residents 65 and over" is not one ACS cell: it is the sum of the twelve male and
+# female age bands from B01001 (65-66, 67-69, 70-74, 75-79, 80-84, 85+), over the
+# table's total. The two derived figures carry a margin of error computed the way
+# the Census Bureau's handbook says (square root of the sum of squares for a sum;
+# the proportion formula for a share), never a bare ratio.
+OLDER_TOTAL = "B01001_001"
+OLDER_BANDS = [f"B01001_{n:03d}" for n in (*range(20, 26), *range(44, 50))]
+OLDER_SLUG = "older_residents"
+OLDER_LABEL = "Older residents"
+ACS_TABLES[OLDER_SLUG] = [(v, v, "persons") for v in (OLDER_TOTAL, *OLDER_BANDS)]
+
+
 class ACSError(RuntimeError):
     pass
 
@@ -199,7 +211,34 @@ def _store_overlay(
     return overlay
 
 
-def _acs_metrics(values: dict[str, str], table: list[tuple[str, str, str]]) -> list[dict]:
+def _older_metrics(values: dict[str, str]) -> list[dict]:
+    """65-and-over count and share, with margins of error; missing parts make both null."""
+    total, total_moe = _num(values.get(f"{OLDER_TOTAL}E")), _num(values.get(f"{OLDER_TOTAL}M"))
+    parts = [(_num(values.get(f"{v}E")), _num(values.get(f"{v}M"))) for v in OLDER_BANDS]
+    count_label, share_label = "Residents 65 and over", "Share of residents 65 and over"
+    if total is None or total_moe is None or any(e is None or m is None for e, m in parts):
+        return [
+            {"label": count_label, "estimate": None, "margin_of_error": None, "unit": "persons"},
+            {"label": share_label, "estimate": None, "margin_of_error": None, "unit": "percent"},
+        ]
+    count = sum(e for e, _ in parts)  # type: ignore[misc]
+    count_moe = sum(m**2 for _, m in parts) ** 0.5  # type: ignore[operator]
+    metrics = [{"label": count_label, "estimate": count, "margin_of_error": count_moe, "unit": "persons"}]
+    if total > 0:
+        p = count / total
+        radicand = count_moe**2 - p**2 * total_moe**2
+        if radicand < 0:  # the handbook's fallback: the ratio formula
+            radicand = count_moe**2 + p**2 * total_moe**2
+        metrics.append({"label": share_label, "estimate": round(p * 100, 1),
+                        "margin_of_error": round(radicand**0.5 / total * 100, 1), "unit": "percent"})
+    else:
+        metrics.append({"label": share_label, "estimate": None, "margin_of_error": None, "unit": "percent"})
+    return metrics
+
+
+def _acs_metrics(values: dict[str, str], table: list[tuple[str, str, str]], badge_slug: str | None = None) -> list[dict]:
+    if badge_slug == OLDER_SLUG:
+        return _older_metrics(values)
     return [
         {
             "label": label,
@@ -237,7 +276,7 @@ def load_acs_district_overlays(
                 geography_id=f"{prefix}-{code.zfill(3)}",
                 badge_slug=badge_slug,
                 source="acs",
-                metrics=_acs_metrics(values, table),
+                metrics=_acs_metrics(values, table, badge_slug),
                 as_of=ACS_YEAR,
             )
             count += 1
@@ -260,7 +299,7 @@ def load_acs_county_overlays(db: Session, *, badge_slug: str, client: ACSClient 
             geography_id=county_name,
             badge_slug=badge_slug,
             source="acs",
-            metrics=_acs_metrics(values, table),
+            metrics=_acs_metrics(values, table, badge_slug),
             as_of=ACS_YEAR,
         )
         count += 1
@@ -320,6 +359,9 @@ def load_all_overlays(db: Session, *, bls_year: str | None = None) -> dict[str, 
         "acs_congressional_infrastructure_transportation": load_acs_district_overlays(
             db, badge_slug="infrastructure_transportation", prefixes=("CD",)
         ),
+        "acs_district_older_residents": load_acs_district_overlays(db, badge_slug=OLDER_SLUG),
+        "acs_congressional_older_residents": load_acs_district_overlays(db, badge_slug=OLDER_SLUG, prefixes=("CD",)),
+        "acs_county_older_residents": load_acs_county_overlays(db, badge_slug=OLDER_SLUG),
         "acs_county_housing": load_acs_county_overlays(db, badge_slug="housing"),
         "acs_county_infrastructure_transportation": load_acs_county_overlays(
             db, badge_slug="infrastructure_transportation"

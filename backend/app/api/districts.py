@@ -133,7 +133,7 @@ def get_district(code: str, db: Session = Depends(get_db)) -> dict:
             DemographicOverlay.source == "acs",
         )
     ).scalars().all()
-    labels = {t.slug: t.label for t in db.execute(select(Tag)).scalars()}
+    labels = {"older_residents": "Older residents", **{t.slug: t.label for t in db.execute(select(Tag)).scalars()}}
     profile = [
         {
             "badge_slug": o.badge_slug, "badge_label": labels.get(o.badge_slug, o.badge_slug), "vintage": o.as_of,

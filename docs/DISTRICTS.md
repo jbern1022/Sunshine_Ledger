@@ -37,6 +37,10 @@ never appear on the state-legislative sponsorship map (`/map/districts` reads
 - ACS for congressional districts uses the Census `congressional district`
   geography in the 2024 5-year release (119th Congress boundaries).
 
+## Older residents (65 and over)
+
+`older_residents` is an ACS overlay for state House, state Senate, congressional districts and the two counties: residents 65 and over, and their share of all residents. It is the sum of the twelve male and female 65+ age bands of table B01001, so its margin of error is computed (square root of the sum of squares; the Census handbook's proportion formula for the share), and a suppressed or missing band leaves both figures empty rather than undercounting. It appears in the district profile with the same reliability flags as the other figures. Load it with `python -m app.pipeline.demographic_overlay` (needs `CENSUS_API_KEY`); it is also in `load_all_overlays`. It describes residents, not voters.
+
 ## Not built
 
 - Street address to district. It needs a geocoder, which would send the

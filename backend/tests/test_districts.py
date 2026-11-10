@@ -273,3 +273,42 @@ def test_a_member_re_elected_to_the_same_seat_is_one_line(db_session):
     _tenure(db_session, pat, "fl_house", 5, date(2022, 11, 22))
     got = members(db_session, d)
     assert len(got) == 1 and got[0]["start_date"] == date(2018, 11, 20) and got[0]["end_date"] is None and got[0]["current"]
+
+
+def test_older_residents_count_share_and_margins():
+    from app.pipeline.demographic_overlay import OLDER_BANDS, OLDER_TOTAL, _older_metrics
+
+    values = {f"{OLDER_TOTAL}E": "1000", f"{OLDER_TOTAL}M": "50"}
+    for v in OLDER_BANDS:
+        values[f"{v}E"], values[f"{v}M"] = "10", "6"  # 12 bands -> 120 people
+    count, share = _older_metrics(values)
+    assert count["estimate"] == 120 and count["unit"] == "persons"
+    assert round(count["margin_of_error"], 2) == round((12 * 36) ** 0.5, 2)
+    assert share["estimate"] == 12.0 and share["unit"] == "percent"
+    # handbook proportion formula: sqrt(moe_x^2 - p^2 * moe_y^2) / total
+    expected = ((12 * 36) - 0.12**2 * 50**2) ** 0.5 / 1000 * 100
+    assert share["margin_of_error"] == round(expected, 1)
+
+
+def test_older_residents_missing_or_suppressed_cell_gives_no_figures():
+    from app.pipeline.demographic_overlay import OLDER_BANDS, OLDER_TOTAL, _older_metrics
+
+    values = {f"{OLDER_TOTAL}E": "1000", f"{OLDER_TOTAL}M": "50"}
+    for v in OLDER_BANDS:
+        values[f"{v}E"], values[f"{v}M"] = "10", "6"
+    values[f"{OLDER_BANDS[0]}E"] = "-666666666"
+    assert [m["estimate"] for m in _older_metrics(values)] == [None, None]
+    assert [m["estimate"] for m in _older_metrics({})] == [None, None]
+
+
+def test_older_residents_loads_for_districts_with_one_request_of_25_variables(db_session):
+    from app.pipeline.demographic_overlay import OLDER_BANDS, OLDER_SLUG, OLDER_TOTAL, load_acs_district_overlays
+
+    class Fake:
+        def get_by_district(self, variables, *, chamber):
+            assert len(variables) == 2 * (1 + len(OLDER_BANDS))
+            return {"101": {v: "10" for v in variables}}
+
+    assert load_acs_district_overlays(db_session, badge_slug=OLDER_SLUG, client=Fake()) == 2
+    row = db_session.execute(select(DemographicOverlay).where(DemographicOverlay.geography_id == "HD-101")).scalar_one()
+    assert row.badge_slug == OLDER_SLUG and row.metrics[0]["estimate"] == 120
