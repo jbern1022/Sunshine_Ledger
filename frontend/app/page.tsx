@@ -9,6 +9,7 @@ import { jurisdictionOptions } from "@/lib/jurisdictions";
 import type { BillListItem, SessionCount, SourceStatus, StatusCount, TagCount } from "@/lib/types";
 import BillCard from "@/components/BillCard";
 import ElectionContext from "@/components/ElectionContext";
+import FollowButton from "@/components/FollowButton";
 import DataFreshness from "@/components/DataFreshness";
 
 const PAGE_SIZE = BROWSE_PAGE_SIZE;
@@ -285,6 +286,17 @@ function BrowsePageInner() {
           ))}
         </select>
       </div>
+
+      {tag && (
+        <div className="mb-3">
+          <FollowButton
+            kind="topic"
+            target={tag}
+            jurisdiction={jurisdiction || ""}
+            label={`${tags.find((x) => x.slug === tag)?.label ?? tag}${jurisdiction ? ` · ${jurisdiction}` : ""}`}
+          />
+        </div>
+      )}
 
       {error && (
         <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">

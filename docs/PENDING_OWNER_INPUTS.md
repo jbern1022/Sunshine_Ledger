@@ -71,4 +71,4 @@ Not built, because it needs the real pool or an input first:
 * **Enacted-stage earmarks**: need the enacted laws' joint explanatory statement tables, and the lists' reuse terms.
 * **News analysis in production**: no articles, no human labels, no frozen thresholds exist; public labels are gated.
 * **Layer 3 of the Federal Impact Lens**: attributed estimates only when CBO or an agency publishes a Florida figure.
-* **Topic follow buttons and official follow buttons**: topics wait on where to place them; officials on the legal review.
+* **Official follow buttons**: wait for the legal review (topic buttons are on the filtered browse page).
