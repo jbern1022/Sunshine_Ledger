@@ -52,3 +52,13 @@ session is an opaque HttpOnly SameSite=Lax cookie; state-changing calls need the
 `COGNITO_REGION/USER_POOL_ID/CLIENT_ID[/CLIENT_SECRET]`, else 503. New settings: `AUTH_ENABLED`, `SESSION_COOKIE_DOMAIN`,
 `SESSION_COOKIE_SECURE`. Still needed to go live: a real user pool (AWS), the screens, SES, the privacy-page change, and the
 gates in `6hCMm7FWfJ47jCgp`.
+
+## Update 2026-11-10 (evening): the account page is built, switched off
+
+`/account` (`components/AccountPanel.tsx`, `lib/account.ts`): sign-in with the second step, a uniform error for credential
+failures, account summary, sign out / sign out everywhere, data download, delete with an explicit confirmation and the
+re-sign-in message, a restricted recovery session that sees nothing else, and the watchlist with unfollow. It is a 404
+unless the site is built with `NEXT_PUBLIC_AUTH_ENABLED=true` (a build-time flag, like `NEXT_PUBLIC_API_URL`), and the API
+routes behind it are 404 unless `AUTH_ENABLED=true`. Not built: sign-up and email verification screens, MFA enrollment (QR
+and manual key), passkey registration, password-reset request screen, recovery screens, "follow" buttons on bills,
+officials and topics. Each of those needs the real user pool to be designed against.
