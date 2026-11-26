@@ -100,3 +100,23 @@ def test_link_people_leaves_two_candidates_unlinked(db_session):
     _person(db_session, "Jane Smith", "SD-012")
     _person(db_session, "Smith, Jane", "SD-012")
     assert link_people(db_session, cycle=2026)["ambiguous"] == 1
+
+
+@pytest.mark.parametrize(
+    "printed,clean",
+    [
+        ("Boyd, Jim President", "Boyd, Jim"),
+        ("Rodriguez, Ana Maria President Pro Tempore", "Rodriguez, Ana Maria"),
+        ("DiCeglie, Nick Majority (Republican) Leader", "DiCeglie, Nick"),
+        ("Driskell, Lori Minority (Democratic) Leader", "Driskell, Lori"),
+        ("Perez, Daniel Speaker", "Perez, Daniel"),
+        ("Salzman, Michelle", "Salzman, Michelle"),
+    ],
+)
+def test_leadership_titles_printed_after_a_name_are_dropped(printed, clean):
+    """The Senate roster prints leadership titles after the name; the 2026-11-25
+    load stored 'Boyd, Jim President' as a winner's name."""
+    from app.promises.winners import parse_csv
+
+    rows = parse_csv(f'chamber,district,name\nsenate,20,"{printed}"\n')
+    assert rows[0]["name"] == clean
