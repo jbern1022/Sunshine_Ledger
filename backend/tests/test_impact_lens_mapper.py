@@ -244,3 +244,42 @@ def test_process_pending_counts_failed_entries_and_keeps_going(db_session, bill_
 
     stored, failed, bills = process_pending(db_session, FakeClient("not json"), generated_by="llm:test")
     assert (stored, bills) == (0, 2) and failed == 2
+
+
+# -- Runaway "unmapped" lists (2026-11-26) -------------------------------------------------------------
+# qwen2.5:14b sometimes invents unmapped conditions for an entry that has none (index 0, 1, ... 113) until
+# the output cap cuts it off. 21-30 entries failed every night and were retried forever. Everything before
+# "unmapped" is complete in those answers, so it is kept; the cut tail (and the "ambiguous" field after it)
+# is not, so the mapping always goes to review.
+
+from pathlib import Path  # noqa: E402
+
+from app.impact_lens.criteria import review_tier  # noqa: E402
+
+RUNAWAY = (Path(__file__).parent / "fixtures_impact_lens_runaway.txt").read_text()  # real output, trimmed
+NO_CONDITIONS = {"group": "Department of Elderly Affairs", "text": "must ensure the program includes a website",
+                 "quote": "The program must, at a minimum: (a) Include a website", "conditions": [], "exceptions": []}
+
+
+def test_a_runaway_unmapped_list_is_salvaged_after_the_retries_and_sent_to_review():
+    client = FlakyClient(RUNAWAY)
+    out = mapper.map_entry(NO_CONDITIONS, 1, client)
+    assert client.calls == mapper.MAX_ATTEMPTS  # a clean retry is always preferred
+    assert out["requires"] == [] and out["excludes"] == []  # pointers at conditions that don't exist are dropped
+    assert any("cut off" in n for n in out["notes"])
+    assert review_tier(out) == "needs_review"
+
+
+def test_salvage_keeps_the_complete_part_of_a_real_entry():
+    head = json.dumps({k: GOOD_ANSWER[k] for k in ("audience", "requires", "excludes")})[:-1]
+    cut = head + ', "unmapped": [{"kind": "condition", "index": 0, "reason": "x"}, {"kind": "condi'
+    out = mapper.map_entry(ENTRY, 0, FlakyClient(cut))
+    assert out["requires"][0]["values"] == ["county:Duval", "county:Miami-Dade"]
+    assert out["excludes"][0]["values"] == ["single_family"]
+    assert review_tier(out) == "needs_review"
+
+
+def test_a_clean_retry_wins_over_salvage():
+    client = FlakyClient(RUNAWAY, json.dumps(GOOD_ANSWER))
+    out = mapper.map_entry(ENTRY, 0, client)
+    assert client.calls == 2 and not any("cut off" in n for n in out["notes"])

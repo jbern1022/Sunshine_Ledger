@@ -1,0 +1,12 @@
+{
+  "audience": {"kind": "attr", "attr": "role", "any_of": ["local_government"]},
+  "affected": null,
+  "requires": [
+    {"attr": "role", "op": "in", "values": ["healthcare_provider"], "from": {"kind": "condition", "index": 0}}
+  ],
+  "excludes": [],
+  "unmapped": [
+    {"kind": "condition", "index": 0, "reason": "Specific details about the program's content and requirements cannot be mapped to the provided vocabulary."},
+    {"kind": "condition", "index": 1, "reason": "Specific details about the program's content and requirements cannot be mapped to the provided vocabulary."},
+    {"kind": "condition", "index": 2, "reason": "Specific details about the program's content and requirements cannot be mapped to the provided vocabulary."},
+    {"kind": "condition", "index": 3, "reaso
