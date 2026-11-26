@@ -32,7 +32,11 @@ export async function getBill(entityId: string): Promise<BillDetail | null> {
   }
 }
 
-/** Every bill id, for the sitemap. Paged because the corpus is ~2,400 and
+/** Most bill URLs one sitemap file may carry (the protocol allows 50,000
+ *  URLs per file, and static pages and people share it). */
+export const SITEMAP_BILL_CEILING = 45_000;
+
+/** Every bill id, for the sitemap. Paged because the corpus is ~20,700 (2026-11) and
  *  the API caps `limit` at 100. */
 export async function getAllBillsForSitemap(): Promise<
   Array<{ entity_id: string; last_action_date: string | null }>
@@ -57,8 +61,12 @@ export async function getAllBillsForSitemap(): Promise<
     );
 
     // Stop on a short page or once the reported total is covered, and keep a
-    // hard ceiling so a pagination bug can't spin here forever.
-    if (page.items.length < pageSize || out.length >= page.total || out.length >= 10000) break;
+    // hard ceiling so a pagination bug can't spin here forever. The ceiling
+    // was 10,000 until 2026-11-26, when the corpus had grown to 20,681 and
+    // half the bills had silently dropped out of the sitemap. 45,000 stays
+    // under the protocol's 50,000 URLs per sitemap file; past that, split it
+    // with generateSitemaps (a sitemap index).
+    if (page.items.length < pageSize || out.length >= page.total || out.length >= SITEMAP_BILL_CEILING) break;
   }
 
   return out;
