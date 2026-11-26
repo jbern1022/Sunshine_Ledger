@@ -100,6 +100,10 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = ""
 
+    # Daily activity totals (docs/USAGE_COUNTS_DESIGN.md). Off: POST /usage answers 404 and nothing is
+    # written. Turning it on changes a promise on /privacy, so it is the owner's switch.
+    usage_counts_enabled: bool = False
+
     # Reader accounts (docs/ADR_READER_AUTH_COGNITO.md). Off: every /auth and /watchlist route answers 404.
     # Public registration additionally stays closed until the privacy, deletion, security and legal gates pass.
     auth_enabled: bool = False
