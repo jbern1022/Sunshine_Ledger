@@ -11,6 +11,13 @@
 #
 # Retention: keeps the last 14 daily dumps locally and on the remote host;
 # older ones are pruned automatically.
+#
+# Second off-site copy (optional until configured): when S3_BACKUP_BUCKET is
+# set, the verified dump is also uploaded to S3 with a write-only credential
+# (profile S3_BACKUP_PROFILE, default `sunshine-backup`: s3:PutObject on
+# backups/* only). The script never lists, reads back or deletes in S3; the
+# bucket's lifecycle rule handles expiry (30 days, old versions 7). See
+# docs/RUNBOOK.md "Off-site backups to S3".
 
 set -euo pipefail
 
@@ -33,6 +40,11 @@ MIN_DUMP_BYTES=$((512 * 1024))
 # writing a partial file.
 MIN_FREE_KB=$((1024 * 1024)) # 1 GiB
 
+# S3 copy. Empty bucket = not configured yet: the step is skipped and says so.
+S3_BACKUP_BUCKET="${S3_BACKUP_BUCKET:-}"
+S3_BACKUP_PROFILE="${S3_BACKUP_PROFILE:-sunshine-backup}"
+S3_BACKUP_REGION="${S3_BACKUP_REGION:-us-east-2}"
+
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 DUMP_FILE="sunshineledger-${TIMESTAMP}.dump"
 HOST_PATH="${BACKUP_DIR}/${DUMP_FILE}"
@@ -44,6 +56,12 @@ HOST_PATH="${BACKUP_DIR}/${DUMP_FILE}"
 # than just that something went wrong. An alert saying "only 340MB free"
 # is actionable at 3am; "backup failed" is not.
 FAIL_REASON=""
+
+# Set once the dump is verified and copied out of the container. After that
+# point a failure (the Pi or S3 copy) must NOT delete the local dump: it is a
+# good backup, and possibly the only off-box copy that worked.
+DUMP_VERIFIED=0
+OFFSITE_NOTE=""
 
 fail() {
     FAIL_REASON="$*"
@@ -61,14 +79,18 @@ fail() {
 on_exit() {
     local code=$?
     if [ $code -ne 0 ]; then
-        rm -f "$HOST_PATH"
         docker exec "$CONTAINER" rm -f "/tmp/${DUMP_FILE}" 2>/dev/null || true
-        echo "[$(date)] Cleaned up partial dump after failure (exit ${code})." >&2
+        if [ "$DUMP_VERIFIED" -eq 1 ]; then
+            echo "[$(date)] Kept the verified local dump ${HOST_PATH} (exit ${code})." >&2
+        else
+            rm -f "$HOST_PATH"
+            echo "[$(date)] Cleaned up partial dump after failure (exit ${code})." >&2
+        fi
         monitor_ping "${BACKUP_PUSH_URL:-}" down \
             "${FAIL_REASON:-exited ${code} before completing}" "$SECONDS"
     else
         monitor_ping "${BACKUP_PUSH_URL:-}" up \
-            "dump ${DUMP_BYTES_HUMAN:-unknown} pushed to ${REMOTE_HOST}" "$SECONDS"
+            "dump ${DUMP_BYTES_HUMAN:-unknown} pushed to ${REMOTE_HOST}${OFFSITE_NOTE}" "$SECONDS"
     fi
 }
 trap on_exit EXIT
@@ -111,6 +133,7 @@ if [ "$DUMP_BYTES" -lt "$MIN_DUMP_BYTES" ]; then
 fi
 
 DUMP_BYTES_HUMAN=$(du -h "$HOST_PATH" | cut -f1)
+DUMP_VERIFIED=1
 echo "[$(date)] Dump created and verified: ${DUMP_BYTES_HUMAN}"
 
 # Push off-box. The remote key is restricted (rrsync, write-only, this
@@ -119,4 +142,20 @@ rsync -avz -e "ssh -i ${REMOTE_KEY} -o StrictHostKeyChecking=accept-new" \
     "$HOST_PATH" "${REMOTE_HOST}:" || fail "rsync to ${REMOTE_HOST} failed"
 
 echo "[$(date)] Pushed off-box to ${REMOTE_HOST}"
+
+# Second off-site copy, outside the house. Once configured, a failure here
+# fails the run (and the Kuma push) even though the Pi copy succeeded: a
+# warning nobody reads is how backup failures went unnoticed before.
+if [ -z "$S3_BACKUP_BUCKET" ]; then
+    echo "[$(date)] S3 copy skipped: S3_BACKUP_BUCKET is not set"
+else
+    command -v aws >/dev/null 2>&1 || fail "S3_BACKUP_BUCKET is set but the aws CLI is not installed"
+    AWS_PROFILE="$S3_BACKUP_PROFILE" aws s3 cp "$HOST_PATH" \
+        "s3://${S3_BACKUP_BUCKET}/backups/${DUMP_FILE}" \
+        --region "$S3_BACKUP_REGION" --only-show-errors \
+        || fail "S3 upload to ${S3_BACKUP_BUCKET} failed (the Pi copy succeeded)"
+    OFFSITE_NOTE=" and S3"
+    echo "[$(date)] Uploaded to s3://${S3_BACKUP_BUCKET}/backups/${DUMP_FILE}"
+fi
+
 echo "[$(date)] Backup complete."
