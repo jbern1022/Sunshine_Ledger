@@ -227,3 +227,75 @@ def test_payload_exposes_days_until_reverify(client, db_session):
     cals = client.get("/health/data").json()["election_calendars"]
     assert "FL" in cals
     assert "days_until_reverify" in cals["FL"]
+
+
+# The summarizer deliberately skips some records. /health/data must use the
+# same rules, or it reports those records as stuck forever (2026-11-25: 370
+# "missing" summaries, almost all of them minutes the summarizer never takes).
+
+
+def test_minutes_the_summarizer_skips_are_not_flagged(client, db_session, bill_factory):
+    _add_source(db_session, hours_ago=1)
+    entity = bill_factory(name="November 19, 2026")
+    entity.attributes = {"item_type": "Minutes"}
+    entity.bill.description = "November 19, 2026"
+    db_session.commit()
+    _age_entity(db_session, entity, hours=48)
+
+    resp = client.get("/health/data")
+    assert resp.json()["bills_missing_summary"] == 0
+    assert resp.status_code == 200
+
+
+def test_bare_title_items_are_not_flagged(client, db_session, bill_factory):
+    _add_source(db_session, hours_ago=1)
+    entity = bill_factory(name="Matter 21647")
+    entity.attributes = {"item_type": "General Business"}
+    entity.bill.description = "Matter 21647"
+    db_session.commit()
+    _age_entity(db_session, entity, hours=48)
+
+    assert client.get("/health/data").json()["bills_missing_summary"] == 0
+
+
+def test_item_with_title_fallback_description_counts_as_summarized(client, db_session, bill_factory):
+    _add_source(db_session, hours_ago=1)
+    entity = bill_factory(name="Approve a contract for road resurfacing")
+    entity.attributes = {"item_type": "Consent Agenda"}
+    entity.bill.description = "Approve a contract for road resurfacing"
+    db_session.commit()
+    _age_entity(db_session, entity, hours=48)
+    db_session.add(
+        Claim(
+            bill_entity_id=entity.id,
+            claim_type="what_it_does",
+            claim_text="Approves a contract for road resurfacing.",
+            generated_by="rule:item_title",
+        )
+    )
+    db_session.commit()
+
+    assert client.get("/health/data").json()["bills_missing_summary"] == 0
+
+
+def test_federal_bills_outside_the_delegation_are_not_flagged(client, db_session, bill_factory):
+    """Roll-call-only federal bills are never summarized (federal policy)."""
+    _add_source(db_session, hours_ago=1)
+    entity = bill_factory(bill_number="H.R. 1")
+    entity.bill.source_system = "congress"
+    entity.bill.description = "A national bill"
+    db_session.commit()
+    _age_entity(db_session, entity, hours=48)
+
+    assert client.get("/health/data").json()["bills_missing_summary"] == 0
+
+
+def test_substantive_local_item_without_a_summary_is_still_flagged(client, db_session, bill_factory):
+    _add_source(db_session, hours_ago=1)
+    entity = bill_factory(name="Approve a contract for road resurfacing")
+    entity.attributes = {"item_type": "Consent Agenda"}
+    entity.bill.description = "Approve a contract for road resurfacing"
+    db_session.commit()
+    _age_entity(db_session, entity, hours=48)
+
+    assert client.get("/health/data").json()["bills_missing_summary"] == 1
