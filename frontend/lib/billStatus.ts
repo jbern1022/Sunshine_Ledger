@@ -4,7 +4,7 @@
 export function effectiveLabel(status: string | null | undefined): string {
   const s = (status ?? "").toLowerCase();
   if (["passed", "enacted", "adopted"].some((w) => s.startsWith(w))) return "Takes effect";
-  if (["failed", "vetoed", "withdrawn", "replaced"].some((w) => s.startsWith(w))) return "Would have taken effect";
+  if (["failed", "vetoed", "withdrawn", "replaced", "died", "tabled"].some((w) => s.startsWith(w))) return "Would have taken effect";
   return "If enacted, takes effect";
 }
 
@@ -21,7 +21,7 @@ export function applicability(
   today: Date = new Date(),
 ): { verb: string; note: string | null } {
   const s = (status ?? "").toLowerCase();
-  if (["failed", "vetoed", "withdrawn", "replaced"].some((w) => s.startsWith(w))) {
+  if (["failed", "vetoed", "withdrawn", "replaced", "died", "tabled"].some((w) => s.startsWith(w))) {
     return { verb: "Would have applied to", note: null };
   }
   if (!["passed", "enacted", "adopted"].some((w) => s.startsWith(w))) {
