@@ -212,6 +212,73 @@ def _find_ignoring_commas(quote: str, folded: str) -> tuple[int, int] | None:
     return index[at], index[end] + 1
 
 
+# -- Metes-and-bounds boundary descriptions ---------------------------------
+# Local bills creating or changing a special district restate its boundary as
+# a survey description ("BEGINNING WHERE ...; THENCE NORTH ...; THENCE ...
+# TO THE POINT OF BEGINNING"), often tens of thousands of characters. Shown to
+# the model it was quoted as a "provision", the quote ran past the output cap
+# inside the first item and the bill failed every night (H0509 Collier
+# Mosquito Control District, H4021, H4025, H4031, H4059, H4091, H4095, since
+# 2026-11-19 at least). A boundary says WHERE, never WHO or WHAT CHANGES, so
+# the layers get a placeholder in its place, and a quote that contains the
+# placeholder is never accepted (verify_quotes).
+
+BOUNDARY_PLACEHOLDER_PREFIX = "[Boundary description omitted:"
+_THENCE = re.compile(r"\bthence\b", re.I)
+_BOUNDARY_START = re.compile(r"\b(beginning|commenc(?:e|ing))\b", re.I)
+_BOUNDARY_END = re.compile(r"\b(?:point|place) of beginning\b[^.;\n]*[.;]?", re.I)
+_MIN_THENCE = 5
+_MAX_GAP = 1500       # chars between consecutive THENCE calls in one description
+_LOOKAROUND = 2000    # how far to look for its BEGINNING / POINT OF BEGINNING
+_MIN_ELIDED = 1000    # shorter runs are left as they are
+
+
+def elide_boundary_descriptions(text: str) -> str:
+    """Replace each long run of THENCE survey calls with a one-line placeholder
+    that says how much was left out. Text without such runs comes back
+    unchanged (same string), so bills without boundaries are unaffected."""
+    hits = [m.start() for m in _THENCE.finditer(text)]
+    if len(hits) < _MIN_THENCE:
+        return text
+    runs: list[list[int]] = [[hits[0]]]
+    for h in hits[1:]:
+        if h - runs[-1][-1] <= _MAX_GAP:
+            runs[-1].append(h)
+        else:
+            runs.append([h])
+    spans: list[tuple[int, int]] = []
+    for run in runs:
+        if len(run) < _MIN_THENCE:
+            continue
+        first, last = run[0], run[-1]
+        lo = max(0, first - _LOOKAROUND)
+        starts = list(_BOUNDARY_START.finditer(text, lo, first))
+        if starts:
+            start = starts[-1].start()
+        else:  # no BEGINNING: from the end of the previous line or clause
+            cut = max(text.rfind("\n", lo, first), text.rfind(":", lo, first), text.rfind(";", lo, first))
+            start = cut + 1 if cut >= 0 else first
+        end_m = _BOUNDARY_END.search(text, last, last + _LOOKAROUND)
+        if end_m:
+            end = end_m.end()
+        else:
+            stops = [i for i in (text.find(".", last), text.find("\n", last)) if i >= 0]
+            end = (min(stops) + 1) if stops else len(text)
+        while start < end and text[start] in " \t":
+            start += 1
+        if end - start >= _MIN_ELIDED:
+            spans.append((start, end))
+    if not spans:
+        return text
+    out, pos = [], 0
+    for start, end in spans:
+        out.append(text[pos:start])
+        out.append(f"{BOUNDARY_PLACEHOLDER_PREFIX} {end - start:,} characters]")
+        pos = end
+    out.append(text[pos:])
+    return "".join(out)
+
+
 def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[dict]]:
     """Keep only quotes that appear verbatim in `text` and that carry enough
     substance to stand as a provision on their own.
@@ -242,6 +309,8 @@ def verify_quotes(candidates: list[dict], text: str) -> tuple[list[dict], list[d
             if span:
                 at = span[0]
                 quote = haystack[span[0]:span[1]]
+        if BOUNDARY_PLACEHOLDER_PREFIX in quote:
+            at = -1  # the placeholder is ours, not the bill's (elide_boundary_descriptions)
         if at >= 0 and _is_substantive_quote(quote):
             kept.append({**c, "quote": quote})
         else:
