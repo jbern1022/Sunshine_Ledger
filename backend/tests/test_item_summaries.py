@@ -114,7 +114,7 @@ def test_item_prompt_is_not_framed_as_legislation():
 
 
 def test_only_non_legislation_gets_the_scoped_prompt_version():
-    assert prompt_version_for("legislation") == PROMPT_VERSION
+    assert prompt_version_for("legislation") == f"{PROMPT_VERSION}+state1"
     for kind in ("agenda", "discussion", "other"):
         assert prompt_version_for(kind) == f"{PROMPT_VERSION}+item1"
     assert prompt_version_for("other") != prompt_version_for("legislation")

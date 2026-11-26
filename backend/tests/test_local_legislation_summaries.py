@@ -54,9 +54,9 @@ def test_prompt_names_the_instrument_and_government_and_forbids_guessing():
     assert "only a title" in p
 
 
-def test_local_legislation_has_its_own_version_and_state_bills_keep_theirs():
-    assert prompt_version_for("legislation") == PROMPT_VERSION
-    assert prompt_version_for("legislation", "state") == PROMPT_VERSION
+def test_local_legislation_and_state_bills_have_separate_versions():
+    assert prompt_version_for("legislation") == f"{PROMPT_VERSION}+state1"
+    assert prompt_version_for("legislation", "state") == f"{PROMPT_VERSION}+state1"
     assert prompt_version_for("legislation", "city") == f"{PROMPT_VERSION}+local1"
     assert prompt_version_for("legislation", "county") == f"{PROMPT_VERSION}+local1"
     assert prompt_version_for("agenda", "city") == f"{PROMPT_VERSION}+item1"

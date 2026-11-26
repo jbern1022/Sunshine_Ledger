@@ -48,13 +48,18 @@ ITEM_PROMPT_SUFFIX = "item1"
 LOCAL_PROMPT_SUFFIX = "local1"
 LOCAL_LEVELS = frozenset({"city", "county"})
 
+# State (and federal delegation) bills: the rules added after accuracy sample 02
+# (docs/grant-ready/ACCURACY_SAMPLE_02_STATE_BILLS.md). Scoped like the others, so
+# bumping it re-summarizes state bills only.
+STATE_PROMPT_SUFFIX = "state1"
+
 
 def prompt_version_for(kind: str, level: str | None = None) -> str:
     if kind != "legislation":
         return f"{PROMPT_VERSION}+{ITEM_PROMPT_SUFFIX}"
     if level in LOCAL_LEVELS:
         return f"{PROMPT_VERSION}+{LOCAL_PROMPT_SUFFIX}"
-    return PROMPT_VERSION
+    return f"{PROMPT_VERSION}+{STATE_PROMPT_SUFFIX}"
 
 
 # generated_by for a plain restatement of an item's title, written by a rule
@@ -89,7 +94,7 @@ def model_for_claim_type(claim_type: str, *, quality_model: str, fast_model: str
 
 
 def summary_input_hash(
-    bill_text: str, *, model: str, fast_model: str = "", prompt_version: str = PROMPT_VERSION
+    bill_text: str, *, model: str, fast_model: str = "", prompt_version: str | None = None
 ) -> str:
     """Fingerprint everything that determines the generated summaries.
 
@@ -107,7 +112,8 @@ def summary_input_hash(
     itself change the fingerprint of every already-stored claim and trigger
     a full re-summarization producing the same summaries again.
     """
-    parts = [prompt_version, model]
+    # Default: a state bill, the one kind with no scope of its own in the call sites that omit it.
+    parts = [prompt_version or prompt_version_for("legislation"), model]
     if fast_model:
         parts.append(f"fast={fast_model}")
     parts.append(bill_text[:MAX_BILL_TEXT_CHARS])
@@ -126,7 +132,12 @@ In the text, [deleted: …] marks wording the bill removes and [added: …] mark
 
 Write a 2-4 sentence plain-language summary of what this bill actually does. Rules:
 - Use everyday words, not legal jargon. If you must use a legal term, explain it in the same sentence.
-- Only state what is in the text above. Do not speculate about intent, politics, or effects not stated in the text.
+- Only state what is in the text above. Do not speculate about intent, politics, or effects not stated in the text. Do not state a goal, aim or purpose unless the text states it.
+- When the bill deletes a requirement, say exactly which requirement is removed. Do not describe it as removing anything broader (for example, deleting a duty to notify an agency does not remove supervision).
+- Keep the text's strength: "requires" is not "allows", and "may" is not "must".
+- Keep every condition and limit the text sets: "if federal approval is obtained", "under certain circumstances", "subject to", "up to".
+- Only when the text says a provision "is repealed" or "expires" on a date (a sunset), say it is repealed on that date unless the Legislature reenacts it. Never say this about an effective date ("This act shall take effect …"); state an effective date plainly.
+- If the text says it is a resolution, joint resolution or memorial, call it that, not a bill.
 - Do not use adjectives that imply a value judgment (e.g. "harmful", "beneficial", "important").
 - Output only the summary text, no preamble.
 """
