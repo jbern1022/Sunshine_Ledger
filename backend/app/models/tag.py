@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -83,3 +85,55 @@ class BillTag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<BillTag bill={self.bill_entity_id} tag={self.tag_id}>"
+
+
+class TagQuarantine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A tag slug the local model proposed that is not in the canonical
+    allowlist. Held for review instead of dropped: a recurring slug may mean
+    the vocabulary should grow, but only a person grows it (no silent
+    taxonomy expansion). status: pending | added | mapped | rejected --
+    `added` means the slug was approved for the vocabulary (the change itself
+    is an edit to topic_tagging_seed.TAGS, which the classifier's allowlist
+    is built from), `mapped` that it was judged equivalent to `mapped_tag`,
+    `rejected` that it stays out. Neither tags the bill automatically; the
+    next classification pass does.
+    """
+
+    __tablename__ = "tag_quarantine"
+
+    bill_entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    proposed_slug: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    # Provenance: how the slug arose, so a reviewer can judge it.
+    tag_source: Mapped[str] = mapped_column(String(20), nullable=False, default="ollama")
+    bill_title: Mapped[str | None] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
+    mapped_tag_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tags.id", ondelete="SET NULL"))
+    reviewer: Mapped[str | None] = mapped_column(String(100))
+    review_note: Mapped[str | None] = mapped_column(Text)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint("bill_entity_id", "proposed_slug", name="uq_tag_quarantine_bill_slug"),
+    )
+
+
+class BillTagRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """What the last local-model classification of a bill saw and how it
+    ended. `input_hash` is a hash of the title and description, so an amended
+    bill is re-classified rather than keeping stale tags. `outcome`:
+    ok | empty (the model answered but nothing valid; Governance applied) |
+    failed (the call or parse failed; no tag written, retried next run) |
+    legacy (tagged before runs were recorded; input recorded, not re-run).
+    """
+
+    __tablename__ = "bill_tag_runs"
+
+    bill_entity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("entities.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(20), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(300))
+    ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
