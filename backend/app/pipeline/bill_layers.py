@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 
 from app.pipeline.bill_layers_text import (
+    elide_boundary_descriptions,
     applicability_exclusions,
     change_regions,
     bill_section_numbers,
@@ -256,7 +257,10 @@ def _law_text(full_text: str) -> str:
     # (so verbatim quotes fail) and waste the model's character budget.
     text = strip_page_artifacts(full_text)
     first = _BILL_SECTION_HEADING.search(text)
-    return text[first.start():].lstrip() if first else text
+    law = text[first.start():].lstrip() if first else text
+    # Survey boundaries (local district bills) say where, not who or what
+    # changes, and quoting one overran the output cap every night.
+    return elide_boundary_descriptions(law)
 
 
 def _truncate(full_text: str) -> tuple[str, bool]:
