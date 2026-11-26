@@ -1,0 +1,18 @@
+# Sunshine Ledger pilot-light standby (AWS EC2 only). Installed by
+# scripts/standby/install.sh; runs scripts/standby/standby-boot.sh on every start.
+[Unit]
+Description=Sunshine Ledger standby (refresh or failover, by instance tag)
+Wants=network-online.target
+After=network-online.target docker.service snap.amazon-ssm-agent.amazon-ssm-agent.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sunshine-ledger/scripts/standby/standby-boot.sh
+# Restore + Next.js build can take a while on a t3a.medium.
+TimeoutStartSec=90min
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

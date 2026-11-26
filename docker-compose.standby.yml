@@ -1,0 +1,25 @@
+# Pilot-light standby only (AWS EC2, see scripts/standby/). Layered on top of
+# docker-compose.yml by scripts/standby/standby-boot.sh:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.standby.yml ...
+#
+# Never used on docker-host. The standby serves last night's backup, so every
+# write is refused (READ_ONLY) and the site shows the "backup copy" banner.
+# NEXT_PUBLIC_* values are inlined when the frontend builds at container start,
+# so the banner flag has to be in the frontend's own environment, not only .env.
+services:
+  backend:
+    environment:
+      READ_ONLY: "true"
+
+  frontend:
+    environment:
+      NEXT_PUBLIC_READ_ONLY: "true"
+
+  # Started by the boot script, only in failover mode and only after the apps
+  # answer locally. Never restarted by Docker on its own: a reboot (e.g. the
+  # weekly refresh) must not put a stale copy back on the production tunnel.
+  cloudflared:
+    restart: "no"
+  cloudflared2:
+    restart: "no"
