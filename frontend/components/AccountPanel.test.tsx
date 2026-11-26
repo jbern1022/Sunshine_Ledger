@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import AccountPanel from "./AccountPanel";
 import * as acct from "@/lib/account";
 
+vi.mock("@/components/TotpSetup", () => ({ default: () => null }));
 vi.mock("@/lib/account", () => ({
   getMe: vi.fn(), getWatchlist: vi.fn(), signIn: vi.fn(), answerTotp: vi.fn(), signOut: vi.fn(), signOutEverywhere: vi.fn(),
   deleteAccount: vi.fn(), exportData: vi.fn(), removeWatch: vi.fn(),

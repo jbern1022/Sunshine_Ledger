@@ -176,3 +176,54 @@ def test_reset_request_looks_the_same_for_unknown_and_known_addresses(client, on
     b = client.post("/auth/password-reset/request", json={"email": "nobody@example.org"})
     assert a.status_code == b.status_code == 200 and a.json() == b.json() == {"check_your_email": True}
     assert provider.reset_codes == {"a@example.org": "999"}
+
+
+# -- TOTP enrollment ---------------------------------------------------------------------------------
+
+def test_totp_enrollment_end_to_end(client, on, provider, db_session):
+    sign_in(client)
+    r = client.post("/auth/mfa/setup", json={"password": "pw-1"}, headers=csrf(client))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["secret"] == "FAKESECRETBASE32"
+    assert body["otpauth_uri"].startswith("otpauth://totp/Sunshine%20Ledger:a%40example.org?secret=FAKESECRETBASE32&issuer=Sunshine%20Ledger")
+    assert "no-store" in r.headers.get("cache-control", "")
+    # Proof of a working code before anything is switched on.
+    assert client.post("/auth/mfa/verify", json={"password": "pw-1", "code": "000000"}, headers=csrf(client)).status_code == 401
+    assert client.get("/auth/me").json()["second_factor_required"] is False
+    r = client.post("/auth/mfa/verify", json={"password": "pw-1", "code": FakeProvider.ENROLL_CODE}, headers=csrf(client))
+    assert r.status_code == 200 and r.json() == {"enrolled": True, "signed_out": True}
+    # Every session ended (including this one), and the next sign-in needs the code.
+    assert client.get("/auth/me").status_code == 401
+    step = sign_in(client).json()
+    assert step["signed_in"] is False and step["challenge"] == "totp"
+    r = client.post("/auth/totp", json={"challenge_token": step["challenge_token"], "code": FakeProvider.ENROLL_CODE})
+    assert r.status_code == 200
+    assert client.get("/auth/me").json()["second_factor_required"] is True
+    user = db_session.query(User).filter_by(email="a@example.org").one()
+    assert user.mfa_required is True
+
+
+def test_totp_enrollment_needs_a_session_csrf_and_the_password(client, on):
+    assert client.post("/auth/mfa/setup", json={"password": "pw-1"}).status_code in (401, 403)
+    sign_in(client)
+    assert client.post("/auth/mfa/setup", json={"password": "pw-1"}).status_code == 403  # no CSRF header
+    r = client.post("/auth/mfa/setup", json={"password": "wrong"}, headers=csrf(client))
+    assert r.status_code == 401 and r.json()["detail"] == "invalid_credentials"
+
+
+def test_totp_enrollment_refused_when_already_enrolled(client, on, provider):
+    provider.add("t@example.org", "pw-2", totp="135790")
+    step = sign_in(client, "t@example.org", "pw-2").json()
+    client.post("/auth/totp", json={"challenge_token": step["challenge_token"], "code": "135790"})
+    r = client.post("/auth/mfa/setup", json={"password": "pw-2"}, headers=csrf(client))
+    assert r.status_code == 409 and r.json()["detail"] == "mfa_already_enabled"
+
+
+def test_totp_secret_and_codes_never_reach_the_logs(client, on, caplog):
+    caplog.set_level(logging.DEBUG)
+    sign_in(client)
+    client.post("/auth/mfa/setup", json={"password": "pw-1"}, headers=csrf(client))
+    client.post("/auth/mfa/verify", json={"password": "pw-1", "code": FakeProvider.ENROLL_CODE}, headers=csrf(client))
+    for secret in ("FAKESECRETBASE32", FakeProvider.ENROLL_CODE, "pw-1"):
+        assert secret not in caplog.text

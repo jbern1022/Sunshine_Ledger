@@ -1,6 +1,6 @@
 """An in-memory identity provider for tests: the behaviours the real adapter must reproduce."""
 
-from app.identity import InvalidCredentials, ProviderOutcome, WeakPassword
+from app.identity import InvalidCredentials, MfaAlreadyEnabled, ProviderOutcome, WeakPassword
 
 
 class FakeProvider:
@@ -60,3 +60,26 @@ class FakeProvider:
         if email in self.users:
             self.reset_codes[email] = "999"
         self.requested = getattr(self, "requested", []) + [email]
+
+    # TOTP enrollment. The fake "authenticator" accepts ENROLL_CODE; once enrolled, sign-in asks for it.
+    ENROLL_CODE = "246810"
+
+    def _check(self, email, password):
+        u = self.users.get(email)
+        if u is None or u["password"] != password:
+            raise InvalidCredentials()
+        return u
+
+    def begin_totp_setup(self, email, password):
+        u = self._check(email, password)
+        if u["totp"]:
+            raise MfaAlreadyEnabled()
+        u["pending_secret"] = "FAKESECRETBASE32"
+        return u["sub"], u["pending_secret"]
+
+    def finish_totp_setup(self, email, password, code):
+        u = self._check(email, password)
+        if not u.get("pending_secret") or code != self.ENROLL_CODE:
+            raise InvalidCredentials()
+        u["totp"], u["pending_secret"] = self.ENROLL_CODE, None
+        return u["sub"]

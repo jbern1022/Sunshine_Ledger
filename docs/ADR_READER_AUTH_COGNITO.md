@@ -102,6 +102,19 @@ user-password sign-in with the email-based SECRET_HASH; TOTP setup and the MFA c
 `AdminDeleteUser` with the user's `sub` as `Username`. The adapter (app/cognito_provider.py) behaved as
 written for all of these. Not yet tested: passkeys (below).
 
+## Authenticator (TOTP) enrollment (built 2026-11-26)
+
+Optional for readers and offered on the account page. `POST /auth/mfa/setup` (password) re-authenticates
+with Cognito, calls AssociateSoftwareToken with that one-request access token and returns the secret (shown
+as a QR code drawn in the browser, plus the typed key; `Cache-Control: no-store`). `POST /auth/mfa/verify`
+(password + code) re-authenticates, calls VerifySoftwareToken, then SetUserMFAPreference (TOTP enabled and
+preferred), sets `users.mfa_required` and ends every session (`sessions.enroll_factor`); the next sign-in
+asks for the code. No provider token is stored; a proven code is required before anything is switched on;
+an account that already has TOTP gets 409 `mfa_already_enabled` (replacing a factor is a separate, stricter
+flow, not built). A restricted (approved-recovery) session may enroll. Not yet built: turning TOTP off,
+replacing a lost authenticator (the recovery framework above), and the email notice on enrollment (needs
+SES production access).
+
 ## Passkeys and MFA compatibility (to be tested, not assumed)
 
 * A passkey can stand in for password plus second factor only when it is user-verifying. The pool

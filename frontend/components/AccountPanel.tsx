@@ -7,6 +7,7 @@ import {
   type Me, type WatchItem,
 } from "@/lib/account";
 import { t, type MessageKey } from "@/lib/i18n";
+import TotpSetup from "@/components/TotpSetup";
 
 const input = "mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-sunshine-500 focus:outline-none focus:ring-1 focus:ring-sunshine-500";
 const button = "rounded-md border border-sunshine-700 px-3 py-1.5 text-sm font-medium text-sunshine-700 hover:bg-sunshine-50 disabled:opacity-50";
@@ -205,6 +206,12 @@ export default function AccountPanel() {
             <button type="button" className={button} onClick={async () => afterSignOut(await signOut())}>{t("account.signOut")}</button>
             <button type="button" className={button} onClick={async () => afterSignOut(await signOutEverywhere())}>{t("account.signOutEverywhere")}</button>
           </div>
+
+          {me.second_factor_required ? (
+            <p className="mt-4 text-sm text-slate-700">{t("account.totp.on")}</p>
+          ) : (
+            <TotpSetup onSignedOut={() => { setMe(null); setWatch(null); setNotice(t("account.totp.done")); }} />
+          )}
 
           {!me.restricted && (
             <section className="mt-6" aria-labelledby="watch-heading">
