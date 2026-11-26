@@ -37,8 +37,9 @@ class SourceInfo:
 SOURCES: tuple[SourceInfo, ...] = (
     SourceInfo(
         "legiscan", "Florida Legislature (via LegiScan)", "FL", "Nightly", 36, "legiscan",
-        "The 2024, 2025 and 2026 sessions, regular and special: bills, votes, amendments and "
-        "action history. Bill text and staff analyses are most complete for 2026.",
+        "The 2024 to 2027 sessions, regular and special: bills, votes, amendments and action "
+        "history. Bill text and staff analyses are most complete for 2026. 2027 bills appear as "
+        "they are filed, before the session opens.",
     ),
     # One entry per nightly Legistar city, read from the adapter's registry so a
     # new city appears here without touching this file.
