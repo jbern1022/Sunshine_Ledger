@@ -31,8 +31,18 @@ local Docker socket. So: merge to `main`, push to gitea, and the deploy
 happens -- don't also run `deploy.sh` by hand. Requirements, all one-time:
 
 - The production `.env` copy at `/home/joe/sunshine-ledger/deploy.env` on
-  docker-host (chmod 600). **Keep it in sync with the Mac's `.env`** when
-  either changes: `scp .env docker:sunshine-ledger/deploy.env`.
+  docker-host (chmod 600). **That server file is the source of truth**: keys
+  are added there (Cognito, AWS, `CONGRESS_API_KEY`), and a stale local `.env`
+  copied over it would silently delete them. Never `scp` a local `.env` onto it.
+  Use `scripts/sync-env.sh`:
+  - `scripts/sync-env.sh pull` copies the server file to `./.env` (mode 600),
+    backs up the old one and lists the key names added, removed or changed.
+  - `scripts/sync-env.sh diff` lists differing key names only.
+  - `scripts/sync-env.sh push --yes` replaces the server file, but refuses if
+    the local file lacks any key the server has, and keeps
+    `deploy.env.bak-<timestamp>` on the server. Recreate the backend afterwards.
+  Values are never printed. `scripts/test-sync-env.sh` checks the script against
+  a fake server.
 - The repo marked **Trusted → volumes** in Woodpecker's repo settings
   (the step mounts the Docker socket and that file).
 
