@@ -12,7 +12,7 @@ one piece that isn't as clean as "just deploy the images."
 ## Current architecture (home-lab)
 
 Docker Compose on a single Proxmox VM ("Omen"): `db` (postgis/postgis),
-`backend` (FastAPI), `frontend` (Next.js `next dev`), `cloudflared` x2
+`backend` (FastAPI), `frontend` (Next.js production build: `next build && next start`, see the gap section below), `cloudflared` x2
 (tunnel, no inbound ports opened on the home network). No host-specific
 bind mounts in the production compose invocation -- `docker-compose.yml`
 alone (not `docker-compose.override.yml`, which is dev-only and only
@@ -64,7 +64,7 @@ comparable blocker.
 |---|---|---|
 | Database | `postgis/postgis` container | RDS for PostgreSQL with the `postgis` extension enabled. Confirm the target RDS engine version's supported PostGIS version at migration time (RDS lags upstream PostGIS releases by version) -- currently pinned to `postgis/postgis:16-3.4` locally. |
 | Backend | FastAPI container, `uvicorn` | ECS Fargate, not Lambda. FastAPI holds a persistent SQLAlchemy connection pool (`app/db.py`); Lambda's per-invocation cold-start model fights that (would need RDS Proxy + a rewrite to lazy-init the pool per invocation, plus a Mangum adapter). Fargate runs the existing container image with zero code changes. |
-| Frontend | Next.js container, `next dev` | ECS Fargate running `next build && next start`, **not** `next dev` as currently configured (see "Known gap" below) -- or S3 + CloudFront if/when the app moves to static export, which it currently doesn't (server-rendered pages hitting the API at request time). |
+| Frontend | Next.js container, `next build && next start` (fixed 2026-08-04) | ECS Fargate running `next build && next start` -- or S3 + CloudFront if/when the app moves to static export, which it currently doesn't (server-rendered pages hitting the API at request time). |
 | LLM summarization | Ollama on home GPU | See options above -- likely a hosted API. |
 | Ingestion pipelines | `docker compose exec` one-off runs + cron on Omen | EventBridge Scheduler + ECS scheduled tasks (or Lambda, since these are bounded batch jobs with no persistent connection pool concern), same container images. |
 | Reverse proxy / TLS | Cloudflare Tunnel (no inbound ports) | ALB + ACM, or keep Cloudflare in front of the ALB for continuity (DNS doesn't need to change either way). |
