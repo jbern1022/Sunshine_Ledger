@@ -42,9 +42,19 @@ PROMPT_VERSION = "2"
 # never the state bills or ordinances. See WHAT_IT_DOES_ITEM_PROMPT.
 ITEM_PROMPT_SUFFIX = "item1"
 
+# City and county ordinances and resolutions have their own "what it does" prompt
+# (LOCAL_LEGISLATION_PROMPT), scoped the same way: bumping it re-summarizes local
+# legislation only, never state bills.
+LOCAL_PROMPT_SUFFIX = "local1"
+LOCAL_LEVELS = frozenset({"city", "county"})
 
-def prompt_version_for(kind: str) -> str:
-    return PROMPT_VERSION if kind == "legislation" else f"{PROMPT_VERSION}+{ITEM_PROMPT_SUFFIX}"
+
+def prompt_version_for(kind: str, level: str | None = None) -> str:
+    if kind != "legislation":
+        return f"{PROMPT_VERSION}+{ITEM_PROMPT_SUFFIX}"
+    if level in LOCAL_LEVELS:
+        return f"{PROMPT_VERSION}+{LOCAL_PROMPT_SUFFIX}"
+    return PROMPT_VERSION
 
 
 # generated_by for a plain restatement of an item's title, written by a rule
@@ -168,12 +178,93 @@ Text published for this item (it may be only a title):
 Write a 1-3 sentence plain-language description of what this item is and what it asks the board or council to do. Rules:
 - Call it "this item" or "this request". Never call it a bill, legislation or an act.
 - Name the kind of record when the text shows it (a public hearing, a contract, a settlement, a presentation, a proclamation).
+- Keep every condition and limit the text sets ("if awarded", "for completed projects", "up to", "subject to").
 - Only state what is in the text above. If the text is only a title, restate the title in plain words and say the published record gives no further detail.
 - Do not guess at purpose, intent or effects. Do not use words such as "likely", "probably", "presumably", "appears to" or "seems".
 - Do not explain or expand abbreviations, codes, case names or terms unless the text above explains them. Copy them as written.
 - Do not use adjectives that imply a value judgment (e.g. "harmful", "beneficial", "important").
 - Output only the description, no preamble.
 """
+
+LOCAL_LEGISLATION_PROMPT = """You are describing one {instrument} of a Florida local government, {jurisdiction}, for a general public audience with no legal background. It is not a state bill.
+
+Record: {bill_number} — {title}
+
+Text published for it (it may be only a title):
+\"\"\"
+{bill_text}
+\"\"\"
+
+Write a 1-4 sentence plain-language description of what this {instrument} does. Rules:
+- Call it "this {instrument}". Never call it a bill.
+- The government acting is {jurisdiction}. Do not say "the state" unless the text above says the state acts or is asked to act.
+- Keep the text's own strength: "pursue", "seek", "consider" or "authorize" are not "buy", "approve" or "do". Do not say it has been adopted, approved or ratified unless the text says so.
+- Only state what is in the text above. If the text is only a title, restate the title in plain words and add nothing: no definitions, purposes, parties, amounts or places that are not written there.
+- Do not guess at purpose, intent or effects. Do not use words such as "likely", "probably", "presumably", "appears to" or "seems".
+- Do not explain terms, codes or programs unless the text above explains them.
+- Do not use adjectives that imply a value judgment (e.g. "harmful", "beneficial", "important").
+- Output only the description, no preamble.
+"""
+
+LOCAL_RETRY_NOTE = (
+    "\n\nYour previous answer broke a rule: it called the {instrument} a bill, named the state instead of "
+    "{jurisdiction}, or guessed. Write it again, following every rule exactly."
+)
+
+
+def instrument_label(item_type: str | None) -> str:
+    t = (item_type or "").lower()
+    if "ordinance" in t:
+        return "ordinance"
+    if "resolution" in t:
+        return "resolution"
+    return "measure"
+
+
+_LOCAL_BILL_WORDING = re.compile(r"\b(?:this|the|a)\s+bill\b(?!\s+of\b)|^\s*bill\b", re.IGNORECASE)
+_THE_STATE = re.compile(r"\bthe\s+state\b", re.IGNORECASE)
+_STATE_IN_SOURCE = re.compile(r"\bstate\b", re.IGNORECASE)
+
+
+def violates_local_wording(text: str, source_text: str) -> bool:
+    """True when a local ordinance's description calls it a bill, puts "the
+    state" where the source names no state, or guesses."""
+    if _LOCAL_BILL_WORDING.search(text) or _HEDGE_WORDING.search(text):
+        return True
+    return bool(_THE_STATE.search(text)) and not _STATE_IN_SOURCE.search(source_text)
+
+
+def generate_local_legislation_summary(
+    bill_number: str,
+    title: str,
+    bill_text: str,
+    *,
+    item_type: str | None,
+    jurisdiction: str,
+    client: "OllamaClient",
+) -> tuple[str, bool]:
+    """Describe a city or county ordinance or resolution. Returns (text, is_fallback).
+
+    Same shape as generate_item_description: one retry that restates the rule,
+    then a plain restatement of the title, which says nothing untrue."""
+    instrument = instrument_label(item_type)
+    source = bill_text[:MAX_BILL_TEXT_CHARS]
+    prompt = LOCAL_LEGISLATION_PROMPT.format(
+        instrument=instrument,
+        jurisdiction=jurisdiction,
+        bill_number=bill_number,
+        title=title,
+        bill_text=source,
+    )
+    answer = client.generate(prompt)
+    if violates_local_wording(answer, source):
+        answer = client.generate(prompt + LOCAL_RETRY_NOTE.format(instrument=instrument, jurisdiction=jurisdiction))
+    if not violates_local_wording(answer, source):
+        return answer, False
+    label = (item_type or "").strip() or instrument.capitalize()
+    plain_title = " ".join((title or "").split())[:300].rstrip(" .")
+    return f"{label}: {plain_title}. The published record gives no further detail here.", True
+
 
 ITEM_RETRY_NOTE = (
     "\n\nYour previous answer broke a rule: it called the item a bill or legislation, or it guessed. "
@@ -362,9 +453,24 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
 
     item_type = (entity.attributes or {}).get("item_type")
     kind = item_kind(item_type)
-    version = prompt_version_for(kind)
+    level = entity.jurisdiction_level
+    version = prompt_version_for(kind, level)
     fallback_fields: set[str] = set()
-    if kind == "legislation":
+    if kind == "legislation" and level in LOCAL_LEVELS:
+        writer = fast_client or client
+        what, is_fallback = generate_local_legislation_summary(
+            entity.bill.bill_number, entity.name, bill_text,
+            item_type=item_type, jurisdiction=entity.jurisdiction_name or "the local government", client=writer,
+        )
+        who = client.generate(
+            WHO_IT_AFFECTS_PROMPT.format(
+                bill_number=entity.bill.bill_number, title=entity.name, bill_text=bill_text[:MAX_BILL_TEXT_CHARS]
+            )
+        )
+        summaries = {"what_it_does": what, "who_it_affects": who}
+        if is_fallback:
+            fallback_fields.add("what_it_does")
+    elif kind == "legislation":
         summaries = generate_bill_summaries(
             entity.bill.bill_number, entity.name, bill_text, client=client, fast_client=fast_client
         )
