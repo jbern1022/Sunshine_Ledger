@@ -219,6 +219,65 @@ def import_winners(
     return counts
 
 
+# A short, conservative nickname table: only names common among Florida legislators and their sources.
+# Used together with the seat and the surname, never alone.
+NICKNAMES = {
+    "alex": {"alejandro", "alexander", "alexandra", "alexis"}, "andy": {"andrew"}, "bill": {"william"},
+    "bob": {"robert"}, "rob": {"robert"}, "chris": {"christopher", "christine", "christina"},
+    "chuck": {"charles"}, "dan": {"daniel"}, "dave": {"david"}, "ed": {"edward"}, "greg": {"gregory"},
+    "jeff": {"jeffrey"}, "jim": {"james"}, "jimmy": {"james"}, "joe": {"joseph", "jose"},
+    "jon": {"jonathan"}, "kathy": {"katherine", "kathleen"}, "larry": {"lawrence"}, "liz": {"elizabeth"},
+    "matt": {"matthew"}, "mike": {"michael"}, "nick": {"nicholas"}, "pat": {"patrick", "patricia"},
+    "rick": {"richard", "ricardo"}, "sam": {"samuel", "samantha"}, "steve": {"steven", "stephen"},
+    "ted": {"edward", "theodore"}, "tom": {"thomas"}, "tony": {"anthony", "antonio"}, "will": {"william"},
+}
+ELECTION_DAY = {2026: datetime(2026, 11, 3, tzinfo=timezone.utc)}
+
+
+def _ascii_lower(s: str) -> str:
+    s = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in s if not unicodedata.combining(c)).lower()
+
+
+def name_parts(name: str) -> tuple[set[str], list[str]]:
+    """(first names incl. a quoted nickname, surname tokens). 'Maggard, Randall Scott "Randy"' gives
+    ({randall, randy}, [maggard]); 'Demi Busatta Cabrera' gives ({demi}, [busatta, cabrera])."""
+    s = _ascii_lower(name)
+    firsts = {n.strip() for n in re.findall(r'"([^"]+)"', s) if n.strip()}
+    s = re.sub(r'"[^"]*"', " ", s)
+    s = re.sub(r"\b(jr|sr|ii|iii|iv)\b\.?", " ", s)
+    if "," in s:
+        last, _, rest = s.partition(",")
+        surname, given = re.findall(r"[a-z]+", last), re.findall(r"[a-z]+", rest)
+    else:
+        tokens = re.findall(r"[a-z]+", s)
+        given, surname = tokens[:1], tokens[1:]
+    if given:
+        firsts.add(given[0])
+    return firsts, [t for t in surname if len(t) > 1]  # drop middle initials
+
+
+def _first_names_agree(a: set[str], b: set[str]) -> bool:
+    for x in a:
+        for y in b:
+            if x == y or y in NICKNAMES.get(x, ()) or x in NICKNAMES.get(y, ()):
+                return True
+            short, long_ = sorted((x, y), key=len)
+            if len(short) >= 3 and long_.startswith(short):
+                return True
+    return False
+
+
+def variant_match(winner_name: str, person_name: str) -> bool:
+    """Same person written differently: the surnames agree (one's tokens contain the other's) and the
+    first names agree by nickname, prefix or the table above. Only ever applied within one seat."""
+    wf, ws = name_parts(winner_name)
+    pf, ps = name_parts(person_name)
+    if not ws or not ps or not (set(ws) <= set(ps) or set(ps) <= set(ws)):
+        return False
+    return _first_names_agree(wf, pf)
+
+
 def link_people(db: Session, *, cycle: int) -> dict:
     """Link winners to existing person entities. A match needs the chamber
     AND district AND the name key; anything less stays unlinked (no name-only
@@ -237,14 +296,20 @@ def link_people(db: Session, *, cycle: int) -> dict:
         chamber = "house" if m.group(1).upper() == "HD" else "senate"
         by_seat.setdefault((chamber, int(m.group(2))), []).append(p)
 
-    out = {"linked": 0, "no_match": 0, "ambiguous": 0}
+    out = {"linked": 0, "linked_variant": 0, "no_match": 0, "ambiguous": 0}
     for w in db.execute(select(ElectionWinner).where(ElectionWinner.cycle == cycle)).scalars():
         if w.person_entity_id is not None:
             continue
-        matches = [p for p in by_seat.get((w.chamber, w.district), []) if name_key(p.name) == name_key(w.name)]
+        seat = by_seat.get((w.chamber, w.district), [])
+        matches = [p for p in seat if name_key(p.name) == name_key(w.name)]
+        key = "linked"
+        if not matches:
+            # Second pass, still seat-scoped: nicknames, shortened first names, compound surnames
+            # (2026-11-26: six re-elected members were left unlinked this way).
+            matches, key = [p for p in seat if variant_match(w.name, p.name)], "linked_variant"
         if len(matches) == 1:
             w.person_entity_id = matches[0].id
-            out["linked"] += 1
+            out[key] += 1
         elif len(matches) > 1:
             out["ambiguous"] += 1
         else:
@@ -253,21 +318,60 @@ def link_people(db: Session, *, cycle: int) -> dict:
     return out
 
 
+def _seats_before(db: Session, cutoff: datetime) -> set[tuple[str, int]]:
+    """Seats some FL person record already held before `cutoff` (the pre-election roster)."""
+    seats = set()
+    for p in db.execute(
+        select(Entity).where(Entity.entity_type == "person", Entity.jurisdiction_name == "FL", Entity.created_at < cutoff)
+    ).scalars():
+        m = re.match(r"^(HD|SD)[-\s]?0*(\d+)$", str((p.attributes or {}).get("district", "")).strip(), re.IGNORECASE)
+        if m and not (p.attributes or {}).get("committee"):
+            seats.add(("house" if m.group(1).upper() == "HD" else "senate", int(m.group(2))))
+    return seats
+
+
+def mark_incumbents(db: Session, *, cycle: int) -> dict:
+    """Fill `incumbent` where the source left it blank: True when the winner is linked to a person who
+    already held this seat before election day; False when the seat was held by someone else; None
+    when there is no record of the seat. A value the source stated is never changed."""
+    cutoff = ELECTION_DAY[cycle]
+    prior = _seats_before(db, cutoff)
+    out = {"incumbent": 0, "new": 0, "unknown": 0}
+    for w in db.execute(select(ElectionWinner).where(ElectionWinner.cycle == cycle)).scalars():
+        if w.incumbent is not None:
+            continue
+        person = db.get(Entity, w.person_entity_id) if w.person_entity_id else None
+        if person is not None and person.created_at is not None and person.created_at < cutoff:
+            w.incumbent = True
+        elif (w.chamber, w.district) in prior:
+            w.incumbent = False
+        else:
+            w.incumbent = None
+        out[{True: "incumbent", False: "new", None: "unknown"}[w.incumbent]] += 1
+    db.flush()
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("csv_path")
-    parser.add_argument("--source-url", required=True, help="the results page the export came from")
+    parser.add_argument("csv_path", nargs="?", help="omit to only re-link people and fill incumbency")
+    parser.add_argument("--source-url", help="the results page the export came from (required with a CSV)")
     parser.add_argument("--certified", action="store_true", help="the file holds certified results")
     parser.add_argument("--cycle", type=int, default=2026)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
-    with open(args.csv_path, encoding="utf-8") as fh:
-        rows = parse_csv(fh.read())
+    if args.csv_path and not args.source_url:
+        parser.error("--source-url is required with a CSV")
     with SessionLocal() as db:
-        counts = import_winners(db, rows, cycle=args.cycle, source_url=args.source_url, certified=args.certified)
+        counts = {}
+        if args.csv_path:
+            with open(args.csv_path, encoding="utf-8") as fh:
+                rows = parse_csv(fh.read())
+            counts = import_winners(db, rows, cycle=args.cycle, source_url=args.source_url, certified=args.certified)
         linked = link_people(db, cycle=args.cycle)
+        incumbency = mark_incumbents(db, cycle=args.cycle)
         db.commit()
-    logger.info("winners: %s; people: %s", counts, linked)
+    logger.info("winners: %s; people: %s; incumbency: %s", counts, linked, incumbency)
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ from app.promises.winners import (
     WinnersError,
     import_winners,
     link_people,
+    mark_incumbents,
     name_key,
     parse_chamber,
     parse_csv,
@@ -88,7 +89,7 @@ def test_link_people_needs_seat_and_name(db_session):
     jane = _person(db_session, "Jane Smith", "SD-012")
     _person(db_session, "John Public", "HD-99")  # right name, wrong seat: must not link
     result = link_people(db_session, cycle=2026)
-    assert result == {"linked": 1, "no_match": 1, "ambiguous": 0}
+    assert result == {"linked": 1, "linked_variant": 0, "no_match": 1, "ambiguous": 0}
     w12 = db_session.execute(select(ElectionWinner).where(ElectionWinner.district == 12)).scalar_one()
     w45 = db_session.execute(select(ElectionWinner).where(ElectionWinner.district == 45)).scalar_one()
     assert w12.person_entity_id == jane.id
@@ -120,3 +121,71 @@ def test_leadership_titles_printed_after_a_name_are_dropped(printed, clean):
 
     rows = parse_csv(f'chamber,district,name\nsenate,20,"{printed}"\n')
     assert rows[0]["name"] == clean
+
+
+# -- Name variants within a seat, and incumbency (2026-11-26) -----------------------------------------
+# The six real cases from production: incumbents left unlinked, so they looked like new members.
+
+def _winner_csv(name, office="Representative in the Legislature", district="54"):
+    quoted = name.replace('"', '""')  # CSV: a quote inside a quoted field is doubled
+    return f'Office,District,Candidate,Party\n{office},{district},"{quoted}",REP\n'
+
+
+@pytest.mark.parametrize("winner,person", [
+    ('Maggard, Randall Scott "Randy"', "Randy Maggard"),   # quoted nickname
+    ('Yeager, Bradford Troy "Brad"', "Brad Yeager"),
+    ("Fabricio, Tom", "Thomas Fabricio"),                  # first-name prefix
+    ("Bernard, Mack", "Mackenson Bernard"),
+    ("Rizo, Alex", "Alejandro Rizo"),                      # common nickname table
+    ("Busatta, Demi", "Demi Busatta Cabrera"),             # compound surname
+])
+def test_name_variants_link_within_the_same_seat(db_session, winner, person):
+    import_winners(db_session, parse_csv(_winner_csv(winner)), cycle=2026, source_url="u", certified=False, now=NOW)
+    p = _person(db_session, person, "HD-54")
+    result = link_people(db_session, cycle=2026)
+    assert result["linked_variant"] == 1
+    assert db_session.execute(select(ElectionWinner)).scalar_one().person_entity_id == p.id
+
+
+@pytest.mark.parametrize("winner,person,district", [
+    ("Smith, Jane", "John Smith", "HD-54"),      # same surname, different first name
+    ("Fabricio, Tom", "Thomas Fabricio", "HD-55"),  # a variant, but another seat
+    ("Rizo, Alex", "Alex Rodriguez", "HD-54"),   # same first name, different surname
+])
+def test_variants_never_link_across_names_or_seats(db_session, winner, person, district):
+    import_winners(db_session, parse_csv(_winner_csv(winner)), cycle=2026, source_url="u", certified=False, now=NOW)
+    _person(db_session, person, district)
+    link_people(db_session, cycle=2026)
+    assert db_session.execute(select(ElectionWinner)).scalar_one().person_entity_id is None
+
+
+def test_two_variant_candidates_stay_unlinked(db_session):
+    import_winners(db_session, parse_csv(_winner_csv("Fabricio, Tom")), cycle=2026, source_url="u", certified=False, now=NOW)
+    _person(db_session, "Thomas Fabricio", "HD-54")
+    _person(db_session, "Tommy Fabricio", "HD-54")
+    assert link_people(db_session, cycle=2026)["ambiguous"] == 1
+
+
+def test_mark_incumbents(db_session):
+    csv = ("Office,District,Candidate,Party\n"
+           "Representative in the Legislature,1,\"Old, Ann\",REP\n"      # re-elected
+           "Representative in the Legislature,2,\"New, Bea\",DEM\n"      # seat had someone else
+           "Representative in the Legislature,3,\"Fresh, Cy\",REP\n"     # no record of the seat
+           "Representative in the Legislature,4,\"Late, Di\",REP\n")     # person created after the election
+    import_winners(db_session, parse_csv(csv), cycle=2026, source_url="u", certified=False, now=NOW)
+    before = datetime(2026, 1, 5, tzinfo=timezone.utc)
+    for name, seat in (("Ann Old", "HD-1"), ("Zed Gone", "HD-2")):
+        _person(db_session, name, seat).created_at = before
+    _person(db_session, "Di Late", "HD-4")  # created now, i.e. after election day
+    link_people(db_session, cycle=2026)
+    assert mark_incumbents(db_session, cycle=2026) == {"incumbent": 1, "new": 1, "unknown": 2}
+    got = {w.district: w.incumbent for w in db_session.execute(select(ElectionWinner)).scalars()}
+    assert got == {1: True, 2: False, 3: None, 4: None}
+
+
+def test_mark_incumbents_never_overwrites_the_source(db_session):
+    import_winners(db_session, parse_csv(CSV), cycle=2026, source_url="u", certified=False, now=NOW)  # CSV says yes / no
+    link_people(db_session, cycle=2026)
+    mark_incumbents(db_session, cycle=2026)
+    got = {w.district: w.incumbent for w in db_session.execute(select(ElectionWinner)).scalars()}
+    assert got == {12: True, 45: False}
