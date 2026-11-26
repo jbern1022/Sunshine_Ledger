@@ -1,17 +1,19 @@
 import secrets
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+from app.cf_access import admin_reviewer
 from app.config import settings
 
 _security = HTTPBasic()
 
 
-def require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> str:
+def require_admin(request: Request, credentials: HTTPBasicCredentials = Depends(_security)) -> str:
     """HTTP Basic Auth gate for the small set of admin-only endpoints
     (currently: flag review). Constant-time comparison to avoid a timing
-    side-channel on the username/password check.
+    side-channel on the username/password check. Returns who to record as
+    the reviewer.
 
     Fails closed: if ADMIN_PASSWORD isn't configured, every request is
     rejected rather than falling back to a guessable default.
@@ -31,4 +33,6 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(_security)) -> str
             detail="Invalid admin credentials",
             headers={"WWW-Authenticate": "Basic"},
         )
-    return credentials.username
+    # Behind Cloudflare Access: the reviewer is the verified Access email, not
+    # the shared Basic username (app/cf_access.py).
+    return admin_reviewer(request, credentials)

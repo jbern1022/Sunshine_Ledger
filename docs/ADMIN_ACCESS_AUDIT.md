@@ -80,4 +80,13 @@ Cloudflare Access (one-time PIN, one allowed address, 24 h sessions) now fronts 
   (never through Cloudflare), forwards only those two endpoints, and passes the reviewer's Basic
   credentials and `Cf-Access-Authenticated-User-Email` on. **Add `sunshineledger.josephbernal.com/admin*`
   to the Access application** so the page and its proxy sit behind the same login.
-* Not yet done: the API recording the Access email on review actions (audit gap 2).
+* **Audit gap 2 (2026-11-26, branch feat/admin-access-identity):** the API verifies Access's signed
+  `Cf-Access-Jwt-Assertion` (RS256 against `https://<team>/cdn-cgi/access/certs`, issuer = the team
+  domain, audience = the application's AUD tag, not expired) and records its email as the reviewer
+  (`app/cf_access.py`, used by `require_admin`). The plain `Cf-Access-Authenticated-User-Email` header
+  is not trusted (anyone reaching the origin could set it), and the `/admin/api/promises` proxy now
+  forwards the signed token instead. HTTP Basic still applies behind it. A present-but-invalid token is
+  always refused (403). Settings: `CF_ACCESS_TEAM_DOMAIN=old-poetry-5370.cloudflareaccess.com`,
+  `CF_ACCESS_AUD=<the admin app's AUD tag>`; unset = the old behaviour. `CF_ACCESS_REQUIRED=true` also
+  refuses admin requests that arrive without a token, closing any path to the origin that skips Access;
+  turn it on after one review has been seen recorded with the Access email.
