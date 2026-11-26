@@ -58,10 +58,18 @@ class IdentityProvider(Protocol):
     def confirm_sign_up(self, email: str, code: str) -> None: ...  # raises InvalidCredentials
     def resend_confirmation(self, email: str) -> None: ...  # never raises for an unknown address
     def request_password_reset(self, email: str) -> None: ...  # never raises for an unknown address
+    # TOTP enrollment, re-authenticated with the password each step. begin returns (sub, base32 secret)
+    # and raises MfaAlreadyEnabled; finish proves a code, turns TOTP on, returns the sub.
+    def begin_totp_setup(self, email: str, password: str) -> tuple[str, str]: ...
+    def finish_totp_setup(self, email: str, password: str, code: str) -> str: ...  # raises InvalidCredentials
 
 
 class WeakPassword(Exception):
     """The provider's password policy rejected the password. Safe to show: it says nothing about who has an account."""
+
+
+class MfaAlreadyEnabled(Exception):
+    """The account already has an authenticator; replacing it is a separate, stricter flow."""
 
 
 class InvalidCredentials(Exception):
@@ -167,3 +175,34 @@ def sign_out_everywhere(db: Session, token: str | None) -> int:
         return 0
     user = db.get(User, row.user_id)
     return sessions.revoke_all(db, user, "logout_everywhere") if user else 0
+
+
+def start_totp_enrollment(provider: IdentityProvider, user: User, password: str) -> str:
+    """Re-authenticate the signed-in user and get a new authenticator secret from the provider.
+    The secret goes to the browser once (to show as a QR code) and is never stored or logged here."""
+    if not user.email:
+        raise AuthFailed("invalid_credentials")
+    try:
+        sub, secret = provider.begin_totp_setup(user.email, password)
+    except MfaAlreadyEnabled as exc:
+        raise AuthFailed("mfa_already_enabled") from exc
+    except InvalidCredentials as exc:
+        raise AuthFailed("invalid_credentials") from exc
+    if sub != user.cognito_sub:
+        raise AuthFailed("invalid_credentials")  # the password belongs to someone else: never mix accounts
+    return secret
+
+
+def complete_totp_enrollment(db: Session, provider: IdentityProvider, user: User, password: str, code: str) -> None:
+    """Prove a code from the new authenticator, turn TOTP on at the provider, then require it here and
+    end every session (sessions.enroll_factor), so the next sign-in uses the new factor."""
+    if not user.email:
+        raise AuthFailed("invalid_credentials")
+    try:
+        sub = provider.finish_totp_setup(user.email, password, code)
+    except InvalidCredentials as exc:
+        raise AuthFailed("invalid_credentials") from exc
+    if sub != user.cognito_sub:
+        raise AuthFailed("invalid_credentials")
+    sessions.enroll_factor(db, user)
+

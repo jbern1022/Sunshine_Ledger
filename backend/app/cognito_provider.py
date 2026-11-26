@@ -28,7 +28,7 @@ import hmac
 
 from botocore.exceptions import ClientError
 
-from app.identity import InvalidCredentials, ProviderOutcome, WeakPassword
+from app.identity import InvalidCredentials, MfaAlreadyEnabled, ProviderOutcome, WeakPassword
 
 # Errors that mean "these credentials or this code did not work". Anything else is a real fault and
 # propagates (the caller maps unexpected exceptions to a generic 5xx, never to a sign-in answer).
@@ -36,6 +36,7 @@ _CREDENTIAL_ERRORS = {
     "NotAuthorizedException", "UserNotFoundException", "UserNotConfirmedException", "CodeMismatchException",
     "ExpiredCodeException", "InvalidPasswordException", "PasswordResetRequiredException", "LimitExceededException",
     "TooManyFailedAttemptsException", "TooManyRequestsException", "InvalidParameterException",
+    "EnableSoftwareTokenMFAException",  # VerifySoftwareToken: the code did not match
 }
 
 
@@ -86,6 +87,39 @@ class CognitoProvider:
         if challenge or "AuthenticationResult" not in r:
             raise InvalidCredentials()  # a challenge we do not support: fail closed
         return self._vouch(r["AuthenticationResult"]["AccessToken"], frozenset({"pwd"}))
+
+    def _fresh_access_token(self, email: str, password: str) -> str:
+        """Re-authenticate for a factor change. Only an account WITHOUT TOTP gets tokens straight away;
+        one that has it answers with the TOTP challenge, which enrollment does not continue."""
+        params = {"USERNAME": email, "PASSWORD": password, **self._secret_hash(email)}
+        r = self._call(
+            self._c.initiate_auth, ClientId=self._client_id, AuthFlow="USER_PASSWORD_AUTH", AuthParameters=params,
+        )
+        if r.get("ChallengeName") == "SOFTWARE_TOKEN_MFA":
+            raise MfaAlreadyEnabled()
+        if r.get("ChallengeName") or "AuthenticationResult" not in r:
+            raise InvalidCredentials()
+        return r["AuthenticationResult"]["AccessToken"]
+
+    def begin_totp_setup(self, email: str, password: str) -> tuple[str, str]:
+        token = self._fresh_access_token(email, password)
+        sub = self._vouch(token, frozenset({"pwd"})).sub
+        secret = self._call(self._c.associate_software_token, AccessToken=token)["SecretCode"]
+        return sub, secret  # the token goes out of scope here: nothing keeps it
+
+    def finish_totp_setup(self, email: str, password: str, code: str) -> str:
+        token = self._fresh_access_token(email, password)
+        sub = self._vouch(token, frozenset({"pwd"})).sub
+        r = self._call(
+            self._c.verify_software_token, AccessToken=token, UserCode=code, FriendlyDeviceName="Sunshine Ledger",
+        )
+        if r.get("Status") != "SUCCESS":
+            raise InvalidCredentials()
+        self._call(
+            self._c.set_user_mfa_preference, AccessToken=token,
+            SoftwareTokenMfaSettings={"Enabled": True, "PreferredMfa": True},
+        )
+        return sub
 
     def verify_totp(self, challenge_token: str, code: str) -> ProviderOutcome:
         try:

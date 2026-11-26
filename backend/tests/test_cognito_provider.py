@@ -140,3 +140,50 @@ def test_confirm_resend_and_reset_request(setup):
         p.request_password_reset("nobody@example.org")  # silent
         with pytest.raises(ClientError):
             p.request_password_reset("a@example.org")  # a real fault is not swallowed
+
+
+# -- TOTP enrollment (re-authenticated; the access token is used for one request and dropped) --------
+
+def test_totp_setup_reauthenticates_then_asks_cognito_for_a_secret(setup):
+    c, s, p = setup
+    s.add_response("initiate_auth", {"AuthenticationResult": {"AccessToken": "AT"}},
+                   {"ClientId": CLIENT, "AuthFlow": "USER_PASSWORD_AUTH", "AuthParameters": {"USERNAME": "a@example.org", "PASSWORD": "pw"}})
+    s.add_response("get_user", user_attrs(), {"AccessToken": "AT"})
+    s.add_response("associate_software_token", {"SecretCode": "JBSWY3DPEHPK3PXP"}, {"AccessToken": "AT"})
+    with s:
+        assert p.begin_totp_setup("a@example.org", "pw") == ("sub-9", "JBSWY3DPEHPK3PXP")
+
+
+def test_totp_setup_refuses_an_account_that_already_has_totp(setup):
+    from app.identity import MfaAlreadyEnabled
+    c, s, p = setup
+    s.add_response("initiate_auth", {"ChallengeName": "SOFTWARE_TOKEN_MFA", "Session": "SESSION-0123456789-ABCDEF", "ChallengeParameters": {}})
+    with s, pytest.raises(MfaAlreadyEnabled):
+        p.begin_totp_setup("a@example.org", "pw")
+
+
+def test_totp_finish_verifies_the_code_then_turns_totp_on(setup):
+    c, s, p = setup
+    s.add_response("initiate_auth", {"AuthenticationResult": {"AccessToken": "AT"}})
+    s.add_response("get_user", user_attrs(), {"AccessToken": "AT"})
+    s.add_response("verify_software_token", {"Status": "SUCCESS"},
+                   {"AccessToken": "AT", "UserCode": "123456", "FriendlyDeviceName": "Sunshine Ledger"})
+    s.add_response("set_user_mfa_preference", {},
+                   {"AccessToken": "AT", "SoftwareTokenMfaSettings": {"Enabled": True, "PreferredMfa": True}})
+    with s:
+        assert p.finish_totp_setup("a@example.org", "pw", "123456") == "sub-9"
+    s.assert_no_pending_responses()
+
+
+@pytest.mark.parametrize("failure", ["status", "mismatch"])
+def test_a_wrong_code_turns_nothing_on(setup, failure):
+    c, s, p = setup
+    s.add_response("initiate_auth", {"AuthenticationResult": {"AccessToken": "AT"}})
+    s.add_response("get_user", user_attrs())
+    if failure == "status":
+        s.add_response("verify_software_token", {"Status": "ERROR"})
+    else:
+        s.add_client_error("verify_software_token", "EnableSoftwareTokenMFAException")
+    # No set_user_mfa_preference is queued: calling it would fail the Stubber.
+    with s, pytest.raises(InvalidCredentials):
+        p.finish_totp_setup("a@example.org", "pw", "000000")

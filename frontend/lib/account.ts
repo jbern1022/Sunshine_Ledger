@@ -157,3 +157,29 @@ export async function removeWatch(id: string): Promise<boolean> {
   const r = await simplePost(`/watchlist/${id}/remove`);
   return r.ok;
 }
+
+export type TotpSetupStart = { ok: true; secret: string; uri: string } | { ok: false; code: string };
+
+/** Step 1 of turning on an authenticator app: re-check the password and get a new secret to scan. The
+ *  secret is shown once and kept only in component state until the step finishes. */
+export async function startTotpSetup(password: string): Promise<TotpSetupStart> {
+  try {
+    const res = await call("/auth/mfa/setup", { method: "POST", body: { password }, csrf: true });
+    if (!res.ok) return { ok: false, code: await failureCode(res) };
+    const body = await res.json();
+    return { ok: true, secret: body.secret, uri: body.otpauth_uri };
+  } catch {
+    return { ok: false, code: "unavailable" };
+  }
+}
+
+/** Step 2: prove a code from the app. On success the server ends every session, this one included. */
+export async function finishTotpSetup(password: string, code: string): Promise<Outcome> {
+  try {
+    const res = await call("/auth/mfa/verify", { method: "POST", body: { password, code }, csrf: true });
+    return res.ok ? { ok: true } : { ok: false, code: await failureCode(res) };
+  } catch {
+    return { ok: false, code: "unavailable" };
+  }
+}
+

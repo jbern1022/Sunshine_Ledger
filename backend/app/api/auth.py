@@ -92,6 +92,15 @@ class EmailOnly(BaseModel):
     email: str = Field(max_length=320)
 
 
+class PasswordOnly(BaseModel):
+    password: str = Field(max_length=256, repr=False)
+
+
+class TotpEnrollCode(BaseModel):
+    password: str = Field(max_length=256, repr=False)
+    code: str = Field(max_length=12, repr=False)
+
+
 class WatchIn(BaseModel):
     kind: str = Field(max_length=10)
     target: str = Field(max_length=80)
@@ -230,6 +239,49 @@ def sign_out_all(response: Response, db: Session = Depends(get_db), sl_session: 
     n = identity.sign_out_everywhere(db, sl_session)
     _clear_cookies(response)
     return {"signed_out": True, "sessions_ended": n}
+
+
+# -- Authenticator (TOTP) enrollment ------------------------------------------------------------------
+# Optional for readers, encouraged in the account panel. Both steps re-check the password (the provider
+# needs a fresh token, and a factor change is a sensitive action); neither keeps a provider token. A
+# restricted session (approved recovery) may use these: enrolling a factor is all it is allowed to do.
+
+def _issuer_label(email: str) -> str:
+    from urllib.parse import quote
+    return quote(f"Sunshine Ledger:{email}", safe=":")
+
+
+@router.post("/auth/mfa/setup", dependencies=[Depends(csrf_protected)])
+@limiter.limit("5/minute")
+def mfa_setup(
+    request: Request, response: Response, body: PasswordOnly, row: AuthSession = Depends(current_session),
+    db: Session = Depends(get_db), provider: identity.IdentityProvider = Depends(get_identity_provider),
+) -> dict:
+    user = _user(db, row)
+    try:
+        secret = identity.start_totp_enrollment(provider, user, body.password)
+    except identity.AuthFailed as exc:
+        if exc.code == "mfa_already_enabled":
+            raise HTTPException(status_code=409, detail=exc.code) from exc
+        raise _fail(exc) from exc
+    response.headers["Cache-Control"] = "no-store"
+    uri = f"otpauth://totp/{_issuer_label(user.email or '')}?secret={secret}&issuer=Sunshine%20Ledger"
+    return {"secret": secret, "otpauth_uri": uri}
+
+
+@router.post("/auth/mfa/verify", dependencies=[Depends(csrf_protected)])
+@limiter.limit("5/minute")
+def mfa_verify(
+    request: Request, response: Response, body: TotpEnrollCode, row: AuthSession = Depends(current_session),
+    db: Session = Depends(get_db), provider: identity.IdentityProvider = Depends(get_identity_provider),
+) -> dict:
+    user = _user(db, row)
+    try:
+        identity.complete_totp_enrollment(db, provider, user, body.password, body.code.strip())
+    except identity.AuthFailed as exc:
+        raise _fail(exc) from exc
+    _clear_cookies(response)  # every session just ended (sessions.enroll_factor), this one included
+    return {"enrolled": True, "signed_out": True}
 
 
 @router.get("/auth/me")
