@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DEFAULT_LOCALE, t } from "@/lib/i18n";
 import { SECURITY_POLICY_URL } from "@/lib/links";
+import UsageBeacon from "@/components/UsageBeacon";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang={DEFAULT_LOCALE}>
       <body>
+        <UsageBeacon />
         <header className="border-b border-slate-200 bg-white">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
             <Link href="/" className="flex items-center gap-2">

@@ -13,6 +13,7 @@ from app.models.staff_analysis import StaffAnalysis
 from app.models.bill_layer import BillLayer, BillLayerSource, BillLayerReview
 from app.models.bill_layer_criteria import BillLayerCriteria, BillLayerCriteriaReview
 from app.models.source_check import SourceCheck
+from app.models.usage_count import UsageCount
 from app.models.bill_text_version import BillTextVersion
 from app.models.legiscan_call import LegiScanCallCount
 from app.models.promise import (
@@ -56,6 +57,7 @@ __all__ = [
     "BillLayerCriteria",
     "BillLayerCriteriaReview",
     "SourceCheck",
+    "UsageCount",
     "BillTextVersion",
     "LegiScanCallCount",
     "ElectionWinner",

@@ -7,6 +7,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.api import bill_layers_admin, bills, elections, flags, health as health_router, impact_lens as impact_lens_router, map as map_router, people, promises as promises_router, districts as districts_router, federal as federal_router, earmarks as earmarks_router, auth as auth_router
 from app.api import corrections as corrections_router
 from app.api import sources as sources_router
+from app.api import usage as usage_router
 from app.config import settings
 from app.rate_limit import limiter
 
@@ -44,6 +45,7 @@ app.include_router(earmarks_router.router)
 app.include_router(auth_router.router)
 app.include_router(health_router.router)
 app.include_router(sources_router.router)
+app.include_router(usage_router.router)
 
 
 @app.middleware("http")
