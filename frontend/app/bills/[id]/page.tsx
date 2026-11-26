@@ -20,6 +20,7 @@ import { forTarget } from "@/lib/accountability";
 import FollowButton from "@/components/FollowButton";
 import { hasAnyLayer } from "@/lib/layers";
 import { effectiveLabel, provisionDateLabel } from "@/lib/billStatus";
+import { displayStatus } from "@/lib/displayStatus";
 
 /** Permalink for a single bill.
  *
@@ -126,13 +127,13 @@ export default async function BillPage({ params, searchParams }: Props) {
         <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           <p>
             <span className="font-medium text-ledger-900">{t("bill.status")}</span>
-            {bill.status}
+            {displayStatus(bill.status, bill.last_action)}
             {bill.last_action && <> — {bill.last_action}</>}
             {bill.last_action_date && <span className="text-slate-500"> ({bill.last_action_date})</span>}
           </p>
           {isLegislation && bill.effective && (
             <p className="mt-0.5">
-              <span className="font-medium text-ledger-900">{effectiveLabel(bill.status)}: </span>
+              <span className="font-medium text-ledger-900">{effectiveLabel(displayStatus(bill.status, bill.last_action))}: </span>
               {bill.effective.when}
               <span className="text-xs text-slate-500">
                 {bill.effective.has_exceptions || (bill.provision_dates ?? []).length > 0
@@ -165,7 +166,7 @@ export default async function BillPage({ params, searchParams }: Props) {
       {hasAnyLayer(bill.layers) ? (
         <>
           <BillLayers billEntityId={bill.entity_id} layers={bill.layers} hasStaffAnalysis={bill.has_staff_analysis} fallbackSummary={bill.what_it_does} accountability={bill} />
-          {whoBlock && <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} accountability={bill} />}
+          {whoBlock && <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={displayStatus(bill.status, bill.last_action)} effective={bill.effective} accountability={bill} />}
         </>
       ) : (
         <>
@@ -182,7 +183,7 @@ export default async function BillPage({ params, searchParams }: Props) {
           )}
 
           {whoBlock ? (
-            <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={bill.status} effective={bill.effective} accountability={bill} />
+            <WhoItAffects billEntityId={bill.entity_id} block={whoBlock} status={displayStatus(bill.status, bill.last_action)} effective={bill.effective} accountability={bill} />
           ) : isLegislation && whoItAffects && (
             <section className="mt-4">
               <h2 className="text-sm font-semibold text-ledger-900">{t("bill.whoItAffects")}</h2>

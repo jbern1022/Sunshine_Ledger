@@ -88,6 +88,7 @@ def _to_list_item(
         geo_scope_names=bill.geo_scope_names,
         introduced_date=bill.introduced_date,
         last_action_date=bill.last_action_date,
+        last_action=bill.last_action,
         what_it_does=_what_it_does(claims),
         source_count=source_count,
         full_text_url=bill.full_text_url,
@@ -633,7 +634,6 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
 
     return BillDetail(
         **list_item.model_dump(),
-        last_action=bill.last_action,
         full_text=bill.full_text,
         sponsors=sponsors_out,
         claims=claims_out,
