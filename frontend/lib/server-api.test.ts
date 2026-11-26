@@ -3,6 +3,7 @@ import {
   getBill,
   getPerson,
   getAllBillsForSitemap,
+  SITEMAP_BILL_CEILING,
   getAllPeopleForSitemap,
   getRecentBillsForFeed,
 } from "./server-api";
@@ -151,6 +152,19 @@ describe("getAllBillsForSitemap", () => {
     expect(fetchMock.mock.calls[1][0]).toContain("offset=100");
   });
 
+  it("covers a corpus past the old 10,000 ceiling (20,681 bills on 2026-11-26)", async () => {
+    const total = 20_681;
+    fetchMock.mockImplementation((url: string) => {
+      const offset = Number(new URL(url).searchParams.get("offset"));
+      const n = Math.min(100, total - offset);
+      return Promise.resolve(jsonResponse(billPage(makeBills(n, offset), total)));
+    });
+
+    const result = await getAllBillsForSitemap();
+
+    expect(result).toHaveLength(total);
+  });
+
   it("stops and returns what it has so far if a later page fails", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(billPage(makeBills(100, 0), 300)))
@@ -170,7 +184,7 @@ describe("getAllBillsForSitemap", () => {
     await expect(getAllBillsForSitemap()).resolves.toHaveLength(100);
   });
 
-  it("stops at the 10,000-item hard ceiling even if the API keeps claiming more", async () => {
+  it("stops at the hard ceiling even if the API keeps claiming more", async () => {
     // A real guard against a pagination bug hanging the sitemap route
     // forever -- always return a full page with an inflated total, so only
     // the hard ceiling (not a short page or the total) can end the loop.
@@ -178,8 +192,9 @@ describe("getAllBillsForSitemap", () => {
 
     const result = await getAllBillsForSitemap();
 
-    expect(result).toHaveLength(10_000);
-    expect(fetchMock).toHaveBeenCalledTimes(100);
+    expect(result).toHaveLength(SITEMAP_BILL_CEILING);
+    expect(fetchMock).toHaveBeenCalledTimes(SITEMAP_BILL_CEILING / 100);
+    expect(SITEMAP_BILL_CEILING).toBeLessThan(50_000); // the sitemap protocol's per-file limit
   });
 });
 
