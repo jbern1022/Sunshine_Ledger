@@ -655,12 +655,33 @@ Automated, off-box, and restore-tested as of 2026-08-04.
   dedicated key (`~/.ssh/sunshineledger_backup_key` on docker-host) restricted via
   `rrsync -wo` in the Pi's `authorized_keys` — that key can only write into
   that one directory, nothing else on the Pi is reachable with it.
+- **Second off-site copy (S3, outside the house)**: when `S3_BACKUP_BUCKET` is
+  set in the cron environment, the verified dump is also uploaded to
+  `s3://sunshine-ledger-backups-269314582841/backups/` (us-east-2, versioned,
+  SSE-S3, TLS-only; lifecycle expires `backups/` after 30 days and old versions
+  after 7). The credential is IAM user `sunshine-ledger-backup-writer`, which can
+  only `s3:PutObject` on `backups/*`, so the script never lists, reads back or
+  prunes in S3. Once configured, an S3 failure fails the run and turns Kuma red
+  even though the Pi copy succeeded; the verified local dump is kept. Until
+  configured, the log says "S3 copy skipped".
+
+  Setup on docker-host (owner):
+  1. Install the AWS CLI v2.
+  2. Put the writer's keys in `~/.aws/credentials` under `[sunshine-backup]`
+     (`chmod 600`).
+  3. Add `S3_BACKUP_BUCKET=sunshine-ledger-backups-269314582841` to the backup
+     cron line (or the environment file it sources).
+  4. Run the script once by hand and confirm the log line
+     `Uploaded to s3://…` and a green Kuma push.
+  5. Copy the new `scripts/backup-db.sh` to `/home/joe/scripts/` (keep a
+     `.bak-YYYYMMDD`).
 - **Retention**: 14 days, pruned automatically both on docker-host (by the backup
   script itself) and on the Pi (separate cron job there, since the
   restricted key can't run arbitrary prune commands remotely). On docker-host the
   prune runs *before* the dump, deliberately — see below.
 - **Failure handling**: the script fails loudly (`BACKUP FAILED: <reason>`
-  on stderr) and deletes its own partial dump, so the backup directory
+  on stderr) and deletes its own partial dump (a verified dump is kept if only
+  an off-site copy failed), so the backup directory
   never contains a file that isn't a real backup. It checks free space up
   front, runs `pg_restore --list` against the dump to confirm the archive
   is actually restorable, and enforces a minimum size as a backstop.
