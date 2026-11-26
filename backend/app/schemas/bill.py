@@ -110,6 +110,8 @@ class BillListItem(BaseModel):
     geo_scope_names: list[str]
     introduced_date: date | None
     last_action_date: date | None
+    # Lets the reader-facing status say "Replaced by CS/HB 1219" for a tabled bill.
+    last_action: str | None = None
     what_it_does: str | None
     source_count: int
     full_text_url: str | None

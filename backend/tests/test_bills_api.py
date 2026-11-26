@@ -725,3 +725,12 @@ def test_bill_detail_lists_dates_of_particular_provisions(client, db_session, bi
         "quote": "The amendments made by this act to s. 1.01, Florida Statutes, first apply to the 2027 property tax roll.",
     }]
     assert client.get(f"/bills/{bill_factory(bill_number='HB 2').id}").json()["provision_dates"] == []
+
+
+def test_list_items_carry_the_last_action(client, bill_factory, db_session):
+    """The card needs it to say "Replaced by CS/HB 1219" for a tabled bill (D9)."""
+    entity = bill_factory()
+    entity.bill.last_action = "Laid on Table, refer to CS/HB 1219"
+    db_session.commit()
+    item = client.get("/bills").json()["items"][0]
+    assert item["last_action"] == "Laid on Table, refer to CS/HB 1219"

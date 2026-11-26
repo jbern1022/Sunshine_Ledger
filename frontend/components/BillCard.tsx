@@ -6,6 +6,7 @@ import { fetchBill } from "@/lib/api";
 import ChallengeForm from "@/components/ChallengeForm";
 import type { BillDetail, BillListItem, SourceOut } from "@/lib/types";
 import TagBadges from "@/components/TagBadges";
+import { displayStatus } from "@/lib/displayStatus";
 import { t, tRich } from "@/lib/i18n";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -105,7 +106,7 @@ export default function BillCard({ bill }: { bill: BillListItem }) {
             </Link>
           </h2>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(bill.status)}`}>{bill.status}</span>
+        <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusClass(bill.status)}`}>{displayStatus(bill.status, bill.last_action)}</span>
       </div>
 
       <TagBadges tags={bill.tags} />

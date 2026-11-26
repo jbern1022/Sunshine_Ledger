@@ -58,6 +58,7 @@ export interface BillListItem {
   geo_scope_names: string[];
   introduced_date: string | null;
   last_action_date: string | null;
+  last_action?: string | null;
   what_it_does: string | null;
   source_count: number;
   full_text_url: string | null;
