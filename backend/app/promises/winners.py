@@ -90,6 +90,14 @@ def name_key(name: str) -> str:
     return " ".join([parts[0], parts[-1]]) if len(parts) > 1 else s.strip()
 
 
+# Rosters print leadership titles after the name ("Boyd, Jim President",
+# "DiCeglie, Nick Majority (Republican) Leader"); they are offices, not names.
+_TRAILING_TITLE = re.compile(
+    r"\s+(?:President(?:\s+Pro\s+Tempore)?|Speaker(?:\s+Pro\s+Tempore)?"
+    r"|(?:Majority|Minority)(?:\s+\((?:Republican|Democratic)\))?\s+Leader(?:\s+Pro\s+Tempore)?)\s*$"
+)
+
+
 def parse_csv(text: str) -> list[dict]:
     reader = csv.DictReader(io.StringIO(text.lstrip("﻿")))
     if not reader.fieldnames:
@@ -118,7 +126,7 @@ def parse_csv(text: str) -> list[dict]:
             district = parse_district(raw[needed["district"]])
         except WinnersError as exc:
             raise WinnersError(f"line {n}: {exc}") from exc
-        name = " ".join(raw[needed["name"]].split())
+        name = _TRAILING_TITLE.sub("", " ".join(raw[needed["name"]].split()))
         if not name:
             raise WinnersError(f"line {n}: no name")
         if (chamber, district) in seen:
