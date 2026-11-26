@@ -260,7 +260,9 @@ def list_tags(db: Session = Depends(get_db)) -> list[TagCount]:
     return [TagCount(slug=slug, label=label, count=n) for slug, label, n in db.execute(stmt).all()]
 
 
-@router.patch("/tags/{bill_tag_id}", response_model=TagOut)
+# Under /bills/admin so the Cloudflare Access rule for admin paths covers it
+# (it was /bills/tags/{id}, outside every /admin prefix, so only HTTP Basic guarded it).
+@router.patch("/admin/tags/{bill_tag_id}", response_model=TagOut)
 def update_bill_tag(
     bill_tag_id: uuid.UUID,
     body: BillTagUpdate,

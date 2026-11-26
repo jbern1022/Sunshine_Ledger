@@ -26,7 +26,7 @@ Routes behind it:
 | `POST /responses/admin` | publish a right-of-reply |
 | `GET /bill-layers/admin/unreviewed` | list unreviewed layer blocks |
 | `POST /bill-layers/admin/{layer_id}/review` | approve/reject a layer block |
-| `PATCH /bills/tags/{bill_tag_id}` | hide or restore a topic badge |
+| `PATCH /bills/admin/tags/{bill_tag_id}` (moved from `/bills/tags/{id}` 2026-11-25 so Cloudflare Access covers it) | hide or restore a topic badge |
 | `GET /promises/admin/queue` | promise review queue |
 | `POST /promises/admin/{id}/review` | approve/reject/classify a promise statement |
 
@@ -65,3 +65,19 @@ no interactive MFA.
   tickets and AWS access.
 - **Small code change if wanted:** a failed-attempt limit on the admin routes
   (e.g. 10/minute/IP) and a log line for each failure.
+
+
+## Cloudflare Access (2026-11-25)
+
+Cloudflare Access (one-time PIN, one allowed address, 24 h sessions) now fronts the API's
+`/{flags,corrections,responses,bill-layers,promises}/admin*` paths; HTTP Basic stays behind it.
+
+* `PATCH /bills/tags/{id}` moved to `/bills/admin/tags/{id}` so an Access rule can cover it.
+  **Add `bills/admin*` to the Access application.**
+* The site's `/admin/promises` page can no longer call the API's admin paths from the browser (Access
+  answers cross-origin requests with a login redirect). It now calls a same-origin proxy,
+  `/admin/api/promises/{queue | <id>/review}`, which forwards server-to-server over `INTERNAL_API_URL`
+  (never through Cloudflare), forwards only those two endpoints, and passes the reviewer's Basic
+  credentials and `Cf-Access-Authenticated-User-Email` on. **Add `sunshineledger.josephbernal.com/admin*`
+  to the Access application** so the page and its proxy sit behind the same login.
+* Not yet done: the API recording the Access email on review actions (audit gap 2).
