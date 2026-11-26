@@ -46,7 +46,14 @@ echo "==> Fetching $PUBLIC_FRONTEND_URL"
 homepage=""
 home_status="000"
 chunk_paths=""
-for _ in 1 2 3 4 5 6; do
+# The frontend runs `npm run build` when its container starts (NEXT_PUBLIC_*
+# are baked in at build time), so the site answers 502 for a few minutes after
+# every deploy. Six quick retries (~90 s) lost that race on 2026-11-26
+# (pipeline 266: the deploy was fine, the check gave up first). Wait up to
+# SMOKE_FRONTEND_WAIT_SECONDS (default 600) instead; a healthy deploy still
+# passes as soon as the site answers.
+frontend_deadline=$(( $(date +%s) + ${SMOKE_FRONTEND_WAIT_SECONDS:-600} ))
+while :; do
   response="$(curl -sL --max-time 10 -w '\n%{http_code}' "$PUBLIC_FRONTEND_URL" 2>/dev/null || true)"
   home_status="${response##*$'\n'}"
   homepage="${response%$'\n'*}"
@@ -55,7 +62,8 @@ for _ in 1 2 3 4 5 6; do
   # references.
   chunk_paths="$(grep -oE '/_next/static/chunks/[A-Za-z0-9._-]+\.js' <<<"$homepage" | sort -u)"
   [[ "$home_status" == "200" && -n "$chunk_paths" ]] && break
-  sleep 5
+  (( $(date +%s) < frontend_deadline )) || break
+  sleep 10
 done
 if [[ "$home_status" != "200" ]]; then
   echo "FAIL: $PUBLIC_FRONTEND_URL returned $home_status (after retries)" >&2
