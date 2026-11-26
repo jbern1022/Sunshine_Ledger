@@ -38,7 +38,7 @@ export default async function DistrictsPage() {
                 .filter((d) => d.chamber === g.key)
                 .map((d) => (
                   <li key={d.code}>
-                    <Link href={`/districts/${d.code}`} className="rounded-full border border-slate-300 px-2.5 py-0.5 text-slate-700 hover:border-slate-500">
+                    <Link href={`/districts/${d.code}`} className="inline-block rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 hover:border-slate-500">
                       {d.code}
                     </Link>
                   </li>
