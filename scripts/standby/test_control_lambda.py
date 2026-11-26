@@ -83,3 +83,24 @@ class Decide(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConfirmOutage(unittest.TestCase):
+    """2026-11-26: the alarm fired on MISSING data (the bridge Lambda briefly lacked IAM access) while home
+    was up, and the standby served stale read-only pages for ~5 h. A start now needs Route 53 to agree."""
+
+    def test_no_start_when_route53_says_home_is_up(self):
+        steps = decide("alarm", "ALARM", inst(), "ALARM", home_ok_share=0.6)
+        self.assertEqual(kinds(steps), ["notify"])
+        self.assertIn("NOT started", steps[0][1])
+
+    def test_start_when_route53_confirms_the_outage(self):
+        steps = decide("alarm", "ALARM", inst(), "ALARM", home_ok_share=0.0)
+        self.assertEqual(steps[:2], [("retag", "failover"), ("start", "failover")])
+
+    def test_retry_also_checks(self):
+        self.assertEqual(kinds(decide("action", "start-if-alarm", inst(), "ALARM", home_ok_share=0.5)), ["notify"])
+
+    def test_unknown_share_keeps_the_old_behaviour(self):
+        # If Route 53 can't be read, fail toward availability: start as before.
+        self.assertEqual(kinds(decide("alarm", "ALARM", inst(), "ALARM", home_ok_share=None))[:2], ["retag", "start"])

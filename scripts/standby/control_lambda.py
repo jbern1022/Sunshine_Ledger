@@ -29,6 +29,9 @@ ALARM_NAME = os.environ.get("ALARM_NAME", "sunshine-ledger-api-down")
 TOPIC_ARN = os.environ.get("TOPIC_ARN", "")
 SCHEDULER_ROLE_ARN = os.environ.get("SCHEDULER_ROLE_ARN", "")
 FAILBACK_DELAY_MINUTES = int(os.environ.get("FAILBACK_DELAY_MINUTES", "10"))
+HEALTH_CHECK_ID = os.environ.get("HEALTH_CHECK_ID", "")
+# Route 53's own rule: an endpoint is healthy when more than 18% of its checkers succeed.
+HEALTHY_SHARE = 0.18
 START_RETRY_MINUTES = 3
 
 
@@ -48,8 +51,11 @@ def parse_event(event: dict) -> tuple[str, str | None]:
     return "alarm", message.get("NewStateValue")
 
 
-def decide(kind: str, detail: str | None, instance: dict | None, alarm_state: str) -> list[tuple]:
+def decide(kind: str, detail: str | None, instance: dict | None, alarm_state: str,
+           home_ok_share: float | None = None) -> list[tuple]:
     """What to do. instance = {"id", "state", "mode", "automation"} or None.
+    home_ok_share = the share of Route 53 checkers that currently see the HOME origin
+    (None if it could not be read). A failover start needs it at or below HEALTHY_SHARE.
 
     Returns a list of steps: ("start", mode), ("retag", mode), ("stop",),
     ("schedule", action, minutes), ("notify", subject, message).
@@ -65,6 +71,13 @@ def decide(kind: str, detail: str | None, instance: dict | None, alarm_state: st
     if (kind, detail) in {("alarm", "ALARM"), ("action", "start-if-alarm")}:
         if kind == "action" and alarm_state != "ALARM":
             return []  # recovered before the retry
+        if home_ok_share is not None and home_ok_share > HEALTHY_SHARE:
+            # The alarm can fire on missing data (e.g. the bridge Lambda failing), not only on a
+            # real outage (2026-11-26). Confirm with Route 53 before serving stale pages.
+            return [("notify", "failover NOT started (Route 53 says home is up)",
+                     f"The uptime alarm is in ALARM, but {home_ok_share:.0%} of Route 53 checkers see the home "
+                     "origin healthy, so this looks like a monitoring fault, not an outage. Check the "
+                     "sunshine-ledger-uptime-bridge Lambda.")]
         if disabled:
             return [("notify", "failover NOT started (automation disabled)",
                      f"The uptime alarm is in ALARM. The standby is {state}; automation=disabled, so nothing was started.")]
@@ -125,6 +138,21 @@ def _find_instance(ec2) -> dict | None:
             "mode": tags.get("standby-mode"), "automation": tags.get("automation")}
 
 
+def _home_ok_share() -> float | None:
+    """Share of Route 53 checkers that currently find '"read_only":false' (i.e. reach home)."""
+    if not HEALTH_CHECK_ID:
+        return None
+    try:
+        import boto3
+        obs = boto3.client("route53").get_health_check_status(HealthCheckId=HEALTH_CHECK_ID)["HealthCheckObservations"]
+    except Exception as exc:  # noqa: BLE001 -- unreadable: fall back to the alarm alone
+        print(f"route53 status unavailable: {exc}")
+        return None
+    if not obs:
+        return None
+    return sum(o["StatusReport"]["Status"].startswith("Success") for o in obs) / len(obs)
+
+
 def handler(event, _context):
     kind, detail = parse_event(event)
     if kind == "ignore":
@@ -134,8 +162,9 @@ def handler(event, _context):
     instance = _find_instance(ec2)
     alarms = cw.describe_alarms(AlarmNames=[ALARM_NAME])["MetricAlarms"]
     alarm_state = alarms[0]["StateValue"] if alarms else "INSUFFICIENT_DATA"
-    steps = decide(kind, detail, instance, alarm_state)
-    print(json.dumps({"kind": kind, "detail": detail, "instance": instance, "alarm": alarm_state, "steps": steps}))
+    home_ok_share = _home_ok_share() if (kind, detail) in {("alarm", "ALARM"), ("action", "start-if-alarm")} else None
+    steps = decide(kind, detail, instance, alarm_state, home_ok_share)
+    print(json.dumps({"kind": kind, "detail": detail, "instance": instance, "alarm": alarm_state, "home_ok_share": home_ok_share, "steps": steps}))
     for step in steps:
         if step[0] == "retag":
             ec2.create_tags(Resources=[instance["id"]], Tags=[{"Key": "standby-mode", "Value": step[1]}])
