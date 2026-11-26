@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = ""
 
+    # Pilot-light standby (Todoist 6j59gqHcC3fFqR5p): the AWS copy restores the last
+    # S3 dump and serves reads during a home outage. Nothing written there survives
+    # failback, so with this on every write route answers 503 (app/read_only.py).
+    read_only: bool = False
+
     # Daily activity totals (docs/USAGE_COUNTS_DESIGN.md). Off: POST /usage answers 404 and nothing is
     # written. Turning it on changes a promise on /privacy, so it is the owner's switch.
     usage_counts_enabled: bool = False

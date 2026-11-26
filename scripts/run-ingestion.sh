@@ -36,6 +36,14 @@ set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/monitoring.sh"
 
 CONTAINER="sunshineledger-backend-1"
+
+# The AWS pilot-light standby runs with READ_ONLY=true: it serves the last S3
+# dump, and anything written there is lost on failback. Ingestion writes to the
+# database directly (not through the API's read-only guard), so it must not run.
+if [ "$(docker exec "$CONTAINER" printenv READ_ONLY 2>/dev/null | tr '[:upper:]' '[:lower:]')" = "true" ]; then
+    echo "[$(date)] READ_ONLY=true in ${CONTAINER} (standby): ingestion skipped."
+    exit 0
+fi
 MODE="${1:-}"
 
 FAILED_STEPS=()

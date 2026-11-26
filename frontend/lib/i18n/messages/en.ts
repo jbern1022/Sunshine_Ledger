@@ -13,6 +13,8 @@ export const en = {
   "site.title": "Sunshine Ledger",
   "site.description": "Florida state and local legislation, in plain language, mapped by impact.",
   "brand.name": "Sunshine Ledger",
+  "readOnly.banner":
+    "You're viewing a backup copy while the main server is offline. Everything can be read, but reports, reviews and account changes are paused, and the newest updates may be missing.",
   "brand.badge": "FLORIDA · MVP",
 
   "nav.browse": "Browse",

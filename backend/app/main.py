@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -9,16 +9,20 @@ from app.api import corrections as corrections_router
 from app.api import sources as sources_router
 from app.api import usage as usage_router
 from app.config import settings
+from app.read_only import ReadOnlyError, read_only_response, reject_writes_when_read_only
 from app.rate_limit import limiter
 
 app = FastAPI(
     title="Sunshine Ledger API",
     description="Florida state and local bill tracker — plain-language summaries, geographic impact, sourced claims.",
     version="0.1.0",
+    # Read-only standby: every write answers 503 (app/read_only.py).
+    dependencies=[Depends(reject_writes_when_read_only)],
 )
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(ReadOnlyError, read_only_response)
 app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
