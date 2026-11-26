@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.data.elections import CALENDARS
 from app.db import get_db
 from app.federal.policy import eligible_for_generation
@@ -62,14 +63,19 @@ def count_stuck_without_summary(db: Session, *, cutoff: dt.datetime) -> int:
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, str | bool]:
     """Liveness only: is the process up and serving.
 
-    Deliberately unchanged and dependency-free -- it must not start failing
-    because the database is slow or the pipeline is behind. Data freshness
-    lives at /health/data.
+    Deliberately dependency-free -- it must not start failing because the
+    database is slow or the pipeline is behind. Data freshness lives at
+    /health/data.
+
+    `read_only` says which origin answered: the Route 53 uptime check
+    string-matches '"read_only":false', so a reply from the pilot-light
+    standby (READ_ONLY=true) still counts as "the home server is down" and
+    the failover automation keeps the standby running until home is back.
     """
-    return {"status": "ok"}
+    return {"status": "ok", "read_only": settings.read_only}
 
 
 @router.get("/health/data")

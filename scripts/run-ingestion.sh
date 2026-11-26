@@ -63,6 +63,43 @@ py() {
     docker exec "$CONTAINER" python -c "$1"
 }
 
+# Steps that only fetch from outside sources and are safe to repeat get one
+# more try at the end of the run. The home internet drops for minutes at a
+# time (Nov 2026: five nights; the 11-25 run lost LegiScan and Miami to
+# "Temporary failure in name resolution"), which outlasts the per-request
+# backoff in app/pipeline/_retry.py (~3.5 min). Steps that need Ollama or that
+# can't be re-run (the background Miami scrape) are plain `step`s.
+NET_RETRY_NAMES=()
+NET_RETRY_CMDS=()
+net_step() {
+    local name="$1" before=${#FAILED_STEPS[@]}
+    step "$@"
+    if [ ${#FAILED_STEPS[@]} -gt "$before" ]; then
+        NET_RETRY_NAMES+=("$name")
+        NET_RETRY_CMDS+=("$(printf '%q ' "${@:2}")")
+    fi
+}
+
+retry_network_steps() {
+    [ ${#NET_RETRY_NAMES[@]} -gt 0 ] || return 0
+    local wait="${NET_RETRY_WAIT_MINUTES:-15}" i name kept
+    echo "[$(date)] ${#NET_RETRY_NAMES[@]} network step(s) failed; one retry in ${wait} min: ${NET_RETRY_NAMES[*]}"
+    sleep $(( wait * 60 ))
+    for i in "${!NET_RETRY_NAMES[@]}"; do
+        name="${NET_RETRY_NAMES[$i]}"
+        echo "[$(date)] Retry: ${name}"
+        # The command was serialized with printf %q, so eval only re-splits it.
+        if eval "${NET_RETRY_CMDS[$i]}"; then
+            echo "[$(date)] RECOVERED on retry: ${name}"
+            kept=()
+            for f in "${FAILED_STEPS[@]}"; do [ "$f" = "$name" ] || kept+=("$f"); done
+            FAILED_STEPS=(${kept[@]+"${kept[@]}"})
+        else
+            echo "[$(date)] STEP FAILED again: ${name}" >&2
+        fi
+    done
+}
+
 if [ "$MODE" = "--gdelt-only" ]; then
     echo "[$(date)] Starting GDELT headline refresh."
     step "GDELT headline refresh" docker exec "$CONTAINER" python -m app.pipeline.gdelt
@@ -103,7 +140,7 @@ miami_finish() {
 # at LEGISCAN_NIGHTLY_CALL_BUDGET calls a night (default 250); the rest wait
 # a night. The calls go into the monthly ledger, and the next step posts an
 # ntfy warning at 70% and 90% of LEGISCAN_MONTHLY_LIMIT.
-step "LegiScan state bills" py "
+net_step "LegiScan state bills" py "
 from app.db import SessionLocal
 from app.pipeline.legiscan import nightly_state_sync, report_api_usage
 db = SessionLocal()
@@ -118,12 +155,12 @@ step "LegiScan usage check" docker exec "$CONTAINER" python -m app.pipeline.usag
 
 # Every client marked nightly in CLIENT_JURISDICTIONS (legistar.py): adding a
 # Legistar city is one registry entry, not an edit here.
-step "Legistar (nightly cities)" docker exec "$CONTAINER" python -m app.pipeline.legistar --nightly --limit 200
+net_step "Legistar (nightly cities)" docker exec "$CONTAINER" python -m app.pipeline.legistar --nightly --limit 200
 
 # Legislation text for city/county items, newest first. Capped so a first run
 # on a new city can't run long; items with no usable attachment are re-checked
 # every 14 days, not every night. Runs before the summarizer so new text is used.
-step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_text --source legistar --limit 100
+net_step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_text --source legistar --limit 100
 
 # (Miami iQM2 is already running in the background; see the top of the run.)
 
@@ -131,10 +168,10 @@ step "Legistar bill text" docker exec "$CONTAINER" python -m app.pipeline.bill_t
 # cosponsored bills (needs CONGRESS_API_KEY in the container; skipped without
 # it), and roll-call votes from the House Clerk and the Senate (no key).
 # See docs/FEDERAL_CONGRESS.md.
-step "Federal roster" docker exec "$CONTAINER" python -m app.federal.roster
-step "Federal sponsorships" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.sponsorships; else echo "CONGRESS_API_KEY not set; skipped"; fi'
-step "Federal roll calls" docker exec "$CONTAINER" python -m app.federal.rollcalls --max-minutes 40
-step "Federal bill text and Florida places" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.texts --limit 50; else echo "CONGRESS_API_KEY not set; skipped"; fi'
+net_step "Federal roster" docker exec "$CONTAINER" python -m app.federal.roster
+net_step "Federal sponsorships" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.sponsorships; else echo "CONGRESS_API_KEY not set; skipped"; fi'
+net_step "Federal roll calls" docker exec "$CONTAINER" python -m app.federal.rollcalls --max-minutes 40
+net_step "Federal bill text and Florida places" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.texts --limit 50; else echo "CONGRESS_API_KEY not set; skipped"; fi'
 
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
 
@@ -157,6 +194,8 @@ step "Miami iQM2 scrape (finish)" miami_finish
 # the privacy page's promise: reporter emails on flags resolved 90+ days ago
 # are deleted.
 step "Purge old flag reporter emails" docker exec "$CONTAINER" python -m app.pipeline.purge_flag_emails
+
+retry_network_steps
 
 if [ ${#FAILED_STEPS[@]} -gt 0 ]; then
     # Exit non-zero as well as pinging: the exit code is what a human sees

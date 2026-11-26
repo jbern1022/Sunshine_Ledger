@@ -41,6 +41,10 @@ happens -- don't also run `deploy.sh` by hand. Requirements, all one-time:
   - `scripts/sync-env.sh push --yes` replaces the server file, but refuses if
     the local file lacks any key the server has, and keeps
     `deploy.env.bak-<timestamp>` on the server. Recreate the backend afterwards.
+  - `scripts/sync-env.sh ssm-diff` / `ssm-push --yes` compare and copy the
+    server file into AWS SSM Parameter Store (`/sunshine-ledger/prod/env/*`),
+    which is all the pilot-light standby can read. **Run `ssm-push --yes`
+    after every change to deploy.env**, or a failover runs on old settings.
   Values are never printed. `scripts/test-sync-env.sh` checks the script against
   a fake server.
 - The repo marked **Trusted → volumes** in Woodpecker's repo settings
@@ -392,9 +396,12 @@ docker compose -f docker-compose.yml exec -T backend python -m app.pipeline.staf
 
 ## Secrets / rotation
 
-All secrets live in `.env` on the local Mac (gitignored), read by `docker
-compose` at deploy time -- **the file itself is never copied to the remote
-host**, only the resolved container env vars are sent over the Docker API.
+All production secrets live in `deploy.env` on docker-host (the source of
+truth; see "Deploy / redeploy" above for `scripts/sync-env.sh`). There is no
+standing `.env` on the Mac. A copy of every key is kept in AWS SSM Parameter
+Store (SecureString, `/sunshine-ledger/prod/env/<KEY>`, account 269314582841,
+us-east-2) for the pilot-light standby: after rotating anything below, run
+`scripts/sync-env.sh ssm-push --yes`.
 
 | Secret | Where to get a new one |
 |---|---|
@@ -725,3 +732,75 @@ dump into a disposable throwaway container and confirmed `entities` (bill
 count) and `claims` counts matched production exactly (2,311 bills, 4,240
 claims), with real bill numbers present. The disposable container was
 removed after verification — this wasn't left running.
+
+## Pilot-light failover (AWS standby)
+
+Keeps the site readable when the home internet (or docker-host) is down.
+Built 2026-11-26; Todoist parent task "AWS pilot-light failover".
+
+**How it works.** A *stopped* EC2 instance, `sunshine-ledger-standby`
+(t3a.medium, x86 because `postgis/postgis` has no arm64 image), waits in
+the Sunshine_Ledger AWS project (us-east-2). When the uptime alarm
+`sunshine-ledger-api-down` fires (two failed 5-minute periods), the Lambda
+`sunshine-ledger-standby-control` tags it `standby-mode=failover` and starts
+it. On boot, `scripts/standby/standby-boot.sh` reads the settings from SSM,
+restores the newest dump from `s3://sunshine-ledger-backups-269314582841/backups/`,
+starts the stack with `docker-compose.standby.yml` (READ_ONLY: writes answer
+503, the site shows the "backup copy" banner), and only once the API and
+site answer locally starts **one** `cloudflared` connector on the production
+tunnel. Cloudflare then sends traffic to it. Expect ~10 min to detect plus
+~15 min to serve.
+
+When home comes back, the alarm goes OK; the Lambda waits 10 minutes, checks
+it is still OK, then stops the standby and retags it `refresh`.
+
+**Why the uptime check can tell them apart.** The standby joins the same
+tunnel, so it answers the public `/health` too. `/health` returns
+`"read_only": true` there, and the Route 53 check string-matches
+`"read_only":false`, so standby answers still count as "home is down" and
+the standby is not stopped while it is the only origin.
+
+**What is stale during a failover.** Data is last night's 03:00 dump (up to
+~24 h old); no ingestion runs (no Ollama, no LegiScan pulls); reader flags,
+corrections, admin reviews, accounts and watchlists are paused (503). Code is
+whatever the last weekly refresh built (at most ~1 week behind `main`).
+
+**Weekly refresh.** EventBridge Scheduler `sunshine-standby-weekly-refresh`
+(Sundays 10:00 ET) starts it in refresh mode: pull from the GitHub mirror
+(branch = instance tag `standby-git-ref`, normally `main`), rebuild, restore
+the newest dump as a test, check the apps answer, power off. It never joins
+the tunnel. You get an email either way ("weekly refresh OK" / "FAILED").
+
+**Safety limits.**
+- Failover powers itself off after 24 h (`shutdown -h +1440`); cancel from
+  a shell on it with `sudo shutdown -c`.
+- Instance tag `automation=disabled` stops alarm-driven starts (you still
+  get the email). Set it before planned work at home that would trip the
+  alarm, and remove it afterwards.
+- The Lambda's role can only start/stop/retag instances tagged
+  `role=standby`; the instance's role can only read the backups, the SSM
+  settings and publish to the alert topic. No SSH keys, no inbound ports.
+- `cloudflared` on the standby has `restart: "no"` and the boot script
+  removes any leftover connector first, so a reboot never rejoins the tunnel.
+
+**Manual operations** (profile `sunshine-ledger`, region us-east-2):
+
+```bash
+ID=$(aws ec2 describe-instances --filters Name=tag:role,Values=standby \
+  --query 'Reservations[0].Instances[0].InstanceId' --output text)
+# fail over by hand (e.g. planned home maintenance)
+aws ec2 create-tags --resources $ID --tags Key=standby-mode,Value=failover
+aws ec2 start-instances --instance-ids $ID
+# fail back by hand: stop it, and reset the mode
+aws ec2 stop-instances --instance-ids $ID
+aws ec2 create-tags --resources $ID --tags Key=standby-mode,Value=refresh
+# pause / resume the automation
+aws ec2 create-tags --resources $ID --tags Key=automation,Value=disabled
+aws ec2 delete-tags --resources $ID --tags Key=automation
+# a shell on it (no SSH): Session Manager
+aws ssm start-session --target $ID      # then: sudo journalctl -u sunshine-standby
+```
+
+**Cost.** ~$2.40/month for the stopped 30 GB disk, plus ~$0.04/hour only
+while it runs (t3a.medium + public IPv4): the weekly refresh is ~30-40 min.
+

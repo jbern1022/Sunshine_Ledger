@@ -51,4 +51,40 @@ grep -q NEW_KEY "$FAKE/sunshine-ledger/deploy.env" && fail "push without --yes c
 grep -q NEW_KEY "$FAKE/sunshine-ledger/deploy.env" || fail "push did not replace the server file"
 ls -A "$FAKE/sunshine-ledger/" | grep -q 'deploy\.env\.bak-' || fail "push made no server backup"
 
+# ssm-diff / ssm-push against a stub `aws` that keeps parameters as files.
+mkdir -p "$W/ssm"
+cat > "$W/bin/aws" <<STUB
+#!/usr/bin/env bash
+D="$W/ssm"
+case "\$2" in
+  get-parameters-by-path)
+    python3 - "\$D" <<'PY'
+import json, os, sys
+d = sys.argv[1]
+print(json.dumps({"Parameters": [{"Name": "/sunshine-ledger/prod/env/" + n, "Value": open(os.path.join(d, n)).read()} for n in sorted(os.listdir(d))]}))
+PY
+    ;;
+  put-parameter)
+    while [ \$# -gt 0 ]; do case "\$1" in --name) n="\${2##*/}"; shift;; --value) v="\${2#file://}"; shift;; esac; shift; done
+    cp "\$v" "\$D/\$n" ;;
+esac
+STUB
+chmod +x "$W/bin/aws"; export AWS="$W/bin/aws"
+printf 'postgres://secret-db' > "$W/ssm/DATABASE_URL"   # same as the server
+printf 'stale' > "$W/ssm/OLLAMA_HOST"                    # differs
+printf 'x' > "$W/ssm/ONLY_IN_SSM"                        # not on the server
+out=$("$S" ssm-diff)
+echo "$out" | grep -q "missing or changed in SSM: .*OLLAMA_HOST" || fail "ssm-diff missed the changed key"
+echo "$out" | grep -q "missing or changed in SSM: .*NEW_KEY" || fail "ssm-diff missed the missing key"
+echo "$out" | grep -q "DATABASE_URL" && fail "ssm-diff reported an unchanged key"
+echo "$out" | grep -q "only in SSM (left alone):  ONLY_IN_SSM" || fail "ssm-diff missed the SSM-only key"
+if "$S" ssm-push >/dev/null 2>&1; then fail "ssm-push without --yes succeeded"; fi
+[ "$(cat "$W/ssm/OLLAMA_HOST")" = stale ] || fail "ssm-push without --yes wrote"
+out=$("$S" ssm-push --yes)
+echo "$out" | grep -q -e topsecret -e secret-db -e "http://" && fail "ssm-push printed a value"
+[ "$(cat "$W/ssm/OLLAMA_HOST")" = "$(sed -n 's/^OLLAMA_HOST=//p' "$FAKE/sunshine-ledger/deploy.env")" ] || fail "ssm-push wrote the wrong value"
+[ "$(cat "$W/ssm/COGNITO_CLIENT_SECRET")" = topsecret ] || fail "ssm-push did not add the missing key"
+[ -e "$W/ssm/ONLY_IN_SSM" ] || fail "ssm-push deleted an SSM-only key"
+"$S" ssm-push --yes | grep -q "SSM is up to date." || fail "second ssm-push was not a no-op"
+
 echo "sync-env: all checks passed"

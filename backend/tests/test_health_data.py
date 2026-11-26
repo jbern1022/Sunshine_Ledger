@@ -42,7 +42,8 @@ def test_liveness_stays_dependency_free(client):
     answers 'is the process up', nothing more."""
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    # read_only is a settings flag (see test_health.py), not a dependency check.
+    assert resp.json() == {"status": "ok", "read_only": False}
 
 
 def test_reports_stale_when_nothing_has_ever_been_ingested(client):
