@@ -171,7 +171,8 @@ function basic(user: string, pass: string): HeadersInit {
 }
 
 export async function fetchPromiseQueue(user: string, pass: string): Promise<{ total: number; items: AdminPromise[] }> {
-  const res = await fetch(`${API_URL}/promises/admin/queue?limit=50`, { headers: basic(user, pass), cache: "no-store" });
+  // Same-origin proxy (app/admin/api/promises): Cloudflare Access blocks cross-origin calls to the API's admin paths.
+  const res = await fetch(`/admin/api/promises/queue?limit=50`, { headers: basic(user, pass), cache: "no-store" });
   if (res.status === 401) throw new Error("unauthorized");
   if (!res.ok) throw new Error(`Failed to load the queue: ${res.status}`);
   return res.json();
@@ -182,7 +183,7 @@ export type ReviewAction = "approve" | "reject" | "not_a_commitment" | "reclassi
 export async function reviewPromise(
   user: string, pass: string, id: string, body: { action: ReviewAction; note?: string; classification?: string },
 ): Promise<void> {
-  const res = await fetch(`${API_URL}/promises/admin/${id}/review`, {
+  const res = await fetch(`/admin/api/promises/${id}/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...basic(user, pass) },
     body: JSON.stringify(body),

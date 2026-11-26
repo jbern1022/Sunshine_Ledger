@@ -434,7 +434,7 @@ def test_patch_bill_tag_requires_auth(client, db_session, bill_factory):
     db_session.commit()
     created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
 
-    resp = client.patch(f"/bills/tags/{created[0].id}", json={"active": False})
+    resp = client.patch(f"/bills/admin/tags/{created[0].id}", json={"active": False})
     assert resp.status_code == 401
 
 
@@ -446,7 +446,7 @@ def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
     created = assign_tags_for_bill(db_session, entity.id, ollama_tag_slugs=["housing"])
 
     resp = client.patch(
-        f"/bills/tags/{created[0].id}", json={"active": False}, auth=("testadmin", "testpass")
+        f"/bills/admin/tags/{created[0].id}", json={"active": False}, auth=("testadmin", "testpass")
     )
     assert resp.status_code == 200
     assert resp.json()["active"] is False
@@ -456,7 +456,7 @@ def test_patch_bill_tag_hides_badge(client, db_session, bill_factory):
 
 
 def test_patch_bill_tag_not_found(client):
-    resp = client.patch(f"/bills/tags/{uuid.uuid4()}", json={"active": False}, auth=("testadmin", "testpass"))
+    resp = client.patch(f"/bills/admin/tags/{uuid.uuid4()}", json={"active": False}, auth=("testadmin", "testpass"))
     assert resp.status_code == 404
 
 
@@ -734,3 +734,9 @@ def test_list_items_carry_the_last_action(client, bill_factory, db_session):
     db_session.commit()
     item = client.get("/bills").json()["items"][0]
     assert item["last_action"] == "Laid on Table, refer to CS/HB 1219"
+
+
+def test_old_tag_route_is_gone(client, db_session, bill_factory):
+    """The admin action lives only under /bills/admin, the prefix Cloudflare Access protects."""
+    resp = client.patch(f"/bills/tags/{uuid.uuid4()}", json={"active": False}, auth=("testadmin", "testpass"))
+    assert resp.status_code in (404, 405)
