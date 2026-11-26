@@ -99,6 +99,12 @@ class Settings(BaseSettings):
     # app/auth.py's fail-closed behavior.
     admin_username: str = "admin"
     admin_password: str = ""
+    # Cloudflare Access in front of the admin paths (docs/ADMIN_ACCESS_AUDIT.md). With the team
+    # domain and the application's AUD tag set, the API verifies Access's signed JWT and records the
+    # logged-in email as the reviewer. Required=true also refuses admin requests without one.
+    cf_access_team_domain: str = ""  # e.g. old-poetry-5370.cloudflareaccess.com
+    cf_access_aud: str = ""          # AUD tag(s), comma-separated
+    cf_access_required: bool = False
 
     # Pilot-light standby (Todoist 6j59gqHcC3fFqR5p): the AWS copy restores the last
     # S3 dump and serves reads during a home outage. Nothing written there survives

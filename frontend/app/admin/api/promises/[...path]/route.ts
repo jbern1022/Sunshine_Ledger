@@ -32,9 +32,11 @@ async function forward(req: Request, ctx: Ctx): Promise<Response> {
   const headers: Record<string, string> = {};
   const auth = req.headers.get("authorization");
   if (auth) headers["Authorization"] = auth;
-  // Who Cloudflare Access let in, for the API to record later (audit gap 2).
-  const reviewer = req.headers.get("cf-access-authenticated-user-email");
-  if (reviewer) headers["Cf-Access-Authenticated-User-Email"] = reviewer;
+  // Who Cloudflare Access let in (audit gap 2). The API verifies this signed
+  // token and records its email as the reviewer; the plain email header is
+  // not trusted there, so it isn't forwarded.
+  const accessJwt = req.headers.get("cf-access-jwt-assertion");
+  if (accessJwt) headers["Cf-Access-Jwt-Assertion"] = accessJwt;
   if (req.method === "POST") headers["Content-Type"] = "application/json";
 
   const query = new URL(req.url).search;

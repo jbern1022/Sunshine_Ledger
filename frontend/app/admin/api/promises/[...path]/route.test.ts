@@ -28,14 +28,21 @@ describe("proxy", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{"total":0,"items":[]}', { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     const req = new Request("http://site/admin/api/promises/queue?limit=50", {
-      headers: { Authorization: "Basic abc", "Cf-Access-Authenticated-User-Email": "admin@example.org", Cookie: "x=1" },
+      headers: {
+        Authorization: "Basic abc",
+        "Cf-Access-Jwt-Assertion": "signed.jwt.token",
+        "Cf-Access-Authenticated-User-Email": "admin@example.org",
+        Cookie: "x=1",
+      },
     });
     const res = await GET(req, ctx(["queue"]));
     expect(res.status).toBe(200);
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toMatch(/\/promises\/admin\/queue\?limit=50$/);
     expect(init.headers.Authorization).toBe("Basic abc");
-    expect(init.headers["Cf-Access-Authenticated-User-Email"]).toBe("admin@example.org");
+    // The signed token is forwarded for the API to verify; the spoofable plain email header is not.
+    expect(init.headers["Cf-Access-Jwt-Assertion"]).toBe("signed.jwt.token");
+    expect(init.headers["Cf-Access-Authenticated-User-Email"]).toBeUndefined();
     expect(init.headers.Cookie).toBeUndefined();
   });
 
