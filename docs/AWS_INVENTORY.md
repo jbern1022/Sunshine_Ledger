@@ -21,7 +21,7 @@ AWS change. CLI profile `sunshine-ledger` (`aws login`). No secrets here.
 | Config | SSM `/sunshine-ledger/dev/cognito/*` | Dev pool id, client id, client secret (SecureString) | |
 | Identity | Cognito `us-east-2_IDPul5NQZ` `sunshine-ledger-dev` | Reader accounts (dev) | MFA OPTIONAL, software token on; USER_PASSWORD_AUTH |
 | Email | SES identity `bernalfieldworks.com` (verified) | Cognito mail, digests, omen alerts | DKIM + MAIL FROM `mail.bernalfieldworks.com`; account suppression list (bounce, complaint); sandbox until case 179566470600566 |
-| Cost | Budget `sunshine-ledger-monthly` $150 | Alerts 50/80/100/125% + forecast | Counts spend before credits |
+| Cost | Budget `sunshine-ledger-monthly` $150 | Alerts at actual $75, $100, $125, $150 and forecast $150 | Counts spend before credits |
 
 ## IAM
 
