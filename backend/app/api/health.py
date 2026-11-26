@@ -8,7 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.data.elections import CALENDARS
 from app.db import get_db
+from app.federal.policy import eligible_for_generation
 from app.models import Bill, Claim, Entity, Source
+from app.pipeline.item_kind import item_kind
+from app.pipeline.summarize import ITEM_FALLBACK_GENERATED_BY, has_no_substance
 
 router = APIRouter(tags=["health"])
 
@@ -21,6 +24,41 @@ MAX_INGEST_AGE_HOURS = 48
 # without a summary. Scraping and summarizing run back-to-back in the same
 # job, so anything younger is probably just mid-run.
 STUCK_AFTER_HOURS = 24
+
+
+def count_stuck_without_summary(db: Session, *, cutoff: dt.datetime) -> int:
+    """Bills the summarizer would take, old enough that a nightly run should
+    have reached them, still without a summary.
+
+    Mirrors the summarizer's own selection (summarize_batch): federal bills
+    outside the delegation are never summarized, minutes and bare titles are
+    skipped, and for non-legislation a title restatement (rule:item_title)
+    counts as done. Counting anything else reports records as stuck that the
+    pipeline will never take (2026-11-25: 370 flagged, nearly all minutes).
+    """
+
+    def claim_exists(condition):
+        return select(Claim.id).where(Claim.bill_entity_id == Entity.id, condition).exists()
+
+    has_llm = claim_exists(Claim.generated_by.like("llm:%"))
+    has_fallback = claim_exists(Claim.generated_by == ITEM_FALLBACK_GENERATED_BY)
+    rows = db.execute(
+        select(Entity.name, Entity.attributes["item_type"].as_string(), has_fallback)
+        .join(Bill, Bill.entity_id == Entity.id)
+        .where(
+            Entity.entity_type == "bill",
+            Entity.created_at < cutoff,
+            (Bill.full_text.isnot(None)) | (Bill.description.isnot(None)),
+            eligible_for_generation(),
+            ~has_llm,
+        )
+    ).all()
+    count = 0
+    for name, item_type, fallback in rows:
+        if item_kind(item_type) != "legislation" and (fallback or has_no_substance(item_type, name)):
+            continue
+        count += 1
+    return count
 
 
 @router.get("/health")
@@ -57,22 +95,7 @@ def data_health(response: Response, db: Session = Depends(get_db)) -> dict:
         select(func.count()).select_from(Entity).where(Entity.entity_type == "bill")
     ).scalar()
 
-    # Bills with something to summarize, old enough that a nightly run
-    # should have reached them, still carrying no LLM-written claim.
-    stuck_cutoff = now - dt.timedelta(hours=STUCK_AFTER_HOURS)
-    missing_summary = db.execute(
-        select(func.count())
-        .select_from(Entity)
-        .join(Bill, Bill.entity_id == Entity.id)
-        .where(
-            Entity.entity_type == "bill",
-            Entity.created_at < stuck_cutoff,
-            (Bill.full_text.isnot(None)) | (Bill.description.isnot(None)),
-            ~select(Claim.id)
-            .where(Claim.bill_entity_id == Entity.id, Claim.generated_by.like("llm:%"))
-            .exists(),
-        )
-    ).scalar()
+    missing_summary = count_stuck_without_summary(db, cutoff=now - dt.timedelta(hours=STUCK_AFTER_HOURS))
 
     reasons: list[str] = []
     if last_ingest is None:
