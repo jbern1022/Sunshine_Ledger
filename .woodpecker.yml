@@ -47,9 +47,20 @@ steps:
       - event: push
       - event: pull_request
 
+  # Offline checks for the ops scripts: the env sync (never prints values,
+  # never drops server keys, SSM push) and the standby failover decisions.
+  - name: script-tests
+    image: python:3.12-slim
+    commands:
+      - python3 -m unittest scripts/standby/test_control_lambda.py
+      - bash scripts/test-sync-env.sh
+    when:
+      - event: push
+      - event: pull_request
+
   - name: deploy
     image: docker:27-cli
-    depends_on: [backend-tests, frontend-build]
+    depends_on: [backend-tests, frontend-build, script-tests]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /home/joe/sunshine-ledger/deploy.env:/run/secrets/deploy.env:ro

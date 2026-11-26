@@ -12,6 +12,13 @@
 #                                         replace the server file with SOURCE (default ./.env),
 #                                         only if SOURCE has every key the server has; the
 #                                         server copy is backed up to deploy.env.bak-<timestamp>
+#   scripts/sync-env.sh ssm-diff          key NAMES where AWS SSM Parameter Store
+#                                         (/sunshine-ledger/prod/env/*) differs from the server
+#   scripts/sync-env.sh ssm-push --yes    copy the server's added/changed keys into SSM
+#                                         (SecureString). Run it after every deploy.env change:
+#                                         the AWS pilot-light standby reads only SSM
+#                                         (scripts/standby/). Keys only in SSM are reported,
+#                                         never deleted.
 #
 # Values are never printed, only key names.
 #
@@ -24,6 +31,9 @@ REMOTE="${SYNC_ENV_REMOTE:-docker}"
 REMOTE_PATH="${SYNC_ENV_REMOTE_PATH:-sunshine-ledger/deploy.env}"
 SSH="${SSH:-ssh}"
 SCP="${SCP:-scp}"
+AWS="${AWS:-aws}"
+SSM_PATH="${SYNC_ENV_SSM_PATH:-/sunshine-ledger/prod/env/}"
+export AWS_PROFILE="${AWS_PROFILE:-sunshine-ledger}" AWS_REGION="${AWS_REGION:-us-east-2}" AWS_PAGER=""
 
 die() { echo "sync-env: $*" >&2; exit 1; }
 
@@ -53,6 +63,21 @@ report() { # report OLD NEW
     echo "  added:   ${added:-none}" | paste -sd' ' -
     echo "  removed: ${removed:-none}" | paste -sd' ' -
     echo "  changed: ${changed:-none}" | paste -sd' ' -
+}
+
+# "KEY<TAB>sha256(value)" for every parameter under $SSM_PATH (values never shown).
+ssm_hashed() {
+    "$AWS" ssm get-parameters-by-path --path "$SSM_PATH" --recursive --with-decryption --output json \
+      | python3 -c '
+import hashlib, json, sys
+for p in json.load(sys.stdin)["Parameters"]:
+    print(p["Name"].rsplit("/", 1)[1] + "\t" + hashlib.sha256(p["Value"].encode()).hexdigest())
+' | sort
+}
+
+# Names of keys whose value on the server differs from SSM or is missing there.
+ssm_stale() { # ssm_stale SERVER_HASHED SSM_HASHED
+    join -t $'\t' -a 1 "$1" "$2" | awk -F'\t' '$2 != $3 {print $1}'
 }
 
 fetch_server() { # fetch_server DEST
@@ -114,8 +139,27 @@ case "$cmd" in
         "$SSH" "$REMOTE" "chmod 600 '${REMOTE_PATH}'"
         echo "Pushed. Server backup: ${REMOTE}:${REMOTE_PATH}.bak-${stamp}. Recreate the backend for it to take effect."
         ;;
-    -h|--help|help)
-        sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    ssm-diff|ssm-push)
+        fetch_server "$TMP"
+        hashed "$TMP" | sort > "$TMP.server"; ssm_hashed > "$TMP.ssm"
+        trap 'rm -f "$TMP" "$TMP.server" "$TMP.ssm" "$TMP.val"' EXIT
+        stale=$(ssm_stale "$TMP.server" "$TMP.ssm")
+        extra=$(comm -13 <(cut -f1 "$TMP.server") <(cut -f1 "$TMP.ssm"))
+        echo "SSM ${SSM_PATH} vs ${REMOTE}:${REMOTE_PATH} (names only):"
+        echo "  missing or changed in SSM: ${stale:-none}" | paste -sd' ' -
+        echo "  only in SSM (left alone):  ${extra:-none}" | paste -sd' ' -
+        [ "$cmd" = ssm-push ] || exit 0
+        [ -n "$stale" ] || { echo "SSM is up to date."; exit 0; }
+        [ "${2:-}" = --yes ] || die "not pushed: re-run with --yes to write these keys to SSM"
+        for k in $stale; do
+            ( umask 077; sed -nE "s/^[[:space:]]*(export[[:space:]]+)?${k}=(.*)$/\\2/p" "$TMP" | tail -1 | tr -d '\n' > "$TMP.val" )
+            "$AWS" ssm put-parameter --name "${SSM_PATH}${k}" --type SecureString --tier Standard \
+                --overwrite --value "file://$TMP.val" >/dev/null || die "could not write ${k}"
+            echo "  wrote ${k}"
+        done
         ;;
-    *) die "unknown command '${cmd}' (pull | diff | push)" ;;
+    -h|--help|help)
+        sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+        ;;
+    *) die "unknown command '${cmd}' (pull | diff | push | ssm-diff | ssm-push)" ;;
 esac
