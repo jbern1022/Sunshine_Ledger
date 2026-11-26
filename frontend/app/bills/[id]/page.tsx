@@ -216,7 +216,7 @@ export default async function BillPage({ params, searchParams }: Props) {
             <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
               {legislatorSponsors.map((s) => (
                 <li key={s.entity_id}>
-                  <Link href={`/people/${s.entity_id}`} className="text-sunshine-700 underline">
+                  <Link href={`/people/${s.entity_id}`} className="inline-block py-1 text-sunshine-700 underline">
                     {s.name}
                   </Link>
                   {s.relationship_type === "co_sponsor" && (
