@@ -132,7 +132,7 @@ def select_bills_needing_summary(
 
         if not force:
             expected = summary_input_hash(
-                text, model=model, fast_model=settings.ollama_model_fast, prompt_version=prompt_version_for(kind)
+                text, model=model, fast_model=settings.ollama_model_fast, prompt_version=prompt_version_for(kind, entity.jurisdiction_level)
             )
             if kind == "legislation":
                 llm_claims = [c for c in entity.claims if c.generated_by.startswith("llm:")]
@@ -190,7 +190,9 @@ def mark_existing_claims_current(db, *, model: str) -> int:
             text,
             model=model,
             fast_model=settings.ollama_model_fast,
-            prompt_version=prompt_version_for(item_kind((entity.attributes or {}).get("item_type"))),
+            prompt_version=prompt_version_for(
+                item_kind((entity.attributes or {}).get("item_type")), entity.jurisdiction_level
+            ),
         )
         for claim in entity.claims:
             if claim.generated_by.startswith("llm:") and claim.input_hash is None:
