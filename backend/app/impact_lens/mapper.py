@@ -69,6 +69,43 @@ class MapperError(RuntimeError):
     pass
 
 
+SALVAGE_NOTE = "salvaged: the model's answer was cut off inside 'unmapped'; ambiguity was not assessed"
+
+
+def salvage(raw_text: str | None) -> dict | None:
+    """Recover an answer that ran away inside its "unmapped" list.
+
+    qwen2.5:14b sometimes keeps inventing unmapped conditions (index 0, 1, ... 113, for an entry that has
+    none) until the output cap cuts it off (2026-11-26: 21-30 entries a night, retried forever). Only that
+    shape is recovered: everything before "unmapped" must parse on its own, then the complete unmapped
+    items are kept and the cut one dropped. "ambiguous" comes after the list, so it is unknown: the caller
+    marks the result for review. A cut anywhere earlier returns None (the answer stays a failure)."""
+    if not raw_text:
+        return None
+    m = re.search(r'"unmapped"\s*:\s*\[', raw_text)
+    if not m:
+        return None
+    head = raw_text[:m.start()].rstrip().rstrip(",")
+    try:
+        obj = json.loads(head + "}")
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(obj, dict):
+        return None
+    items, pos, decoder = [], m.end(), json.JSONDecoder()
+    while True:
+        while pos < len(raw_text) and raw_text[pos] in " \t\r\n,":
+            pos += 1
+        try:
+            item, pos = decoder.raw_decode(raw_text, pos)
+        except json.JSONDecodeError:
+            break
+        if isinstance(item, dict):
+            items.append(item)
+    obj["unmapped"], obj["ambiguous"] = items, None
+    return obj
+
+
 def _numbered(items: list[dict]) -> str:
     if not items:
         return "(none)"
@@ -136,6 +173,7 @@ def map_entry(entry: dict, entry_index: int, client, *, registry: dict[str, Attr
     does not return a JSON object."""
     prompt = build_prompt(entry, registry)
     problem = ""
+    salvaged: dict | None = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             raw_text = client.generate(prompt, json_mode=True)
@@ -145,13 +183,17 @@ def map_entry(entry: dict, entry_index: int, client, *, registry: dict[str, Attr
             raw = json.loads(raw_text)
         except (json.JSONDecodeError, TypeError):
             problem = f"invalid JSON ({len(raw_text or '')} chars, starts {str(raw_text)[:80]!r}, ends {str(raw_text)[-40:]!r})"
+            salvaged = salvage(raw_text) or salvaged
             continue
         if isinstance(raw, dict):
+            salvaged = None  # a clean answer always wins
             break
         problem = f"{type(raw).__name__}, not an object"
     else:
-        raise MapperError(f"model returned {problem} for entry {entry_index} after {MAX_ATTEMPTS} attempts")
-    return validate_criteria(
+        if salvaged is None:
+            raise MapperError(f"model returned {problem} for entry {entry_index} after {MAX_ATTEMPTS} attempts")
+        raw = salvaged
+    criteria = validate_criteria(
         raw,
         entry_index=entry_index,
         n_conditions=len(entry.get("conditions") or []),
@@ -161,6 +203,9 @@ def map_entry(entry: dict, entry_index: int, client, *, registry: dict[str, Attr
         relevance="direct",
         registry=registry,
     )
+    if salvaged is not None:
+        criteria["notes"].append(SALVAGE_NOTE)
+    return criteria
 
 
 def map_layer(db: Session, layer: BillLayer, client, *, generated_by: str, registry: dict[str, Attribute] = REGISTRY) -> tuple[int, int, int]:

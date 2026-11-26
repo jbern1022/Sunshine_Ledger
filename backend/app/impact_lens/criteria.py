@@ -282,6 +282,8 @@ def review_tier(criteria: dict, registry: dict[str, Attribute] | None = None) ->
     registry = REGISTRY if registry is None else registry
     if criteria["relevance"] != "direct" or criteria["ambiguous"] is not None or criteria.get("affected"):
         return "needs_review"
+    if any(str(n).startswith("salvaged:") for n in criteria.get("notes") or []):
+        return "needs_review"  # part of the model's answer was lost (mapper.salvage)
     if criteria["audience"] is None or criteria["unmapped"] or criteria["excludes"]:
         return "needs_review"
     for r in criteria["requires"]:
