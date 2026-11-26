@@ -95,6 +95,13 @@ password-only access. So the gate lives in **our** server, not only in the pool:
 Acceptable ownership proof, reviewer authority, escalation and abuse limits for support review are
 **not decided here**; they stay open (section "Unresolved").
 
+## Verified in the dev pool (2026-11-25)
+
+Pool us-east-2_IDPul5NQZ (us-east-2, Sunshine_Ledger account), throwaway user, deleted afterwards:
+user-password sign-in with the email-based SECRET_HASH; TOTP setup and the MFA challenge; and
+`AdminDeleteUser` with the user's `sub` as `Username`. The adapter (app/cognito_provider.py) behaved as
+written for all of these. Not yet tested: passkeys (below).
+
 ## Passkeys and MFA compatibility (to be tested, not assumed)
 
 * A passkey can stand in for password plus second factor only when it is user-verifying. The pool

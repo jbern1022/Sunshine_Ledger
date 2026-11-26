@@ -1,10 +1,11 @@
 """Amazon Cognito implementation of `IdentityProvider` (docs/ADR_READER_AUTH_COGNITO.md).
 
-**Not wired and not exercised against a real user pool.** It is written against the documented
-`cognito-idp` operations and tested with botocore's Stubber, which proves the requests we make and how
-we read the answers, not that a real pool behaves this way. Everything marked UNVERIFIED in the ADR
-(passkeys with TOTP, region support, whether admin calls accept a `sub` as the username) still has to be
-checked in a dev pool before this is used.
+Used by app/api/auth.py when the Cognito settings are present (accounts stay off behind
+REGISTRATION_OPEN). Unit-tested with botocore's Stubber, and checked against the real dev pool
+us-east-2_IDPul5NQZ on 2026-11-25 with a throwaway user: the user-password flow with an email-based
+SECRET_HASH, TOTP setup and the MFA challenge, and AdminDeleteUser called with the user's `sub` all
+behaved as written here. Still UNVERIFIED (see the ADR): a TOTP-enrolled user who also registers a
+passkey.
 
 Design choices that follow the ADR:
 
@@ -145,7 +146,8 @@ class CognitoProvider:
                 raise
 
     def delete_user(self, sub: str) -> None:
-        # UNVERIFIED: admin calls accept the user's `sub` as Username in this pool configuration.
+        # Admin calls accept the user's `sub` as Username in this pool configuration (checked in the
+        # dev pool, 2026-11-25).
         try:
             self._c.admin_delete_user(UserPoolId=self._pool, Username=sub)
         except ClientError as exc:
