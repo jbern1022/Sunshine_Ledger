@@ -13,6 +13,8 @@
 #    is s3://<backups bucket>/backups/<same name>) and of every snapshot first
 #    seen today, plus the SHA-256 of the previous manifest, so the manifests
 #    form a chain and a missing or replaced day breaks it.
+#    It also lists same-URL pages whose content changed (old and new hash,
+#    both kept in the vault), from app.promises.changes.
 # 3. Signs the manifest's SHA-256 with the KMS key (ECDSA P-256; the private key
 #    never leaves AWS) and stores manifest + signature under manifests/.
 #
@@ -32,6 +34,7 @@ VOLUME="${SNAPSHOT_VOLUME:-sunshineledger_snapshots}"
 BACKUP_DIR="${BACKUP_DIR:-/home/joe/sunshineledger-backups}"
 STATE_DIR="${EVIDENCE_STATE_DIR:-/home/joe/evidence-manifests}"
 DOCKER="${DOCKER:-docker}"
+BACKEND="${BACKEND_CONTAINER:-sunshineledger-backend-1}"
 AWS="${AWS:-aws}"
 
 log() { echo "[$(date -u +%FT%TZ)] evidence: $*"; }
@@ -56,13 +59,19 @@ fi
 log "snapshots: $(wc -l < "$TMP/all.txt" | tr -d ' ') in volume, $NEW new"
 
 # --- 2. manifest -------------------------------------------------------------
+# Same-URL pages whose content changed since yesterday (app/promises/changes.py),
+# recorded in the signed manifest. Best effort: a backend that can't answer
+# records "unknown" rather than stopping the night's fingerprints.
+"$DOCKER" exec "$BACKEND" python -m app.promises.changes --since-hours 26 > "$TMP/changes.json" 2> "$TMP/changes.err" \
+  && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$TMP/changes.json" 2>/dev/null \
+  || { log "source change check failed: $(tail -1 "$TMP/changes.err" 2>/dev/null)"; echo null > "$TMP/changes.json"; }
 DUMP=$(ls -1t "$BACKUP_DIR"/sunshineledger-*.dump 2>/dev/null | head -1 || true)
 [ -n "$DUMP" ] || fail "no dump in $BACKUP_DIR"
 PREV=$(ls -1 "$STATE_DIR"/*.json 2>/dev/null | grep -v "/$DAY.json$" | tail -1 || true)
 
-python3 - "$DAY" "$DUMP" "$TMP/new.txt" "${PREV:-}" "$VAULT" > "$TMP/$DAY.json" <<'PY'
+python3 - "$DAY" "$DUMP" "$TMP/new.txt" "${PREV:-}" "$VAULT" "$TMP/changes.json" > "$TMP/$DAY.json" <<'PY'
 import hashlib, json, os, sys, datetime
-day, dump, new, prev, vault = sys.argv[1:6]
+day, dump, new, prev, vault, changes = sys.argv[1:7]
 def sha(p):
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -81,6 +90,8 @@ print(json.dumps({
     "database_dump": {"name": os.path.basename(dump), "bytes": os.path.getsize(dump), "sha256": sha(dump),
                       "offsite_copy": f"backups/{os.path.basename(dump)}"},
     "new_snapshots": snaps,
+    # null = the check could not run tonight; [] = it ran and found none.
+    "source_changes": json.load(open(changes)),
     "previous_manifest": ({"name": os.path.basename(prev), "sha256": sha(prev)} if prev else None),
     "verify": "openssl dgst -sha256 -verify evidence-signing-public-key.pem -signature <date>.json.sig <date>.json",
 }, indent=2, sort_keys=True))

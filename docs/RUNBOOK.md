@@ -744,6 +744,16 @@ KMS `alias/sunshine-ledger-evidence-signing`, and stores `manifests/YYYY/<date>.
 Local copies: `~/evidence-manifests/`. Log: `~/scripts/evidence.log`. Tests:
 `bash scripts/test-evidence-sync.sh`.
 
+**Source changes.** Each manifest also has `source_changes`: pages fetched again at the same URL
+whose bytes changed in the last 26 h (`python -m app.promises.changes`, run in the backend
+container). Each entry gives the URL, the old and new SHA-256, fetch times and both vault paths.
+`"review": "needs review"` means the visible text changed. `"markup only"` means only the HTML
+changed (tokens, nonces). `null` means the check could not run that night. Nothing is shown on
+the site yet. Two limits: the promise crawler fetches a page only once today (no re-crawl
+schedule), so changes appear only after a re-crawl is added; and a page that reverts to an earlier
+version is not recorded again (`uq_site_snapshots_content`). List every change ever seen:
+`docker exec sunshineledger-backend-1 python -m app.promises.changes --all`.
+
 **Verify a manifest** (anyone, with only the public key):
 `openssl dgst -sha256 -verify docs/evidence-signing-public-key.pem -signature DATE.json.sig DATE.json`
 prints `Verified OK`. Then compare a file's `sha256sum` with its entry, and each manifest's
