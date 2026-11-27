@@ -143,7 +143,7 @@ def main() -> None:
             bill = entity.bill
             out += [f"## {bill.bill_number} — {entity.name}", ""]
             try:
-                who = gen.build_who_it_affects(bill.bill_number, entity.name, bill.full_text or "", client)
+                who = gen.build_who_it_affects(bill.bill_number, gen.prompt_title(entity), bill.full_text or "", client)
                 kept_who += len(who.items)
                 dropped_who += len(who.dropped)
                 out += _render("Who it affects · Sunshine Ledger", who)
@@ -155,8 +155,9 @@ def main() -> None:
                 dropped_quotes += len(says.dropped)
                 out += _render("Bill Says · bill text", says)
                 out += _render("Interpretation · Sunshine Ledger",
-                               gen.build_ai_interpretation(bill.bill_number, entity.name, bill.full_text or "", client))
-                ai_eff = gen.build_ai_expected_effect(bill.bill_number, entity.name, bill.full_text or "", client)
+                               gen.build_ai_interpretation(bill.bill_number, gen.prompt_title(entity), bill.full_text or "", client))
+                ai_eff = gen.build_ai_expected_effect(bill.bill_number, gen.prompt_title(entity), bill.full_text or "", client,
+                                                      local_jurisdiction=gen.local_jurisdiction(entity))
                 kept_effects += len(ai_eff.items)
                 dropped_effects += len(ai_eff.dropped)
                 out += _render("Expected Effect · Sunshine Ledger", ai_eff)
