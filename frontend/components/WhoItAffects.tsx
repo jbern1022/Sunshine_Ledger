@@ -43,6 +43,20 @@ const KIND_KEYS = {
 
 // The rest of a long list folds behind "Show N more" (R9): nothing is cut.
 const SHOWN = 6;
+// A fold this long is grouped by the section each entry comes from (bills
+// keep up to 60 entries since 2026-11-27), in the order the sections first appear.
+const GROUP_AT = 6;
+
+function bySection(items: LayerItem[]): { section: string | null; items: { item: LayerItem; at: number }[] }[] {
+  const groups = new Map<string | null, { item: LayerItem; at: number }[]>();
+  items.forEach((item, i) => {
+    const key = item.section_ref || null;
+    groups.set(key, [...(groups.get(key) ?? []), { item, at: SHOWN + i }]);
+  });
+  const named = [...groups].filter(([k]) => k !== null);
+  const other = groups.get(null);
+  return [...named.map(([section, g]) => ({ section, items: g })), ...(other ? [{ section: null, items: other }] : [])];
+}
 
 export default function WhoItAffects({ billEntityId, block, status, effective, accountability }: Props) {
   const version = block.current;
@@ -121,11 +135,24 @@ export default function WhoItAffects({ billEntityId, block, status, effective, a
             {version.items.length > SHOWN && (
               <details className="mt-3">
                 <summary className="cursor-pointer text-xs text-slate-600 underline">
-                  {t("who.showMore", { count: version.items.length - SHOWN })}
+                  {t(version.items.length - SHOWN >= GROUP_AT ? "who.showMoreBySection" : "who.showMore", { count: version.items.length - SHOWN })}
                 </summary>
-                <ul className="mt-2 space-y-3 text-sm leading-relaxed text-slate-700">
-                  {version.items.slice(SHOWN).map((item, i) => entry(item, SHOWN + i))}
-                </ul>
+                {version.items.length - SHOWN >= GROUP_AT ? (
+                  bySection(version.items.slice(SHOWN)).map((g) => (
+                    <div key={g.section ?? "other"} className="mt-3">
+                      <h4 className="text-xs font-semibold text-slate-600">
+                        {t("who.sectionGroup", { section: g.section ?? t("who.otherProvisions"), count: g.items.length })}
+                      </h4>
+                      <ul className="mt-1 space-y-3 text-sm leading-relaxed text-slate-700">
+                        {g.items.map(({ item, at }) => entry(item, at))}
+                      </ul>
+                    </div>
+                  ))
+                ) : (
+                  <ul className="mt-2 space-y-3 text-sm leading-relaxed text-slate-700">
+                    {version.items.slice(SHOWN).map((item, i) => entry(item, SHOWN + i))}
+                  </ul>
+                )}
               </details>
             )}
             <p className="mt-2 text-[11px] text-slate-500">
