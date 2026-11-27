@@ -150,6 +150,28 @@ export default function MethodologyPage() {
         <DataSourcesList />
       </section>
 
+      <section id="evidence" className="mt-6 scroll-mt-4">
+        <h2 className="text-base font-semibold text-ledger-900">Preserved evidence and how to check it</h2>
+        <p className="mt-1 text-sm text-slate-700">
+          Every night the site writes a list of fingerprints (SHA-256 hashes): one for that night&apos;s database
+          backup and one for each newly saved copy of a source page, such as a candidate&apos;s campaign site. Each
+          list also carries the fingerprint of the list before it, so a missing or replaced night breaks the chain.
+          The list is signed with a key held in Amazon Web Services that never leaves it, and stored where it is
+          locked against change or deletion for a year. Only a recorded override can remove a locked item, for
+          example to comply with a court order or to take down a private person&apos;s details.
+        </p>
+        <p className="mt-2 text-sm text-slate-700">
+          The lists are kept privately and are available on request: ask through &ldquo;Report a problem with this bill&rdquo; on any bill page, with your email for the reply. To check one, save it
+          and its <code>.sig</code> file next to this public key and run the command below; it prints &ldquo;Verified
+          OK&rdquo; only if not one character has changed.
+        </p>
+        <pre className="mt-2 overflow-x-auto rounded-md bg-slate-50 p-2 text-xs text-slate-800" aria-label="Evidence signing public key">{`-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEzuWf6oe3insn5GCuK1taJU0zcG9A
+ZwVx+tr8jgyS7fyPdJvpKGA2B2ocW6rzvlweoq104YptbdKvFRgouRhSXw==
+-----END PUBLIC KEY-----`}</pre>
+        <pre className="mt-2 overflow-x-auto rounded-md bg-slate-50 p-2 text-xs text-slate-800">{"openssl dgst -sha256 -verify evidence-signing-public-key.pem -signature 2026-11-27.json.sig 2026-11-27.json"}</pre>
+      </section>
+
       <section className="mt-6">
         <h2 className="text-base font-semibold text-ledger-900">What this site does not do</h2>
         <ul className="mt-2 space-y-1.5 text-sm text-slate-700">

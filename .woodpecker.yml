@@ -56,6 +56,7 @@ steps:
       - python3 -m unittest scripts/standby/test_control_lambda.py
       - bash scripts/test-sync-env.sh
       - bash scripts/test-run-ingestion-retry.sh
+      - bash scripts/test-evidence-sync.sh
     when:
       - event: push
       - event: pull_request

@@ -21,6 +21,11 @@ AWS change. CLI profile `sunshine-ledger` (`aws login`). No secrets here.
 | Config | SSM `/sunshine-ledger/dev/cognito/*` | Dev pool id, client id, client secret (SecureString) | |
 | Identity | Cognito `us-east-2_IDPul5NQZ` `sunshine-ledger-dev` | Reader accounts (dev) | MFA OPTIONAL, software token on; USER_PASSWORD_AUTH |
 | Email | SES identity `bernalfieldworks.com` (verified) | Cognito mail, digests, omen alerts | DKIM + MAIL FROM `mail.bernalfieldworks.com`; account suppression list (bounce, complaint); sandbox until case 179566470600566 |
+| Storage | S3 `sunshine-ledger-evidence-269314582841-us-east-2-an` (account-regional name) | Evidence vault: promise snapshots (`snapshots/`) and signed nightly fingerprint manifests (`manifests/YYYY/`) | **Object Lock GOVERNANCE, 365-day default** (can't be turned off). Versioned, SSE-S3 + SSE-C blocked, TLS-only, ABAC. Writes logged as CloudTrail data events. Takedown procedure: RUNBOOK "Evidence vault" |
+| Security | KMS `alias/sunshine-ledger-evidence-signing` (`4fbf465c-...`, ECC_NIST_P256 SIGN_VERIFY) | Signs the nightly manifests (ECDSA_SHA_256) | Public key: `docs/evidence-signing-public-key.pem` and `/methodology#evidence`. ~$1/mo |
+| Audit | CloudTrail trail `sunshine-ledger-audit` (multi-region, global events, log file validation) | Management events + write data events on the evidence vault | -> S3 `sunshine-ledger-cloudtrail-269314582841` (versioned, SSE-S3, TLS-only, 365-day expiry). First copy of management events is free |
+| Monitoring | EventBridge rule `sunshine-ledger-aws-health` | AWS Health events (us-east-2) -> `sunshine-ledger-uptime-alerts` | Topic statement `AllowAwsHealthRule` (scoped to the rule ARN). The control Lambda ignores these |
+| Cost | Cost Anomaly Detection: monitor `sunshine-ledger-services` + subscription `sunshine-ledger-daily-5usd` | Daily email when anomalies total >= $5 | Cost-allocation tags can't be activated from a linked project account |
 | Cost | Budget `sunshine-ledger-monthly` $150 | Alerts at actual $75, $100, $125, $150 and forecast $150 | Counts spend before credits |
 
 ## IAM
@@ -32,12 +37,14 @@ AWS change. CLI profile `sunshine-ledger` (`aws login`). No secrets here.
 | Role `sunshine-ledger-standby-scheduler` | Invoke the control Lambda | |
 | Role `sunshine-ledger-uptime-bridge-role` | `route53:GetHealthCheckStatus` on the one check; PutMetricData | Repoint the resource when the check is replaced |
 | Role `sunshine-ledger-uptime-bridge-scheduler-role` | Invoke the bridge | |
-| User `sunshine-ledger-backup-writer` | PutObject `backups/*` only | Key on docker-host (profile `sunshine-backup`); rotate by 2027-02-23 |
+| User `sunshine-ledger-backup-writer` | PutObject `backups/*`; inline `evidence-vault`: PutObject vault `snapshots/*` + `manifests/*`, ListBucket prefix `snapshots/`, `kms:Sign` (ECDSA_SHA_256) on the evidence key. No read, delete or governance bypass (tested 2026-11-27) | Key on docker-host (profile `sunshine-backup`); rotate by 2027-02-23 |
 | User `sunshine-ledger-cognito-backend-dev` | AdminGetUser, AdminDeleteUser on the dev pool | Key in deploy.env; rotate by 2027-02-23 |
 | User `ses-smtp-omen-alerts` | `ses:SendRawEmail` as `omen-alerts@bernalfieldworks.com` only | Proxmox SMTP target; rotate by 2027-02-23 |
 
 ## Rules learned the hard way
 
 * **Before changing any monitoring piece, set `automation=disabled` on the standby.** (2026-11-26: see the RUNBOOK incident.)
+* zsh: write `${A}` before a colon (`$A:trail` and `$A:log` are zsh modifiers that silently mangle ARNs; this cost an evening on 2026-11-26).
+* IAM Access Analyzer analyzers, Identity Center and AWS User Notifications are denied by the project SCP.
 * The managed SCP blocks SNS and CloudWatch alarms in us-east-1, Roles Anywhere, cost-allocation tags and billing dashboards; build monitoring in us-east-2.
 * `aws login` signs into whichever project the browser last opened at settings.aws.com.

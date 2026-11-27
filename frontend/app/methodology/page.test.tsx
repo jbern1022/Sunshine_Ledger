@@ -19,4 +19,12 @@ describe("MethodologyPage", () => {
     expect(screen.getByText(/filing a complaint can.t/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "corrections log" })).toHaveAttribute("href", "/corrections");
   });
+
+  it("publishes the evidence signing key and how to verify", () => {
+    render(<MethodologyPage />);
+    expect(screen.getByRole("heading", { name: "Preserved evidence and how to check it" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Evidence signing public key").textContent).toMatch(/^-----BEGIN PUBLIC KEY-----/);
+    expect(screen.getByText(/openssl dgst -sha256 -verify/)).toBeInTheDocument();
+    expect(screen.getByText(/available on request/)).toBeInTheDocument();
+  });
 });
