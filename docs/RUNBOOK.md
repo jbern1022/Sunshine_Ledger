@@ -802,11 +802,15 @@ aws ssm start-session --target $ID      # then: sudo journalctl -u sunshine-stan
 ```
 
 **Incident 2026-11-26 (false failover, ~5 h).** While the uptime bridge was being switched to the
-string-match check, its IAM permission lagged for a few minutes; the alarm treats missing data as
-breaching, fired at 14:10 UTC, and the Lambda started the standby although home was up. With both
-connected, Cloudflare sent roughly half the visitors (and half the checkers) to the standby's stale,
-read-only copy; the bridge's ">= 50% healthy" rule never cleared, so it never failed back. Stopped by hand
-at 19:13 UTC; no data lost (the standby refuses writes). Two fixes: the bridge now uses Route 53's own
+string-match check, its `CHECK_NAME` was also renamed (`sunshine-ledger-api-home`), so it published the
+metric under a dimension the alarm does not watch. The alarm (dimension `Check=sunshine-ledger-api`) got
+no data at all; it treats missing data as breaching, fired at 14:10 UTC, and the Lambda started the
+standby although home was up. With both connected, Cloudflare sent roughly half the visitors to the
+standby's stale, read-only copy, and with no data the alarm could never clear, so it never failed back.
+(An IAM-permission lag on the bridge that morning was first blamed; it only added a few minutes.)
+`CHECK_NAME` was restored at 19:50 UTC. Stopped by hand
+at 19:13 UTC; no data lost (the standby refuses writes). Fixes: `CHECK_NAME` back to the alarm's dimension (and a warning in its source,
+`infra/aws/uptime-bridge/`); the bridge now uses Route 53's own
 rule (healthy when more than 18% of checkers pass), and the control Lambda **confirms the outage with
 Route 53 before starting** (it refuses, and emails "failover NOT started", when more than 18% of
 checkers still reach home). Lesson: change monitoring with `automation=disabled` set.
