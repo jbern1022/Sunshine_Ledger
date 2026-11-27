@@ -733,6 +733,31 @@ count) and `claims` counts matched production exactly (2,311 bills, 4,240
 claims), with real bill numbers present. The disposable container was
 removed after verification — this wasn't left running.
 
+## Evidence vault and signed fingerprints
+
+`scripts/evidence-sync.sh` runs on docker-host at 03:45 UTC (cron, installed by
+`~/sunshine-aws-setup/install-host-scripts.sh`), after the 03:00 backup. It copies new promise
+snapshots from the `sunshineledger_snapshots` volume to the vault
+(`s3://sunshine-ledger-evidence-269314582841-us-east-2-an/snapshots/`), writes a manifest of
+SHA-256 fingerprints (the newest dump, each new snapshot, the previous manifest), signs it with
+KMS `alias/sunshine-ledger-evidence-signing`, and stores `manifests/YYYY/<date>.json` + `.sig`.
+Local copies: `~/evidence-manifests/`. Log: `~/scripts/evidence.log`. Tests:
+`bash scripts/test-evidence-sync.sh`.
+
+**Verify a manifest** (anyone, with only the public key):
+`openssl dgst -sha256 -verify docs/evidence-signing-public-key.pem -signature DATE.json.sig DATE.json`
+prints `Verified OK`. Then compare a file's `sha256sum` with its entry, and each manifest's
+`previous_manifest.sha256` with the file before it.
+
+**The lock.** Object Lock GOVERNANCE, 365 days by default, on every object version. docker-host's
+credential can add objects but cannot read, delete or bypass the lock. **Takedown** (a court order,
+or a private person's details in a snapshot): from an admin session,
+`aws s3api delete-object --bucket <vault> --key <key> --version-id <id> --bypass-governance-retention`.
+CloudTrail records it (vault writes are data events on trail `sunshine-ledger-audit`). Note the
+reason in the corrections log; the day's manifest keeps the fingerprint, which shows that something
+was removed without revealing it. Never switch the bucket default to COMPLIANCE: no one could then
+remove anything, even for a legal order.
+
 ## Pilot-light failover (AWS standby)
 
 Keeps the site readable when the home internet (or docker-host) is down.

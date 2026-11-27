@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-5xl px-4 py-8 text-xs text-slate-500">
           {t("footer.about")}{" "}
-          <Link href="/methodology" className="underline hover:text-slate-600">{t("footer.how")}</Link> &middot; <Link href="/corrections" className="underline hover:text-slate-600">{t("footer.corrections")}</Link> &middot; <a href="/feed.xml" className="underline hover:text-slate-600">{t("footer.rss")}</a> &middot; <Link href="/privacy" className="underline hover:text-slate-600">{t("footer.privacy")}</Link> &middot; <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-600">{t("footer.security")}</a>
+          <Link href="/methodology" className="underline hover:text-slate-600">{t("footer.how")}</Link> &middot; <Link href="/corrections" className="underline hover:text-slate-600">{t("footer.corrections")}</Link> &middot; <a href="/feed.xml" className="underline hover:text-slate-600">{t("footer.rss")}</a> &middot; <Link href="/privacy" className="underline hover:text-slate-600">{t("footer.privacy")}</Link> &middot; <Link href="/status" className="underline hover:text-slate-600">{t("footer.status")}</Link> &middot; <a href={SECURITY_POLICY_URL} className="underline hover:text-slate-600">{t("footer.security")}</a>
         </footer>
       </body>
     </html>
