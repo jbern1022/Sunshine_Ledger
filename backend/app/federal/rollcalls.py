@@ -39,6 +39,7 @@ from app.federal.sponsorships import CURRENT_CONGRESS, delegation_members
 from app.models import Entity, Event, Relationship, Source
 from app.pipeline.flsenate import USER_AGENT
 from app.pipeline.source_checks import record_check, record_partial
+from app.logging_setup import quiet_http_logging
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +252,7 @@ def main() -> None:
     parser.add_argument("--max-minutes", type=float, help="stop after this long; the next run carries on")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
+    quiet_http_logging()
     with SessionLocal() as db:
         logger.info("roll calls: %s", sync_rollcalls(db, http_fetch(), congress=args.congress, years=tuple(args.year or (2025, 2026)), max_minutes=args.max_minutes))
 

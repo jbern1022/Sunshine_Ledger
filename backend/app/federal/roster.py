@@ -28,6 +28,7 @@ from app.db import SessionLocal
 from app.models import Entity, OfficeTenure
 from app.pipeline.flsenate import USER_AGENT
 from app.promises.winners import name_key
+from app.logging_setup import quiet_http_logging
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +175,7 @@ def main() -> None:
     parser.add_argument("--confirm", action="append", default=[], metavar="BIOGUIDE=UUID")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
+    quiet_http_logging()
     members = fetch_members()
     with SessionLocal() as db:
         result = import_roster(db, members)

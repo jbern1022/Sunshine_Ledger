@@ -410,6 +410,25 @@ class OllamaClient:
         return data["response"].strip()
 
 
+# The prompts say "no preamble", but llama3.1:8b still opens 2,168 state and
+# federal summaries with "Here is a 2-4 sentence plain-language summary of the
+# bill:" (counted 2026-11-27). Only a first line that announces the summary and
+# ends in a colon is removed; nothing else in the answer is touched.
+_PREAMBLE = re.compile(
+    r"\A\s*(?:here\s+is|here's|sure[,!.]?\s*(?:here\s+is|here's)?|below\s+is)\b[^\n]{0,200}?"
+    r"\b(?:summary|description|overview|explanation)\b[^\n]{0,200}?:[ \t]*(?:\n\s*)*",
+    re.IGNORECASE,
+)
+
+
+def strip_preamble(text: str) -> str:
+    """'Here is a ... summary of the bill:' + answer -> answer."""
+    m = _PREAMBLE.match(text or "")
+    if not m or not text[m.end():].strip():
+        return text
+    return text[m.end():].strip()
+
+
 def generate_bill_summaries(
     bill_number: str,
     title: str,
@@ -498,6 +517,7 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
 
     claims = []
     for claim_type, text in summaries.items():
+        text = strip_preamble(text)
         # Attribute each claim to the model that actually wrote it -- with
         # routing on, the two fields can come from different models, and
         # "which model said this" matters when reviewing a flagged claim.

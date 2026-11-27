@@ -24,6 +24,7 @@ from app.federal.bills import TYPES, upsert_bill
 from app.federal.congress_api import CongressClient
 from app.models import Entity, Relationship, Source
 from app.pipeline.source_checks import record_check
+from app.logging_setup import quiet_http_logging
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,7 @@ def main() -> None:
     parser.add_argument("--api-key", help="override CONGRESS_API_KEY (DEMO_KEY works for a small trial)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
+    quiet_http_logging()
     client = CongressClient(args.api_key)
     with SessionLocal() as db:
         logger.info("sponsorships: %s (%d requests)", sync_delegation(db, client, congress=args.congress), client.requests)
