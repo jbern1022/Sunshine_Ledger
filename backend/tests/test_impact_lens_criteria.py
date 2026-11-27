@@ -117,10 +117,43 @@ def test_garbage_input_never_raises_and_maps_nothing():
 
 def test_ambiguity_needs_a_verified_quote():
     q = "The agency shall adopt rules."
-    ok = validate({**GOOD, "ambiguous": {"question": "Which agency?", "quote": q}}, entry_quotes={q})
-    assert ok["ambiguous"] == {"question": "Which agency?", "quote": q} and not C.is_fully_mapped(ok)
-    bad = validate({**GOOD, "ambiguous": {"question": "Which agency?", "quote": "invented"}}, entry_quotes={q})
+    amb = {"reason": "agency_rules", "question": "Which agency?", "quote": q}
+    ok = validate({**GOOD, "ambiguous": amb}, entry_quotes={q})
+    assert ok["ambiguous"] == amb and not C.is_fully_mapped(ok)
+    bad = validate({**GOOD, "ambiguous": {**amb, "quote": "invented"}}, entry_quotes={q})
     assert bad["ambiguous"] is None and bad["unmapped"][-1]["kind"] == "ambiguity"
+
+
+# 6j5J3C7cHJR3p82p: "unclear" says why, from a fixed list, and the quote must
+# show it. A reason the quote doesn't support is not shown.
+@pytest.mark.parametrize("reason,quote", [
+    ("undefined_term", "A qualifying development must include affordable units."),
+    ("agency_rules", "The Department of Revenue shall adopt rules to administer this section."),
+    ("future_event", "Beginning January 1, 2028, the exemption applies to new construction."),
+    ("future_event", "Upon the effective date of the federal waiver, the agency shall implement the program."),
+    ("local_option", "A county may, by ordinance, exempt such property."),
+    ("local_option", "A municipality may elect to participate in the program."),
+    ("cross_reference", "Property described in s. 196.1978(3) is eligible."),
+    ("cross_reference", "Pursuant to chapter 163, part II, the plan must be amended."),
+    ("two_readings", "The owner or operator shall file the report."),
+])
+def test_each_reason_is_kept_when_its_quote_shows_it(reason, quote):
+    amb = {"reason": reason, "question": "Who files?", "quote": quote}
+    assert validate({**GOOD, "ambiguous": amb}, entry_quotes={quote})["ambiguous"] == amb
+
+
+@pytest.mark.parametrize("reason,quote", [
+    ("agency_rules", "A landlord shall return the deposit."),  # nothing about rules
+    ("future_event", "A landlord shall return the deposit."),  # no date or event
+    ("local_option", "A landlord shall return the deposit."),  # no county or city choice
+    ("cross_reference", "A landlord shall return the deposit."),  # points to no other law
+    ("vague", "A landlord shall return the deposit."),  # not on the list
+    (None, "A landlord shall return the deposit."),  # no reason given
+])
+def test_a_reason_the_quote_does_not_show_is_not_shown(reason, quote):
+    out = validate({**GOOD, "ambiguous": {"reason": reason, "question": "Who?", "quote": quote}}, entry_quotes={quote})
+    assert out["ambiguous"] is None
+    assert out["unmapped"][-1]["kind"] == "ambiguity"
 
 
 def test_numeric_operators_with_a_custom_registry():

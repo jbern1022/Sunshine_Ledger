@@ -182,7 +182,7 @@ def test_items_the_guards_would_refuse_are_not_shown_to_the_model():
     assert "0. (not shown: too long or compound to map. Leave it out.)" in p
     assert "Airport-impacted areas" not in p
     assert "1. Not single-family homes rented by their owner." in p  # the plain one stays
-    assert len(p) < 3000
+    assert len(p) < 3600  # the base prompt is ~3,200 chars since the ambiguity reasons (11-27); LONG would add 500+
 
 
 def test_an_unaddressed_long_item_gets_the_real_reason():

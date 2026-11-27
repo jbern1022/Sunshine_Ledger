@@ -163,7 +163,7 @@ def export_sheet(db: Session, pairs: list[tuple[Bill, BillLayer]]) -> str:
             out += [f"- **Unmapped:** {u['kind']} {u['index']}: {u['reason']}" for u in c["unmapped"]]
             out += [f"- **Adjusted:** {n}" for n in c.get("notes", [])]
             if c["ambiguous"]:
-                out.append(f"- **Ambiguous:** {c['ambiguous']['question']}")
+                out.append(f"- **Ambiguous:** ({c['ambiguous'].get('reason', 'no reason')}) {c['ambiguous']['question']}")
             out += [f"- **Review tier:** {review_tier(c)}", "- **Verdict:** ", "- **Note:** ", ""]
     return "\n".join(out) + "\n"
 
