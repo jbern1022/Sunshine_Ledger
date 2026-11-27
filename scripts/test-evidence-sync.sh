@@ -12,7 +12,10 @@ echo "dump-bytes" > "$T/backups/sunshineledger-20261127-030001.dump"
 cat > "$T/bin/docker" <<EOF
 #!/usr/bin/env bash
 echo "docker \$*" >> "$T/calls"
-case "\$*" in *alpine*) cat "$T/volume.txt" ;; esac
+case "\$*" in
+  *alpine*) cat "$T/volume.txt" ;;
+  *"exec"*"app.promises.changes"*) [ -f "$T/changes.json" ] && cat "$T/changes.json" || { echo "backend down" >&2; exit 1; } ;;
+esac
 EOF
 # Fake aws: kms sign returns a base64 "signature"; s3 cp records the destination.
 cat > "$T/bin/aws" <<EOF
@@ -29,7 +32,8 @@ run() {
 fail() { echo "FAIL: $*"; cat "$T/out"; exit 1; }
 DAY=$(date -u +%F)
 
-# Night 1: two snapshots, nothing seen before.
+# Night 1: two snapshots, nothing seen before; one page changed text.
+echo '[{"url": "https://jane.example/", "text_changed": true}]' > "$T/changes.json"
 printf '%s  ./ab/abc.html\n%s  ./cd/cde.html\n' "$(printf a%.0s {1..64})" "$(printf c%.0s {1..64})" > "$T/volume.txt"
 run
 M="$T/state/$DAY.json"
@@ -40,6 +44,7 @@ m = json.load(open(sys.argv[1]))
 assert [s["path"] for s in m["new_snapshots"]] == ["snapshots/ab/abc.html", "snapshots/cd/cde.html"], m["new_snapshots"]
 assert m["database_dump"]["sha256"] == hashlib.sha256(b"dump-bytes\n").hexdigest()
 assert m["previous_manifest"] is None
+assert m["source_changes"] == [{"url": "https://jane.example/", "text_changed": True}], m["source_changes"]
 PY
 [ "$(cat "$M.sig")" = "fake-signature" ] || fail "signature decoded from base64"
 grep -q "s3 sync /s s3://sunshine-ledger-evidence-269314582841-us-east-2-an/snapshots/" "$T/calls" || fail "snapshots synced"
@@ -59,9 +64,12 @@ assert m["previous_manifest"] == {"name": "2000-01-01.json",
                                   "sha256": hashlib.sha256(open(sys.argv[2], "rb").read()).hexdigest()}
 PY
 
-# Night 3: nothing new -> no sync call, manifest still written.
-rm "$T/state/$DAY.json" "$T/state/$DAY.json.sig"; : > "$T/calls"
+# Night 3: nothing new -> no sync call, manifest still written; the backend
+# is down, so source changes are recorded as unknown (null), not as none.
+rm "$T/state/$DAY.json" "$T/state/$DAY.json.sig" "$T/changes.json"; : > "$T/calls"
 run
+python3 -c 'import json,sys; assert json.load(open(sys.argv[1]))["source_changes"] is None' "$T/state/$DAY.json" || fail "unknown changes are null"
+grep -q "source change check failed: backend down" "$T/out" || fail "logs why the change check failed"
 grep -q "s3 sync" "$T/calls" && fail "no sync when nothing is new"
 grep -q "0 new" "$T/out" || fail "logs 0 new"
 
