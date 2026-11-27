@@ -31,6 +31,7 @@ from app.federal.places import METHOD_VERSION, find_places
 from app.models import Bill, Entity, FederalBillText, FederalPlaceFinding
 from app.pipeline.flsenate import USER_AGENT
 from app.pipeline.source_checks import record_check
+from app.logging_setup import quiet_http_logging
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +169,7 @@ def main() -> None:
     parser.add_argument("--api-key")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
+    quiet_http_logging()
     client = CongressClient(args.api_key)
     with SessionLocal() as db:
         logger.info("texts: %s", sync_texts(db, client, http_fetch(), limit=args.limit))

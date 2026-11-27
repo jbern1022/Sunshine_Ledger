@@ -194,6 +194,22 @@ def test_client_needs_a_key_and_never_leaks_it():
     assert "SECRETKEY" not in str(exc.value)
 
 
+def test_the_key_is_sent_as_a_header_not_in_the_url(caplog):
+    seen = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(200, json={"ok": True})
+
+    c = CongressClient("SECRETKEY", pause=0, client=httpx.Client(transport=httpx.MockTransport(handler)))
+    with caplog.at_level("DEBUG"):
+        c.get("/member/X", limit=5)
+    assert seen[0].headers["X-Api-Key"] == "SECRETKEY"
+    assert "SECRETKEY" not in str(seen[0].url)
+    assert dict(seen[0].url.params) == {"limit": "5", "format": "json"}
+    assert "SECRETKEY" not in caplog.text
+
+
 def test_client_follows_pagination_and_treats_404_as_empty():
     pages = {0: {"items": [{"n": 1}, {"n": 2}], "pagination": {"next": "x"}}, 250: {"items": [{"n": 3}], "pagination": {}}}
 

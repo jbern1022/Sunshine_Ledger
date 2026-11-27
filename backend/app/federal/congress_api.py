@@ -40,7 +40,11 @@ class CongressClient:
         def attempt() -> httpx.Response:
             self._sleep(self._pause)
             self.requests += 1
-            resp = self._client.get(f"{BASE_URL}{path}", params={**params, "api_key": self.api_key, "format": "json"})
+            # The key goes in a header, never the query string: httpx logs
+            # request URLs at INFO and puts them in error messages, and the
+            # nightly log carried the key that way until 2026-11-27.
+            resp = self._client.get(f"{BASE_URL}{path}", params={**params, "format": "json"},
+                                    headers={"X-Api-Key": self.api_key})
             if resp.status_code >= 500:
                 resp.raise_for_status()  # retried with backoff
             return resp
