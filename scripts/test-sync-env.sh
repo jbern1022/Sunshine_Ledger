@@ -24,16 +24,16 @@ printf 'DATABASE_URL=postgres://secret-db\nOLLAMA_HOST=http://old\n' > "$W/local
 
 # pull: backs up, installs 600, names only
 out=$("$S" pull "$W/local/.env")
-echo "$out" | grep -q "added:   COGNITO_CLIENT_SECRET" || fail "pull did not report the added key"
-echo "$out" | grep -q "changed: OLLAMA_HOST" || fail "pull did not report the changed key"
-echo "$out" | grep -q -e topsecret -e secret-db -e "http://" && fail "pull printed a value"
-ls -A "$W/local/" | grep -q '\.env\.bak-' || fail "pull made no backup"
+grep -q "added:   COGNITO_CLIENT_SECRET" <<<"$out" || fail "pull did not report the added key"
+grep -q "changed: OLLAMA_HOST" <<<"$out" || fail "pull did not report the changed key"
+grep -q -e topsecret -e secret-db -e "http://" <<<"$out" && fail "pull printed a value"
+out=$(ls -A "$W/local/"); grep -q '\.env\.bak-' <<<"$out" || fail "pull made no backup"
 [ "$(stat -c %a "$W/local/.env" 2>/dev/null || stat -f %Lp "$W/local/.env")" = 600 ] || fail "pull mode is not 600"
 cmp -s "$W/local/.env" "$FAKE/sunshine-ledger/deploy.env" || fail "pull content differs"
 
 # diff: names only
 printf 'NEW_KEY=v\n' >> "$W/local/.env"
-out=$("$S" diff "$W/local/.env"); echo "$out" | grep -q "added:   NEW_KEY" || fail "diff missed NEW_KEY"
+out=$("$S" diff "$W/local/.env"); grep -q "added:   NEW_KEY" <<<"$out" || fail "diff missed NEW_KEY"
 
 # push refuses when a server key would be dropped
 printf 'DATABASE_URL=postgres://secret-db\n' > "$W/local/stale.env"
@@ -49,7 +49,7 @@ grep -q NEW_KEY "$FAKE/sunshine-ledger/deploy.env" && fail "push without --yes c
 # push with --yes: server backed up, replaced, mode 600
 "$S" push "$W/local/.env" --yes >/dev/null
 grep -q NEW_KEY "$FAKE/sunshine-ledger/deploy.env" || fail "push did not replace the server file"
-ls -A "$FAKE/sunshine-ledger/" | grep -q 'deploy\.env\.bak-' || fail "push made no server backup"
+out=$(ls -A "$FAKE/sunshine-ledger/"); grep -q 'deploy\.env\.bak-' <<<"$out" || fail "push made no server backup"
 
 # ssm-diff / ssm-push against a stub `aws` that keeps parameters as files.
 mkdir -p "$W/ssm"
@@ -74,17 +74,17 @@ printf 'postgres://secret-db' > "$W/ssm/DATABASE_URL"   # same as the server
 printf 'stale' > "$W/ssm/OLLAMA_HOST"                    # differs
 printf 'x' > "$W/ssm/ONLY_IN_SSM"                        # not on the server
 out=$("$S" ssm-diff)
-echo "$out" | grep -q "missing or changed in SSM: .*OLLAMA_HOST" || fail "ssm-diff missed the changed key"
-echo "$out" | grep -q "missing or changed in SSM: .*NEW_KEY" || fail "ssm-diff missed the missing key"
-echo "$out" | grep -q "DATABASE_URL" && fail "ssm-diff reported an unchanged key"
-echo "$out" | grep -q "only in SSM (left alone):  ONLY_IN_SSM" || fail "ssm-diff missed the SSM-only key"
+grep -q "missing or changed in SSM: .*OLLAMA_HOST" <<<"$out" || fail "ssm-diff missed the changed key"
+grep -q "missing or changed in SSM: .*NEW_KEY" <<<"$out" || fail "ssm-diff missed the missing key"
+grep -q "DATABASE_URL" <<<"$out" && fail "ssm-diff reported an unchanged key"
+grep -q "only in SSM (left alone):  ONLY_IN_SSM" <<<"$out" || fail "ssm-diff missed the SSM-only key"
 if "$S" ssm-push >/dev/null 2>&1; then fail "ssm-push without --yes succeeded"; fi
 [ "$(cat "$W/ssm/OLLAMA_HOST")" = stale ] || fail "ssm-push without --yes wrote"
 out=$("$S" ssm-push --yes)
-echo "$out" | grep -q -e topsecret -e secret-db -e "http://" && fail "ssm-push printed a value"
+grep -q -e topsecret -e secret-db -e "http://" <<<"$out" && fail "ssm-push printed a value"
 [ "$(cat "$W/ssm/OLLAMA_HOST")" = "$(sed -n 's/^OLLAMA_HOST=//p' "$FAKE/sunshine-ledger/deploy.env")" ] || fail "ssm-push wrote the wrong value"
 [ "$(cat "$W/ssm/COGNITO_CLIENT_SECRET")" = topsecret ] || fail "ssm-push did not add the missing key"
 [ -e "$W/ssm/ONLY_IN_SSM" ] || fail "ssm-push deleted an SSM-only key"
-"$S" ssm-push --yes | grep -q "SSM is up to date." || fail "second ssm-push was not a no-op"
+out=$("$S" ssm-push --yes); grep -q "SSM is up to date." <<<"$out" || fail "second ssm-push was not a no-op"
 
 echo "sync-env: all checks passed"
