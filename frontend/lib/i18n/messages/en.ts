@@ -32,6 +32,7 @@ export const en = {
   "footer.corrections": "Corrections",
   "footer.rss": "RSS",
   "footer.privacy": "Privacy & Terms",
+  "footer.status": "Status",
   "footer.security": "Security",
 
   "freshness.link": "About our data",

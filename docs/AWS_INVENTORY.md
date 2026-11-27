@@ -25,6 +25,8 @@ AWS change. CLI profile `sunshine-ledger` (`aws login`). No secrets here.
 | Security | KMS `alias/sunshine-ledger-evidence-signing` (`4fbf465c-...`, ECC_NIST_P256 SIGN_VERIFY) | Signs the nightly manifests (ECDSA_SHA_256) | Public key: `docs/evidence-signing-public-key.pem` and `/methodology#evidence`. ~$1/mo |
 | Audit | CloudTrail trail `sunshine-ledger-audit` (multi-region, global events, log file validation) | Management events + write data events on the evidence vault | -> S3 `sunshine-ledger-cloudtrail-269314582841` (versioned, SSE-S3, TLS-only, 365-day expiry). First copy of management events is free |
 | Monitoring | EventBridge rule `sunshine-ledger-aws-health` | AWS Health events (us-east-2) -> `sunshine-ledger-uptime-alerts` | Topic statement `AllowAwsHealthRule` (scoped to the rule ARN). The control Lambda ignores these |
+| Status | Lambda `sunshine-ledger-status-publisher` (py3.12, arm64) + rule `sunshine-ledger-status-publisher-every-15-min` | Builds the public status page from the uptime metric, alarm history and the site's freshness endpoints | Source `infra/aws/status`. Scheduled only, never publicly invocable (account concurrency is 10, shared with the failover Lambda). Incident notes: `INCIDENT_NOTES` in the source |
+| Status | S3 `sunshine-ledger-status-269314582841-us-east-2-an` + CloudFront `E2MNTAQTILKVAI` (`d21z9fmiu2i8g3.cloudfront.net`, OAC `E2LI5V0PVUZKA7`) | Public status page, independent of the home origin | Bucket private; only this distribution may read (`AWS:SourceArn`). PriceClass_100, SimpleCORS, CachingOptimized (files say max-age 60). The site's `/status` reads `status.json` server-side |
 | Cost | Cost Anomaly Detection: monitor `sunshine-ledger-services` + subscription `sunshine-ledger-daily-5usd` | Daily email when anomalies total >= $5 | Cost-allocation tags can't be activated from a linked project account |
 | Cost | Budget `sunshine-ledger-monthly` $150 | Alerts at actual $75, $100, $125, $150 and forecast $150 | Counts spend before credits |
 
@@ -37,6 +39,7 @@ AWS change. CLI profile `sunshine-ledger` (`aws login`). No secrets here.
 | Role `sunshine-ledger-standby-scheduler` | Invoke the control Lambda | |
 | Role `sunshine-ledger-uptime-bridge-role` | `route53:GetHealthCheckStatus` on the one check; PutMetricData | Repoint the resource when the check is replaced |
 | Role `sunshine-ledger-uptime-bridge-scheduler-role` | Invoke the bridge | |
+| Role `sunshine-ledger-status-publisher-role` (Lambda) | GetMetricData; DescribeAlarmHistory on `sunshine-ledger-api-down`; PutObject `status.json` and `index.html` only | |
 | User `sunshine-ledger-backup-writer` | PutObject `backups/*`; inline `evidence-vault`: PutObject vault `snapshots/*` + `manifests/*`, ListBucket prefix `snapshots/`, `kms:Sign` (ECDSA_SHA_256) on the evidence key. No read, delete or governance bypass (tested 2026-11-27) | Key on docker-host (profile `sunshine-backup`); rotate by 2027-02-23 |
 | User `sunshine-ledger-cognito-backend-dev` | AdminGetUser, AdminDeleteUser on the dev pool | Key in deploy.env; rotate by 2027-02-23 |
 | User `ses-smtp-omen-alerts` | `ses:SendRawEmail` as `omen-alerts@bernalfieldworks.com` only | Proxmox SMTP target; rotate by 2027-02-23 |
