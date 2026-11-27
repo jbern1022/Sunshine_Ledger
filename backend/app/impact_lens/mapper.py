@@ -35,6 +35,16 @@ MAX_ATTEMPTS = 2
 
 # Bump when the prompt or its guards change in a way that should remap.
 METHOD_VERSION = "impact_lens_criteria/11"  # 11: ambiguity reasons (2026-11-27)
+# Rows at this method version or later still count as mapped, so a bump that
+# only adds to what the mapper may say doesn't remap everything. 11 added the
+# ambiguity reason; on 2026-11-27 no v10 row had an ambiguity at all, and
+# remapping 16,255 entries would take ~15 nights. Raise it to force a remap.
+KEEP_FROM_METHOD = 10
+
+
+def kept_method_versions() -> list[str]:
+    current = int(METHOD_VERSION.rsplit("/", 1)[1])
+    return [f"impact_lens_criteria/{n}" for n in range(KEEP_FROM_METHOD, current + 1)]
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -219,7 +229,7 @@ def map_layer(db: Session, layer: BillLayer, client, *, generated_by: str, regis
         select(BillLayerCriteria.entry_index).where(
             BillLayerCriteria.bill_layer_id == layer.id,
             BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION,
-            BillLayerCriteria.method_version == METHOD_VERSION,
+            BillLayerCriteria.method_version.in_(kept_method_versions()),
         )
     ).scalars())
     stored = skipped = failed = 0

@@ -283,3 +283,21 @@ def test_a_clean_retry_wins_over_salvage():
     client = FlakyClient(RUNAWAY, json.dumps(GOOD_ANSWER))
     out = mapper.map_entry(ENTRY, 0, client)
     assert client.calls == 2 and not any("cut off" in n for n in out["notes"])
+
+
+def test_a_bump_that_only_adds_reasons_does_not_remap_older_rows(db_session, bill_factory):
+    # impact_lens_criteria/11 added ambiguity reasons; v10 rows stay mapped.
+    from app.impact_lens.map_batch import pending_who_layers
+    from app.models import BillLayerCriteria
+    from app.impact_lens.vocabulary import VOCABULARY_VERSION
+
+    layer = _who_layer(bill_factory(), [ENTRY])
+    db_session.add(layer)
+    db_session.commit()
+    assert [l.id for _, l in pending_who_layers(db_session)] == [layer.id]
+    db_session.add(BillLayerCriteria(bill_layer_id=layer.id, entry_index=0, vocabulary_version=VOCABULARY_VERSION,
+                                     method_version="impact_lens_criteria/10", generated_by="x",
+                                     criteria={"audience": None, "unmapped": [], "ambiguous": None}))
+    db_session.commit()
+    assert pending_who_layers(db_session) == []
+    assert mapper.map_layer(db_session, layer, FlakyClient("nope"), generated_by="x") == (0, 1, 0)

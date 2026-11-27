@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session
 from app.api.impact_lens import _CAPPED  # the read endpoint's "first N of M entries" rule, one source of truth
 from app.config import settings
 from app.impact_lens.criteria import review_tier
-from app.impact_lens.mapper import METHOD_VERSION, map_layer
+from app.impact_lens.mapper import METHOD_VERSION, kept_method_versions, map_layer
 from app.impact_lens.vocabulary import VOCABULARY_VERSION, jurisdiction_label
 from app.models import Bill, BillLayer, BillLayerCriteria
 
@@ -65,7 +65,7 @@ def pending_who_layers(db: Session) -> list[tuple[Bill, BillLayer]]:
         select(BillLayerCriteria.bill_layer_id, func.count(func.distinct(BillLayerCriteria.entry_index)))
         .where(
             BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION,
-            BillLayerCriteria.method_version == METHOD_VERSION,
+            BillLayerCriteria.method_version.in_(kept_method_versions()),
         )
         .group_by(BillLayerCriteria.bill_layer_id)
     ).all())
@@ -139,7 +139,7 @@ def export_sheet(db: Session, pairs: list[tuple[Bill, BillLayer]]) -> str:
                 select(BillLayerCriteria).where(
                     BillLayerCriteria.bill_layer_id == layer.id,
                     BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION,
-                    BillLayerCriteria.method_version == METHOD_VERSION,
+                    BillLayerCriteria.method_version.in_(kept_method_versions()),
                 )
             ).scalars()
         }
