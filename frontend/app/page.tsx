@@ -1,5 +1,6 @@
 "use client";
 
+import { displayStatus } from "@/lib/displayStatus";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { fetchBills, fetchSessions, fetchSourceStatus, fetchStatuses, fetchTags } from "@/lib/api";
@@ -255,7 +256,7 @@ function BrowsePageInner() {
           <option value="">{t("browse.all.statuses")}</option>
           {statuses.map((s) => (
             <option key={s.status} value={s.status}>
-              {t("browse.option", { label: s.status, count: String(s.count) })}
+              {t("browse.option", { label: displayStatus(s.status), count: String(s.count) })}
             </option>
           ))}
         </select>

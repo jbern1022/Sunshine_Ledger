@@ -26,6 +26,7 @@ from app.models import (
     Tag,
 )
 from app.api.corrections import bill_accountability
+from app.api.reader_status import reader_status_expr, reader_status_filter
 from app.pipeline.effective_date import effective_clause, provision_dates
 from app.pipeline.item_kind import item_kind
 from app.pipeline.topic_tagging import set_bill_tag_active
@@ -201,7 +202,9 @@ def list_bills(
     if jurisdiction_level:
         stmt = stmt.where(Entity.jurisdiction_level == jurisdiction_level)
     if status:
-        stmt = stmt.where(Bill.status == status)
+        # Grouped as readers see them (D9): "Introduced" leaves out ended
+        # bills LegiScan never moved on; "Died" finds them.
+        stmt = stmt.where(reader_status_filter(status))
     if session:
         stmt = stmt.where(Bill.session == session)
     if geo_scope_name:
@@ -330,13 +333,17 @@ def list_statuses(
     Ordered by count so the statuses that describe most bills come first;
     the long tail of one-off municipal statuses sorts to the bottom rather
     than crowding the top of a dropdown.
+
+    Counted as readers see them (app/api/reader_status.py), so each count
+    matches what the filter returns.
     """
+    shown = reader_status_expr().label("shown")
     stmt = (
-        select(Bill.status, func.count().label("n"))
+        select(shown, func.count().label("n"))
         .join(Entity, Entity.id == Bill.entity_id)
         .where(Entity.entity_type == "bill", Bill.status.isnot(None))
-        .group_by(Bill.status)
-        .order_by(func.count().desc(), Bill.status)
+        .group_by(shown)
+        .order_by(func.count().desc(), shown)
     )
     if jurisdiction_name:
         stmt = stmt.where(Entity.jurisdiction_name == jurisdiction_name)
