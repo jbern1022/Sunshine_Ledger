@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models import BillLayer, BillLayerSource, Source
 from app.models.bill_layer import ALLOWED_PAIRS
-from app.pipeline.bill_layers import METHOD_VERSIONS, LayerResult
+from app.pipeline.bill_layers import METHOD_VERSIONS, LayerResult, cut_at_an_older_cap
 
 
 def layer_input_hash(layer: str, origin: str, input_text: str, model: str) -> str:
@@ -51,7 +51,8 @@ def store_layer_version(
         raise ValueError(f"({layer}, {origin}) is not an allowed layer/origin pair")
 
     existing = current_layer(db, bill_entity_id, layer, origin)
-    if existing is not None and existing.input_hash == input_hash:
+    if (existing is not None and existing.input_hash == input_hash
+            and not (layer == "who_it_affects" and cut_at_an_older_cap(existing.scope_note, len(existing.items or [])))):
         return None
 
     last_version = db.execute(

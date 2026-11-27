@@ -128,4 +128,27 @@ describe("WhoItAffects", () => {
     // Folded, not cut: still in the page.
     expect(screen.getByText("Group 8")).toBeInTheDocument();
   });
+
+  // 6j5FgR3w9R629w6p: with the cap at 60, a long list is grouped by the
+  // section it comes from, so a reader can find e.g. Section 7's entries.
+  it("groups a long folded list by section, in bill order", () => {
+    const b = block();
+    const one = b.current.items[0];
+    const sections = ["Section 1", "Section 1", "Section 2", "Section 3", "Section 3", "Section 3",
+      "Section 7", "Section 4", "Section 7", "Section 5", "Section 6", "Section 6", "Section 8", null];
+    b.current.items = sections.map((s, i) => ({ ...one, group: `Group ${i + 1}`, section_ref: s }));
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getByText("Show 8 more, by section")).toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Section 7 (2)", "Section 4 (1)", "Section 5 (1)", "Section 6 (2)", "Section 8 (1)", "Other provisions (1)"]);
+  });
+
+  it("keeps a short folded list ungrouped", () => {
+    const b = block();
+    const one = b.current.items[0];
+    b.current.items = Array.from({ length: 9 }, (_, i) => ({ ...one, group: `Group ${i + 1}` }));
+    render(<WhoItAffects billEntityId="b1" block={b} status="Passed" effective={null} />);
+    expect(screen.getByText("Show 3 more")).toBeInTheDocument();
+    expect(screen.queryAllByRole("heading", { level: 4 })).toEqual([]);
+  });
 });

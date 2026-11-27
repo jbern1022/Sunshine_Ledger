@@ -217,3 +217,37 @@ def test_bill_text_source_without_a_known_version_keeps_the_bill_link(db_session
     [source] = [link.source for link in says.source_links]
     assert source.url == "https://example.com/bill"
     assert source.document_reference == "HB 123"
+
+
+# 6j5FgR3w9R629w6p: 600 Who blocks were cut at the old 20-entry cap (HB 1389
+# showed 20 of 24 and lost its airport entry). Raising the cap must regenerate
+# only those blocks, once, without bumping the method for the other ~6,000.
+def test_a_block_cut_at_an_older_cap_is_planned_again_once(db_session, bill_factory, monkeypatch):
+    from app.pipeline import bill_layers as gen
+
+    monkeypatch.setattr(settings, "layers_who_it_affects", True)
+    entity = bill_factory()
+    _with_text(db_session, entity)
+    assert process_bills(db_session, RoutingClient()) == (4, 0)
+    who = db_session.query(BillLayer).filter_by(layer="who_it_affects").one()
+    assert plan_jobs(db_session, entity, "fake:1") == []
+
+    # As stored before the change: 20 kept of 24, the scope says so.
+    who.items = [dict(who.items[0]) for _ in range(20)]
+    who.scope_note = "Bill text · first 20 of 24 entries"
+    db_session.commit()
+    jobs = plan_jobs(db_session, entity, "fake:1")
+    assert [(j.layer, j.origin) for j in jobs] == [("who_it_affects", "sunshine_ledger_ai")]
+
+    # The rerun has the same input hash and must still be stored, or the
+    # block would be planned again every night.
+    assert process_bills(db_session, RoutingClient()) == (1, 0)
+    who = db_session.query(BillLayer).filter_by(layer="who_it_affects", superseded_at=None).one()
+    assert (who.version, who.scope_note, len(who.items)) == (2, "Bill text", 1)
+    assert plan_jobs(db_session, entity, "fake:1") == []
+
+    # Still cut after the rerun, but at the current cap: not planned again.
+    who.items = [dict(who.items[0]) for _ in range(gen.MAX_WHO_ENTRIES)]
+    who.scope_note = f"Bill text · first {gen.MAX_WHO_ENTRIES} of {gen.MAX_WHO_ENTRIES + 5} entries"
+    db_session.commit()
+    assert plan_jobs(db_session, entity, "fake:1") == []

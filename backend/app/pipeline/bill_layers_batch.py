@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.config import settings
 from app.db import SessionLocal
 from app.logging_setup import quiet_http_logging
-from app.models import Bill, Entity, Source, StaffAnalysis
+from app.models import Bill, BillLayer, Entity, Source, StaffAnalysis
 from app.federal.lens_text import build_federal_who, selected_text as federal_selected_text
 from app.federal.policy import eligible_for_generation
 from app.pipeline import bill_layers as gen
@@ -68,6 +68,11 @@ def _staff_input(section: str | None, analysis: StaffAnalysis) -> str:
     return f"{staff_label(analysis)}\n{section if section else f'<no section>|{analysis.id}'}"
 
 
+def _cut_short(current: BillLayer) -> bool:
+    """A Who block the entry cap cut before the cap was raised: run it again."""
+    return gen.cut_at_an_older_cap(current.scope_note, len(current.items or []))
+
+
 def plan_jobs(db: Session, entity: Entity, model: str) -> list[LayerJob]:
     bill = entity.bill
     candidates: list[tuple[str, str, str]] = []
@@ -78,7 +83,7 @@ def plan_jobs(db: Session, entity: Entity, model: str) -> list[LayerJob]:
         if selected and settings.layers_who_it_affects:
             h = layer_input_hash("who_it_affects", "sunshine_ledger_ai", selected, model)
             current = current_layer(db, entity.id, "who_it_affects", "sunshine_ledger_ai")
-            if current is None or current.input_hash != h:
+            if current is None or current.input_hash != h or _cut_short(current):
                 return [LayerJob("who_it_affects", "sunshine_ledger_ai", selected, h)]
         return []
     if bill.full_text:
@@ -103,7 +108,7 @@ def plan_jobs(db: Session, entity: Entity, model: str) -> list[LayerJob]:
         hashed = text + framing if (framing and origin == "sunshine_ledger_ai") else text
         h = layer_input_hash(layer, origin, hashed, model)
         current = current_layer(db, entity.id, layer, origin)
-        if current is None or current.input_hash != h:
+        if current is None or current.input_hash != h or (layer == "who_it_affects" and _cut_short(current)):
             jobs.append(LayerJob(layer, origin, text, h))
     return jobs
 

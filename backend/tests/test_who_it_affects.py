@@ -497,19 +497,35 @@ def test_rules_that_differ_beyond_the_local_government_stay_separate():
     assert [i["group"] for i in items] == ["Counties", "Municipalities"]
 
 
-def test_up_to_twenty_entries_are_kept_and_more_are_counted():
-    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, 23))
-    bill = "Section 1. Reports.\n" + lines
-    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, 23)]
+def _many(n):
+    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, n + 1))
+    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, n + 1)]
+    return "Section 1. Reports.\n" + lines, items
+
+
+def test_up_to_the_cap_entries_are_kept_and_more_are_counted(monkeypatch):
+    from app.pipeline import bill_layers
+
+    monkeypatch.setattr(bill_layers, "MAX_WHO_ENTRIES", 20)
+    bill, items = _many(22)
     r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
     assert len(r.items) == 20
     assert r.scope_note == "Bill text · first 20 of 22 entries"
 
 
-def test_entries_cut_by_the_cap_are_reported_as_dropped():
-    lines = "".join(f"({i}) Agency {i} shall file report number {i} with the clerk.\n" for i in range(1, 23))
-    bill = "Section 1. Reports.\n" + lines
-    items = [_entry(f"Agency {i}", f"Agency {i} shall file report number {i} with the clerk.") for i in range(1, 23)]
+def test_twenty_four_entries_are_all_kept():
+    # HB 1389 had 24 and showed 20; its 24th was Section 7's airport approval.
+    bill, items = _many(24)
+    r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
+    assert len(r.items) == 24
+    assert r.scope_note == "Bill text"
+
+
+def test_entries_cut_by_the_cap_are_reported_as_dropped(monkeypatch):
+    from app.pipeline import bill_layers
+
+    monkeypatch.setattr(bill_layers, "MAX_WHO_ENTRIES", 20)
+    bill, items = _many(22)
     r = build_who_it_affects("HB 7", "Reports", bill, FakeClient({"items": items}))
     over_cap = [d for d in r.dropped if d.get("reason") == "over the entry cap"]
     assert len(over_cap) == 2
@@ -858,10 +874,14 @@ def test_repeats_of_a_kept_rule_are_dropped_as_duplicates():
     assert dupes == [city_again, owner_longer]
 
 
-def test_up_to_twenty_entries_are_kept():
-    from app.pipeline.bill_layers import MAX_WHO_ENTRIES
+def test_the_entry_cap_is_sixty_and_old_cuts_are_rerun():
+    from app.pipeline.bill_layers import MAX_WHO_ENTRIES, cut_at_an_older_cap
 
-    assert MAX_WHO_ENTRIES == 20
+    assert MAX_WHO_ENTRIES == 60
+    assert cut_at_an_older_cap("Bill text · first 20 of 24 entries", 20)
+    assert not cut_at_an_older_cap("Bill text · first 60 of 70 entries", 60)
+    assert not cut_at_an_older_cap("Bill text", 24)
+    assert not cut_at_an_older_cap("Sections 1-9 of 13", 20)
 
 
 

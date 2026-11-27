@@ -373,6 +373,9 @@ export const en = {
   "who.insufficient": "Insufficient evidence",
   "who.onlyIfEnacted": "Only if the bill is enacted.",
   "who.showMore": "Show {count} more",
+  "who.showMoreBySection": "Show {count} more, by section",
+  "who.sectionGroup": "{section} ({count})",
+  "who.otherProvisions": "Other provisions",
   "who.verified":
     "Each reason is checked word for word against the bill text. Conditions and exceptions are listed only where the bill states them; its definitions may narrow who is covered. Belonging to a group doesn't mean every condition applies to you.",
   "who.drawnFrom": "Drawn from {scope}",

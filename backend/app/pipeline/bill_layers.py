@@ -460,9 +460,20 @@ MAX_WHO_WINDOWS = 4
 # and 4 rode at the end of a window led by the 9,600-char Section 2 and got
 # no entry (2026-10-03).
 WHO_WINDOW_TARGET = 6_000
-# Entries kept per bill; the page shows the first 6 and folds the rest.
-# 20 since the second pass (HB 1389: 18 distinct changes).
-MAX_WHO_ENTRIES = 20
+# Entries kept per bill; the page shows the first 6 and folds the rest,
+# grouped by section. 20 from the second pass (HB 1389: 18 distinct changes)
+# until 2026-11-27, when 600 of 6,639 blocks were cut there (HB 1389 showed 20
+# of 24 and lost Section 7's airport approval). 60 keeps every entry of all but
+# two of them. A block cut at a lower cap is regenerated once
+# (cut_at_an_older_cap); the method version is unchanged, so no other block is.
+MAX_WHO_ENTRIES = 60
+_CUT = re.compile(r"first (\d+) of \d+ entries")
+
+
+def cut_at_an_older_cap(scope_note: str, kept: int) -> bool:
+    """True when a stored Who block was cut at a cap lower than today's."""
+    m = _CUT.search(scope_note or "")
+    return bool(m) and int(m.group(1)) < MAX_WHO_ENTRIES and kept < MAX_WHO_ENTRIES
 _SECTION_NUMBER = re.compile(r"Section\s+(\d+)\.", re.IGNORECASE)
 
 
