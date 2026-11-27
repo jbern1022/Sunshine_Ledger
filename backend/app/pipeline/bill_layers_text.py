@@ -631,6 +631,43 @@ def _clause_overstates(clause: str, sentences: list[str]) -> bool:
     return any(_BILL_PERMISSIVE.search(s) for s in best)
 
 
+# "AUTHORIZING THE EXECUTIVE DIRECTOR TO SUBMIT": who is authorized, to do what.
+# "AUTHORIZING AND DIRECTING" imposes a duty, so it is left out.
+_TITLE_AUTHORIZES = re.compile(
+    r"\bauthoriz\w*\s+(?!and\s+(?:direct|requir))(?:the\s+|its\s+)?([a-z][a-z .'&-]{1,60}?)\s+to\s+([a-z]+)\b",
+    re.IGNORECASE,
+)
+
+
+def overstates_title_modal(statement: str, title: str) -> bool:
+    """True when a record known only by its title is summarized as requiring
+    something the title only authorizes.
+
+    The title names who is authorized to do what ("AUTHORIZING THE EXECUTIVE
+    DIRECTOR TO SUBMIT ..."); the statement is flagged only when it says that
+    same person is required or directed to do that same thing ("requires the
+    Executive Director to submit", "the Executive Director must submit"). A
+    word-overlap match like overstates_modal's was tried first and flagged 37
+    of 9,138 title-only items, nearly all wrongly (a code violation's "obtain a
+    permit" read as permission). Found 2026-11-27 (accuracy re-run #10): Miami
+    R-26-0321.
+    """
+    flat = normalize_ws(statement)
+    flat_title = normalize_ws(title or "")
+    for m in _TITLE_AUTHORIZES.finditer(flat_title):
+        if re.search(r"\b(?:direct\w*|requir\w*)\s+and\s+$", flat_title[max(0, m.start() - 30):m.start()], re.IGNORECASE):
+            continue  # "DIRECTING AND AUTHORIZING": a duty too
+        actor = r"\s+".join(re.escape(w) for w in m.group(1).split())
+        verb = re.escape(m.group(2))
+        required = (
+            rf"\b(?:requir\w*|direct\w*|mandat\w*|obligat\w*)\s+(?:that\s+)?(?:the\s+|its\s+)?{actor}\s+(?:to\s+)?{verb}\b"
+            rf"|\b{actor}\s+(?:must|shall|(?:is|will\s+be)\s+required\s+to)\s+{verb}\b"
+        )
+        if re.search(required, flat, re.IGNORECASE):
+            return True
+    return False
+
+
 def restates_bill(statement: str, text: str) -> bool:
     """True when `statement` is a near-paraphrase of a sentence the bill
     already contains (often the bill's own wording with "may" inserted),

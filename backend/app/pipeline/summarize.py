@@ -24,7 +24,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import Claim, ClaimSource, Entity, Source
+from app.pipeline.bill_layers_text import overstates_title_modal
 from app.pipeline.item_kind import item_kind
+from app.pipeline.summary_checks import (
+    apply_sunset_rule,
+    drops_condition,
+    is_enacted,
+    overstates_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +226,9 @@ Write a 1-4 sentence plain-language description of what this {instrument} does. 
 
 LOCAL_RETRY_NOTE = (
     "\n\nYour previous answer broke a rule: it called the {instrument} a bill, named the state instead of "
-    "{jurisdiction}, or guessed. Write it again, following every rule exactly."
+    "{jurisdiction}, guessed, said it has been agreed, passed or approved, turned an authorization into a "
+    "requirement, or left out a condition such as \"if awarded\". Describe only what the {instrument} does, "
+    "keep \"authorizes\" as authorizes and keep every condition. Write it again, following every rule exactly."
 )
 
 
@@ -237,12 +246,36 @@ _THE_STATE = re.compile(r"\bthe\s+state\b", re.IGNORECASE)
 _STATE_IN_SOURCE = re.compile(r"\bstate\b", re.IGNORECASE)
 
 
-def violates_local_wording(text: str, source_text: str) -> bool:
+def violates_local_wording(
+    text: str,
+    source_text: str,
+    *,
+    enacted: bool = True,
+    jurisdiction: str | None = None,
+    title_only: bool = False,
+) -> bool:
     """True when a local ordinance's description calls it a bill, puts "the
-    state" where the source names no state, or guesses."""
+    state" where the source names no state, or guesses.
+
+    Also (accuracy re-run 2026-11-27): reports progress ("Margate has agreed")
+    on a record not adopted, and, when the title is the only source, turns
+    "authorizing" into "requires" or drops a condition such as "if awarded".
+    """
     if _LOCAL_BILL_WORDING.search(text) or _HEDGE_WORDING.search(text):
         return True
-    return bool(_THE_STATE.search(text)) and not _STATE_IN_SOURCE.search(source_text)
+    if bool(_THE_STATE.search(text)) and not _STATE_IN_SOURCE.search(source_text):
+        return True
+    return _violates_accuracy_guards(
+        text, source_text, enacted=enacted, jurisdiction=jurisdiction, title_only=title_only
+    )
+
+
+def _violates_accuracy_guards(
+    text: str, source_text: str, *, enacted: bool, jurisdiction: str | None, title_only: bool
+) -> bool:
+    if not enacted and overstates_status(text, jurisdiction=jurisdiction):
+        return True
+    return title_only and (overstates_title_modal(text, source_text) or drops_condition(text, source_text))
 
 
 def generate_local_legislation_summary(
@@ -253,11 +286,15 @@ def generate_local_legislation_summary(
     item_type: str | None,
     jurisdiction: str,
     client: "OllamaClient",
+    enacted: bool = True,
+    title_only: bool = False,
 ) -> tuple[str, bool]:
     """Describe a city or county ordinance or resolution. Returns (text, is_fallback).
 
     Same shape as generate_item_description: one retry that restates the rule,
-    then a plain restatement of the title, which says nothing untrue."""
+    then a plain restatement of the title, which says nothing untrue.
+    `enacted` and `title_only` turn on the status and title checks of
+    violates_local_wording."""
     instrument = instrument_label(item_type)
     source = bill_text[:MAX_BILL_TEXT_CHARS]
     prompt = LOCAL_LEGISLATION_PROMPT.format(
@@ -267,10 +304,16 @@ def generate_local_legislation_summary(
         title=title,
         bill_text=source,
     )
+
+    def violates(text: str) -> bool:
+        return violates_local_wording(
+            text, source, enacted=enacted, jurisdiction=jurisdiction, title_only=title_only
+        )
+
     answer = client.generate(prompt)
-    if violates_local_wording(answer, source):
+    if violates(answer):
         answer = client.generate(prompt + LOCAL_RETRY_NOTE.format(instrument=instrument, jurisdiction=jurisdiction))
-    if not violates_local_wording(answer, source):
+    if not violates(answer):
         return answer, False
     label = (item_type or "").strip() or instrument.capitalize()
     plain_title = " ".join((title or "").split())[:300].rstrip(" .")
@@ -278,8 +321,9 @@ def generate_local_legislation_summary(
 
 
 ITEM_RETRY_NOTE = (
-    "\n\nYour previous answer broke a rule: it called the item a bill or legislation, or it guessed. "
-    "Write it again, following every rule exactly."
+    "\n\nYour previous answer broke a rule: it called the item a bill or legislation, guessed, said it has "
+    "been agreed, passed or approved, turned an authorization into a requirement, or left out a condition "
+    "such as \"if awarded\". Write it again, following every rule exactly."
 )
 
 # "the bill" / "this legislation" on a record that is neither; "bill of sale" and
@@ -313,21 +357,31 @@ def generate_item_description(
     *,
     item_type: str | None,
     client: "OllamaClient",
+    enacted: bool = True,
+    jurisdiction: str | None = None,
+    title_only: bool = False,
 ) -> tuple[str, bool]:
     """Describe a non-legislation record. Returns (text, is_fallback).
 
-    The answer is checked for bill wording and guesses; one retry restates the
-    rule; if the second answer still breaks it, the description is a plain
-    restatement of the title (is_fallback True), which says nothing untrue.
+    The answer is checked for bill wording and guesses (and, with `enacted`
+    False or `title_only`, the status and title checks of
+    violates_local_wording); one retry restates the rule; if the second answer
+    still breaks it, the description is a plain restatement of the title
+    (is_fallback True), which says nothing untrue.
     """
     label = (item_type or "").strip() or "Agenda item"
-    prompt = WHAT_IT_DOES_ITEM_PROMPT.format(
-        bill_number=bill_number, title=title, item_type=label, bill_text=bill_text[:MAX_BILL_TEXT_CHARS]
-    )
+    source = bill_text[:MAX_BILL_TEXT_CHARS]
+    prompt = WHAT_IT_DOES_ITEM_PROMPT.format(bill_number=bill_number, title=title, item_type=label, bill_text=source)
+
+    def violates(text: str) -> bool:
+        return violates_item_wording(text) or _violates_accuracy_guards(
+            text, source, enacted=enacted, jurisdiction=jurisdiction, title_only=title_only
+        )
+
     answer = client.generate(prompt)
-    if violates_item_wording(answer):
+    if violates(answer):
         answer = client.generate(prompt + ITEM_RETRY_NOTE)
-    if not violates_item_wording(answer):
+    if not violates(answer):
         return answer, False
     plain_title = " ".join((title or "").split())[:300].rstrip(" .")
     return f"{label}: {plain_title}. The published record gives no further detail here.", True
@@ -463,6 +517,55 @@ def generate_bill_summaries(
     return out
 
 
+STATUS_RETRY_NOTE = (
+    "\n\nYour previous answer said the bill has passed, been agreed or been approved. Describe only what the "
+    "bill would do. Never say whether it passed. Write it again, following every rule exactly."
+)
+
+# "The Florida Senate has passed a bill that requires ..." -> "This bill requires ..."
+_STATUS_LEAD = re.compile(
+    r"^\s*the\s+(?:florida\s+)?(?:state\s+)?(?:legislature|senate|house(?:\s+of\s+representatives)?|congress)"
+    r"\s+has\s+(?:now\s+)?passed\s+(?:a|an|the)\s+(?:\w+\s+){0,2}?(?:bill|resolution|measure|act)\s+(?:that|which)\s+",
+    re.IGNORECASE,
+)
+
+
+def check_bill_what_it_does(
+    answer: str,
+    *,
+    bill_number: str,
+    title: str,
+    bill_text: str,
+    status: str | None,
+    description: str | None,
+    client: "OllamaClient",
+) -> tuple[str, bool]:
+    """The accuracy guards for a state or federal bill's "what it does".
+    Returns (text, is_fallback).
+
+    1. Status words on a bill not enacted ("The Florida Senate has passed a
+       bill that ..."): one retry that names the rule; if the model repeats
+       it, the leading clause is rewritten to "This bill ..."; if a status
+       word is still there, the official description replaces the summary.
+    2. Open Government Sunset Review bills: whatever the summary says about
+       the sunset is replaced by a sentence written from the bill text.
+    """
+    answer = strip_preamble(answer)
+    if not is_enacted(status) and overstates_status(answer):
+        answer = strip_preamble(
+            client.generate(
+                WHAT_IT_DOES_PROMPT.format(bill_number=bill_number, title=title, bill_text=bill_text[:MAX_BILL_TEXT_CHARS])
+                + STATUS_RETRY_NOTE
+            )
+        )
+        if overstates_status(answer):
+            answer = _STATUS_LEAD.sub("This bill ", answer, count=1)
+        if overstates_status(answer):
+            plain = " ".join((description or title or "").split()).rstrip(" .")
+            return f"{plain}.", True
+    return apply_sunset_rule(answer, bill_text, title), False
+
+
 def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_source: Source) -> list[Claim]:
     """Generate summaries for an already-ingested Bill entity and store them
     as Claims, each attached to the source the bill text came from.
@@ -486,11 +589,16 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
     level = entity.jurisdiction_level
     version = prompt_version_for(kind, level)
     fallback_fields: set[str] = set()
+    # Accuracy guards (2026-11-27): status words matter only for records not
+    # enacted; the title checks only when the title is the whole source.
+    enacted = is_enacted(entity.bill.status)
+    title_only = not (entity.bill.full_text or "").strip()
     if kind == "legislation" and level in LOCAL_LEVELS:
         writer = fast_client or client
         what, is_fallback = generate_local_legislation_summary(
             entity.bill.bill_number, entity.name, bill_text,
             item_type=item_type, jurisdiction=entity.jurisdiction_name or "the local government", client=writer,
+            enacted=enacted, title_only=title_only,
         )
         who = client.generate(
             WHO_IT_AFFECTS_PROMPT.format(
@@ -504,11 +612,23 @@ def summarize_and_store(db: Session, entity: Entity, bill_text: str, primary_sou
         summaries = generate_bill_summaries(
             entity.bill.bill_number, entity.name, bill_text, client=client, fast_client=fast_client
         )
+        summaries["what_it_does"], is_fallback = check_bill_what_it_does(
+            summaries["what_it_does"],
+            bill_number=entity.bill.bill_number,
+            title=entity.name,
+            bill_text=bill_text,
+            status=entity.bill.status,
+            description=entity.bill.description,
+            client=fast_client if (fast_client and "what_it_does" in FAST_MODEL_CLAIM_TYPES) else client,
+        )
+        if is_fallback:
+            fallback_fields.add("what_it_does")
     else:
         # "What it does" is a fast-model field, so the cheaper model writes it when configured.
         writer = fast_client or client
         text, is_fallback = generate_item_description(
-            entity.bill.bill_number, entity.name, bill_text, item_type=item_type, client=writer
+            entity.bill.bill_number, entity.name, bill_text, item_type=item_type, client=writer,
+            enacted=enacted, jurisdiction=entity.jurisdiction_name, title_only=title_only,
         )
         summaries = {"what_it_does": text}
         if is_fallback:
