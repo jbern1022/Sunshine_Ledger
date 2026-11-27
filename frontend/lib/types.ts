@@ -141,6 +141,18 @@ export interface ActionOut {
   important: boolean;
 }
 
+/** The latest staff analysis's Effect and Fiscal Impact sections, quoted. */
+export interface StaffAnalysisExcerpt {
+  committee: string | null;
+  analysis_date: string | null;
+  source_url: string;
+  effect: string | null;
+  fiscal: string | null;
+  truncated: boolean;
+  analyses_count: number;
+  is_latest: boolean;
+}
+
 export interface BillDetail extends BillListItem {
   last_action: string | null;
   /** ACS/BLS figures for the bill's area, per badge (GET /bills/{id}). */
@@ -155,6 +167,7 @@ export interface BillDetail extends BillListItem {
   actions?: ActionOut[];
   layers: BillLayers;
   has_staff_analysis: boolean;
+  staff_analysis?: StaffAnalysisExcerpt | null;
   /** When the bill says it takes effect, from its own text. */
   effective?: { when: string; has_exceptions: boolean } | null;
   provision_dates?: ProvisionDate[];

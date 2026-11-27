@@ -236,6 +236,20 @@ class ProvisionDateOut(BaseModel):
     quote: str
 
 
+class StaffAnalysisOut(BaseModel):
+    """The latest staff analysis's Effect and Fiscal Impact sections, quoted
+    (line wraps joined, words unchanged). See app/api/staff_excerpt.py."""
+
+    committee: str | None
+    analysis_date: date | None
+    source_url: str
+    effect: str | None
+    fiscal: str | None
+    truncated: bool
+    analyses_count: int
+    is_latest: bool
+
+
 class BillDetail(BillListItem):
     last_action: str | None
     # Full bill text, when we have it -- kept off BillListItem since it can
@@ -251,6 +265,7 @@ class BillDetail(BillListItem):
     actions: list[ActionOut] = []
     layers: BillLayersOut
     has_staff_analysis: bool
+    staff_analysis: StaffAnalysisOut | None = None
     text_versions: TextVersionsOut | None = None
     effective: EffectiveOut | None = None
     provision_dates: list[ProvisionDateOut] = []
