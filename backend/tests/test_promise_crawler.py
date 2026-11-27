@@ -200,3 +200,82 @@ def test_snapshot_text_is_stable_and_drops_chrome():
 
 def test_snapshot_text_keeps_a_sentence_whole_across_inline_tags():
     assert snapshot_text(b"<p>I will <b>cut</b> property\n taxes.</p><p>Next.</p>") == "I will cut property taxes.\nNext."
+
+
+# --- Re-crawl schedule (2026-11-27): a site is fetched again once its last full
+# crawl is older than `recrawl_after`, so same-URL changes are seen
+# (app.promises.changes). Before this, a page that succeeded once was never
+# fetched again.
+
+from datetime import timedelta  # noqa: E402
+
+from app.promises.crawler import RECRAWL_AFTER  # noqa: E402
+
+ISSUES_V2 = b"<html><body><h1>Issues</h1><p>I will cut property taxes and fix the roads.</p></body></html>"
+
+
+def _crawler_at(db, tmp_path, handler, when, **kw):
+    clock = Clock()
+    return Crawler(
+        db, client=httpx.Client(transport=httpx.MockTransport(handler), follow_redirects=True),
+        pace=60.0, storage_dir=str(tmp_path), sleep=clock.sleep, clock=clock.now, now=lambda: when, **kw,
+    )
+
+
+def _changed_issues(request):
+    if request.url.path == "/issues":
+        return html(ISSUES_V2)
+    return site_handler(request)
+
+
+def _snaps(db):
+    return db.execute(select(SiteSnapshot)).scalars().all()
+
+
+def test_default_recrawl_interval_is_a_week():
+    assert RECRAWL_AFTER == timedelta(days=7)
+
+
+def test_a_site_is_not_refetched_inside_the_interval(db_session, tmp_path):
+    site = _site(db_session, _winner(db_session))
+    _crawler_at(db_session, tmp_path, site_handler, NOW).run([site])
+    c = _crawler_at(db_session, tmp_path, _changed_issues, NOW + timedelta(days=6))
+    c.run([site])
+    assert c.requests == 0 and len(_snaps(db_session)) == 4
+    assert site.last_checked_at == NOW  # nothing was looked at again
+
+
+def test_a_site_is_refetched_after_the_interval_and_only_changes_add_snapshots(db_session, tmp_path):
+    site = _site(db_session, _winner(db_session))
+    _crawler_at(db_session, tmp_path, site_handler, NOW).run([site])
+    later = NOW + timedelta(days=8)
+    c = _crawler_at(db_session, tmp_path, _changed_issues, later)
+    c.run([site])
+    assert c.requests == 5  # robots + the same 4 pages
+    snaps = _snaps(db_session)
+    assert len(snaps) == 5  # unchanged pages keep their row; /issues gets a new one
+    issues = sorted((s for s in snaps if s.url.endswith("/issues")), key=lambda s: s.fetched_at)
+    assert [s.fetched_at for s in issues] == [NOW, later]
+    assert (tmp_path / issues[-1].storage_path).read_bytes() == ISSUES_V2
+    assert site.last_checked_at == later
+
+
+def test_a_recrawl_cut_off_by_the_cap_is_still_due_next_run(db_session, tmp_path):
+    site = _site(db_session, _winner(db_session))
+    _crawler_at(db_session, tmp_path, site_handler, NOW).run([site])
+    later = NOW + timedelta(days=8)
+    c = _crawler_at(db_session, tmp_path, _changed_issues, later, max_requests=2)  # robots + home
+    assert c.run([site])["capped"]
+    assert site.last_checked_at == NOW  # not a complete crawl
+    c2 = _crawler_at(db_session, tmp_path, _changed_issues, later + timedelta(hours=1))
+    c2.run([site])
+    assert c2.requests == 5 and site.last_checked_at == later + timedelta(hours=1)
+    assert any(s.url.endswith("/issues") and s.fetched_at > NOW for s in _snaps(db_session))
+
+
+def test_recrawl_interval_can_be_set(db_session, tmp_path):
+    site = _site(db_session, _winner(db_session))
+    _crawler_at(db_session, tmp_path, site_handler, NOW).run([site])
+    c = _crawler_at(db_session, tmp_path, site_handler, NOW + timedelta(days=2), recrawl_after=timedelta(days=1))
+    c.run([site])
+    assert c.requests == 5

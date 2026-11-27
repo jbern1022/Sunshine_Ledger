@@ -173,6 +173,13 @@ net_step "Federal sponsorships" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRE
 net_step "Federal roll calls" docker exec "$CONTAINER" python -m app.federal.rollcalls --max-minutes 40
 net_step "Federal bill text and Florida places" docker exec "$CONTAINER" sh -c 'if [ -n "$CONGRESS_API_KEY" ]; then python -m app.federal.texts --limit 50; else echo "CONGRESS_API_KEY not set; skipped"; fi'
 
+# Winners' own sites (promises): new sites and unavailable pages are tried
+# nightly; a site is re-crawled in full once its last complete crawl is a week
+# old (RECRAWL_AFTER), so same-URL changes reach evidence-sync.sh at 03:45. One
+# request per host per minute; 400 requests a night spreads a full cycle
+# (~140 sites x up to 8 pages) over about three nights.
+net_step "Promise sites" docker exec "$CONTAINER" python -m app.promises.crawler --max-requests 400
+
 step "Summarize new/changed bills" docker exec "$CONTAINER" python -m app.pipeline.summarize_batch
 
 # Bill page layers (Bill Says / Interpretation / Expected Effect). Only
