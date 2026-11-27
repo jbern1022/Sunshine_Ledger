@@ -6,12 +6,17 @@ Rules, from the 2026-11-03 owner decisions and the approved iQM2 policy:
   * one request per host per `pace` seconds (default 60), different hosts
     interleave; a per-run cap on requests; checkpoints live in the database,
     so a re-run skips what is already snapshotted and carries on.
+  * a site is crawled again in full once its last complete crawl is older
+    than RECRAWL_AFTER (a week); unchanged pages keep their snapshot, a
+    changed page gets a new one (what app.promises.changes reports).
+    Limitation: a page that flips back to an earlier version (A, B, A) is
+    stored once per version, so the return to A isn't a new snapshot.
   * no social platforms, no cross-host redirects, HTML only, 3 MB per page.
   * a site that is gone is recorded offline and routed to the Internet
     Archive copy where one exists (kept apart from our own fetch time).
 
 Usage:
-    python -m app.promises.crawler [--max-requests N] [--pace SECONDS] [--site-id UUID]
+    python -m app.promises.crawler [--max-requests N] [--pace SECONDS] [--site-id UUID] [--recrawl-days N]
 """
 
 from __future__ import annotations
@@ -50,6 +55,12 @@ ROBOTS_UNREADABLE = "robots.txt could not be read"
 ARCHIVE_HOST = "web.archive.org"
 ARCHIVE_PACE = 5.0
 RETRY_UNAVAILABLE_AFTER = timedelta(days=1)
+# A site whose last complete crawl is older than this is crawled again, every
+# page, so same-URL changes reach app.promises.changes. An unchanged page
+# dedupes to its existing snapshot (same bytes, same row); a changed page gets
+# a new one. A week is polite for ~140 small campaign sites at one request per
+# host per minute.
+RECRAWL_AFTER = timedelta(days=7)
 
 _KIND_WORDS = {
     "issues": ("issue", "platform", "priorit", "policy", "policies", "agenda", "plan", "vision", "positions", "promise"),
@@ -115,6 +126,7 @@ class Crawler:
         sleep=time.sleep,
         clock=time.monotonic,
         now=lambda: datetime.now(timezone.utc),
+        recrawl_after: timedelta = RECRAWL_AFTER,
     ) -> None:
         self.db = db
         self.client = client or httpx.Client(
@@ -124,6 +136,7 @@ class Crawler:
         self.max_requests = settings.crawl_max_requests if max_requests is None else max_requests
         self.storage = Path(storage_dir or settings.snapshot_dir)
         self._sleep, self._clock, self._now = sleep, clock, now
+        self.recrawl_after = recrawl_after
         self.requests = 0
         self._next_ok: dict[str, float] = defaultdict(float)
         self._robots: dict[str, RobotFileParser | None] = {}
@@ -215,10 +228,17 @@ class Crawler:
         return row
 
     # -- the work ---------------------------------------------------------
-    def _done_recently(self, task: Task) -> bool:
+    def _due(self, site: OfficialSite) -> bool:
+        """The site's last complete crawl (`last_checked_at`) is older than `recrawl_after`."""
+        return site.last_checked_at is None or self._now() - site.last_checked_at >= self.recrawl_after
+
+    def _done_recently(self, task: Task, *, due: bool = False) -> bool:
         rows = self.db.execute(
             select(SiteSnapshot).where(SiteSnapshot.site_id == task.site.id, SiteSnapshot.url == task.url)
         ).scalars().all()
+        if due:
+            # Re-crawl: fetch again, except what is refused for good (social platforms).
+            return any(r.status == "refused" for r in rows)
         for r in rows:
             if r.status != "unavailable" or self._now() - r.fetched_at < RETRY_UNAVAILABLE_AFTER:
                 return True
@@ -287,9 +307,13 @@ class Crawler:
         )
 
     def crawl_site(self, site: OfficialSite) -> dict:
+        """Crawl one site. `last_checked_at` moves only when the site got a
+        complete answer (all its pages, or a definite offline/blocked), so a
+        crawl cut off by the run cap is still due next run."""
         out = {"snapshots": 0, "unavailable": 0, "blocked": 0}
+        due = self._due(site)
         home = Task(site, site.url, "home", is_home=True)
-        if self._done_recently(home):
+        if self._done_recently(home, due=due):
             prior = self.db.execute(
                 select(SiteSnapshot).where(
                     SiteSnapshot.site_id == site.id, SiteSnapshot.url == site.url, SiteSnapshot.status == "ok"
@@ -297,17 +321,25 @@ class Crawler:
             ).scalars().first()
             body = (self.storage / prior.storage_path).read_bytes() if prior and prior.storage_path else None
             snap = prior
+            fresh = False
         else:
             snap, body = self.fetch_page(home)
-        site.last_checked_at = self._now()
+            fresh = True
         if snap is None:  # run cap reached before the first page
             return out
+
+        def checked() -> dict:
+            if fresh:  # this run looked at the site and got a complete answer
+                site.last_checked_at = self._now()
+            return out
+
         if snap.status == "ok":
             site.status = "live"
             out["snapshots"] += 1
         elif snap.status == "blocked_by_robots":
             site.status = "blocked"
             out["blocked"] += 1
+            return checked()
         elif snap.note == ROBOTS_UNREADABLE:
             out["unavailable"] += 1  # the site may be fine; say nothing about it, try again next run
             return out
@@ -317,20 +349,20 @@ class Crawler:
             arch = self.archive_fallback(site) if snap.status == "unavailable" else None
             if arch:
                 out["snapshots"] += 1
-            return out
+            return checked()
         if body is None:
             return out
         for kind, url in pick_links(site.url, body):
             task = Task(site, url, kind)
-            if self._done_recently(task):
+            if self._done_recently(task, due=due):
                 continue
             if self.capped:
-                break
+                return out  # cut off: the site stays due
             s, _ = self.fetch_page(task)
             if s is None:
-                break
+                return out
             out["snapshots" if s.status == "ok" else "blocked" if s.status == "blocked_by_robots" else "unavailable"] += 1
-        return out
+        return checked()
 
     def run(self, sites: list[OfficialSite]) -> dict:
         """Crawl the given sites, never touching one host more often than
@@ -363,10 +395,13 @@ def main() -> None:
     parser.add_argument("--max-requests", type=int)
     parser.add_argument("--pace", type=float)
     parser.add_argument("--site-id")
+    parser.add_argument("--recrawl-days", type=float, default=RECRAWL_AFTER.days,
+                        help="re-crawl a site whose last complete crawl is older than this (default %(default)s)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     with SessionLocal() as db:
-        crawler = Crawler(db, pace=args.pace, max_requests=args.max_requests)
+        crawler = Crawler(db, pace=args.pace, max_requests=args.max_requests,
+                          recrawl_after=timedelta(days=args.recrawl_days))
         logger.info("crawl: %s", crawler.run(sites_to_crawl(db, args.site_id)))
 
 
