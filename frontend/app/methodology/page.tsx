@@ -100,8 +100,16 @@ export default function MethodologyPage() {
             effective date: &ldquo;would apply&rdquo; while it is pending, &ldquo;will apply beginning&rdquo; once
             enacted but not yet in effect, &ldquo;applies&rdquo; once in effect, and &ldquo;would have
             applied&rdquo; if it failed. Belonging to a group doesn&apos;t mean every condition applies to you.
+            A long list is grouped by the section of the bill each entry comes from; up to 60 entries are kept per
+            bill, and if a bill has more the page says how many were left out.
           </li>
         </ul>
+        <p className="mt-2 text-sm text-slate-700">
+          <span className="font-medium">What legislative staff say this does</span> — where the Legislature&apos;s
+          committee staff have published an analysis, its &ldquo;Effect of Proposed Changes&rdquo; and fiscal impact
+          sections are quoted from the newest version, with the committee, date and a link to the PDF. No AI is
+          involved: only PDF line breaks and page headers are removed, and footnotes are moved to the end.
+        </p>
         <p className="mt-2 text-sm text-slate-700">
           Every AI-written block says whether it has been reviewed by a person. A new version starts unreviewed,
           even if the one it replaced was reviewed. Earlier versions stay visible on the page rather than being

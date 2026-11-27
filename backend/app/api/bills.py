@@ -30,6 +30,7 @@ from app.api.reader_status import reader_status_expr, reader_status_filter
 from app.pipeline.effective_date import effective_clause, provision_dates
 from app.pipeline.item_kind import item_kind
 from app.pipeline.topic_tagging import set_bill_tag_active
+from app.api.staff_excerpt import staff_excerpt
 from app.schemas.bill import (
     ActionOut,
     AmendmentOut,
@@ -660,6 +661,7 @@ def get_bill(entity_id: uuid.UUID, db: Session = Depends(get_db)) -> BillDetail:
             else None
         ),
         provision_dates=[ProvisionDateOut(**d) for d in provision_dates(bill.full_text)],
+        staff_analysis=staff_excerpt(db, entity_id),
         has_staff_analysis=db.execute(
             select(StaffAnalysis.id).where(
                 StaffAnalysis.entity_id == entity_id,

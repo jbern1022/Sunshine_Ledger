@@ -8,6 +8,7 @@ import TagBadges from "@/components/TagBadges";
 import AmendmentDiff from "@/components/AmendmentDiff";
 import MarkedText from "@/components/MarkedText";
 import BillLayers from "@/components/BillLayers";
+import StaffAnalysisBox from "@/components/StaffAnalysisBox";
 import LegislativeTimeline from "@/components/LegislativeTimeline";
 import TextComparison from "@/components/TextComparison";
 import WhoItAffects from "@/components/WhoItAffects";
@@ -193,6 +194,7 @@ export default async function BillPage({ params, searchParams }: Props) {
         </>
       )}
 
+      {isLegislation && bill.staff_analysis && <StaffAnalysisBox analysis={bill.staff_analysis} />}
       {floridaPlaces && <FloridaPlaces data={floridaPlaces} />}
       {isLegislation && showLens && <ImpactLens billEntityId={bill.entity_id} />}
       {isLegislation && <AreaContext overlays={bill.demographic_overlays ?? []} />}
