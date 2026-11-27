@@ -47,7 +47,7 @@ from app.pipeline.bill_layers_text import (
     within,
 )
 from app.pipeline.effective_date import provision_dates
-from app.pipeline.summarize import MAX_BILL_TEXT_CHARS
+from app.pipeline.summarize import MAX_BILL_TEXT_CHARS, instrument_label
 
 _BILL_SECTION_HEADING = re.compile(r"(?m)^\s*Section\s+\d+\.(?!\d)", re.IGNORECASE)
 
@@ -63,6 +63,54 @@ METHOD_VERSIONS: dict[tuple[str, str], str] = {
 }
 
 MAX_STAFF_SECTION_CHARS = 8_000
+
+# City and county ordinances and resolutions (D3, docs/grant-ready/
+# W1_BASELINE_2026-11-25.md): the prompts were written for state bills, and a
+# Jacksonville ordinance extending its own SHIP appropriation got an expected
+# effect about "local governments". The record's title in each prompt carries
+# whose law it is. State and federal titles are unchanged, so their prompts and
+# input hashes are byte-identical and only local records regenerate.
+_LOCAL_LEVELS = frozenset({"city", "county"})
+_LOCAL_CONTEXT = (
+    "\n\nThis is {article} {instrument} of {jurisdiction}, a Florida local government. It is not a state bill. "
+    "The government acting is {jurisdiction}: name it, and do not write \"local governments\", \"cities\", "
+    "\"counties\" or \"the state\" for it unless the text below says so."
+)
+
+
+def local_jurisdiction(entity) -> str | None:
+    """The government that enacts this record, for city and county records only."""
+    if entity.jurisdiction_level in _LOCAL_LEVELS and entity.jurisdiction_name:
+        return entity.jurisdiction_name
+    return None
+
+
+def prompt_title(entity) -> str:
+    """The title shown to the model: the record's name, plus, for a city or
+    county record, which government's instrument it is."""
+    jurisdiction = local_jurisdiction(entity)
+    if jurisdiction is None:
+        return entity.name
+    instrument = instrument_label((entity.attributes or {}).get("item_type"))
+    article = "an" if instrument[0] in "aeiou" else "a"
+    return entity.name + _LOCAL_CONTEXT.format(article=article, instrument=instrument, jurisdiction=jurisdiction)
+
+
+# Generalizations a local record's expected effect may not make unless its own
+# text does: the law is one government's, not "local governments" in general.
+_LOCAL_GENERALIZATIONS = re.compile(
+    r"\b(?:local government(?:s| entities| agencies| units)?|municipalities|cities|counties|the state)\b", re.IGNORECASE
+)
+
+
+_LOCAL_EFFECT_RETRY = (
+    "\n\nYour previous answer described governments in general. This record is {jurisdiction}'s alone: "
+    "write every effect about {jurisdiction} or the people and projects the text names. Follow every rule exactly."
+)
+
+
+def generalizes_local(text: str, source: str) -> bool:
+    return any(m.group(0).lower() not in source.lower() for m in _LOCAL_GENERALIZATIONS.finditer(text))
 
 
 class LayerGenerationError(RuntimeError):
@@ -343,25 +391,40 @@ def build_ai_interpretation(bill_number: str, title: str, full_text: str, client
     return LayerResult("supported", scope, items, dropped)
 
 
-def build_ai_expected_effect(bill_number: str, title: str, full_text: str, client) -> LayerResult:
+def build_ai_expected_effect(
+    bill_number: str, title: str, full_text: str, client, *, local_jurisdiction: str | None = None
+) -> LayerResult:
     text, truncated = _truncate(full_text)
-    raw = _parse_items(client.generate(
-        AI_EXPECTED_EFFECT_PROMPT.format(bill_number=bill_number, title=title, text=text), json_mode=True
-    ))
+    prompt = AI_EXPECTED_EFFECT_PROMPT.format(bill_number=bill_number, title=title, text=text)
     sections = bill_section_numbers(law_as_amended(text))
-    kept: list[dict] = []
-    dropped: list[dict] = []
-    for r in raw:
-        item = _item(r, assumptions_required=True)
-        if (
-            item["text"]
-            and section_number(item["section_ref"]) in sections
-            and is_conditional(item["text"])
-            and not restates_bill(item["text"], text)
-        ):
-            kept.append(item)
-        else:
-            dropped.append(r)
+
+    def screen(raw: list[dict]) -> tuple[list[dict], list[dict], bool]:
+        kept: list[dict] = []
+        dropped: list[dict] = []
+        generalized = False
+        for r in raw:
+            item = _item(r, assumptions_required=True)
+            local_miss = bool(local_jurisdiction and item["text"] and generalizes_local(item["text"], text))
+            generalized |= local_miss
+            if (
+                item["text"]
+                and section_number(item["section_ref"]) in sections
+                and is_conditional(item["text"])
+                and not restates_bill(item["text"], text)
+                and not local_miss
+            ):
+                kept.append(item)
+            else:
+                dropped.append(r)
+        return kept, dropped, generalized
+
+    kept, dropped, generalized = screen(_parse_items(client.generate(prompt, json_mode=True)))
+    if not kept and generalized:
+        # One retry that restates the rule, as local summaries do (summarize.py).
+        kept, more, _ = screen(_parse_items(client.generate(
+            prompt + _LOCAL_EFFECT_RETRY.format(jurisdiction=local_jurisdiction), json_mode=True
+        )))
+        dropped += more
     if not kept:
         note = "No effects traceable to a specific bill section"
         if truncated:
@@ -1004,6 +1067,15 @@ def _who_entries(
     return _filter_entries([_untagged(r) for r in raw], window)
 
 
+# "Shall be authorized to" grants a permission; read literally it is requirement
+# wording, and the "requires but the quote doesn't" guard dropped every
+# ordinance's "are hereby authorized" entry (Jacksonville 2026-0851-E,
+# 2026-11-26). Rewritten before the guards, which still apply.
+_GRANT_AS_REQUIREMENT = re.compile(
+    r"^(?:shall|must|will)\s+be\s+((?:hereby\s+)?(?:authorized|permitted|allowed|empowered)\b)", re.IGNORECASE
+)
+
+
 def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict]]:
     """Every guard, against the window the model was shown."""
     kept: list[dict] = []
@@ -1011,7 +1083,7 @@ def _filter_entries(raw: list[dict], window: str) -> tuple[list[dict], list[dict
     for r in raw:
         group = re.sub(r"^(?:a|an|the)\s+", "", str(r.get("group") or "").strip(), flags=re.IGNORECASE)
         group = group[:1].upper() + group[1:]
-        change = str(r.get("change") or "").strip()
+        change = _GRANT_AS_REQUIREMENT.sub(r"\1", str(r.get("change") or "").strip())
         if not group or not change:
             continue
         quote_in = str(r.get("quote") or "")

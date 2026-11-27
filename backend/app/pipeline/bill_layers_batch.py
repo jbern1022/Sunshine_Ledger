@@ -95,9 +95,13 @@ def plan_jobs(db: Session, entity: Entity, model: str) -> list[LayerJob]:
         candidates.append(("interpretation", "legislative_staff", _staff_input(extract_effect_section(analysis.text), analysis)))
         candidates.append(("expected_effect", "legislative_staff", _staff_input(extract_fiscal_section(analysis.text), analysis)))
 
+    # A local record's framing (gen.prompt_title) is part of what the model is
+    # asked, so it is hashed too; state titles add nothing, keeping their hashes.
+    framing = gen.prompt_title(entity)[len(entity.name):]
     jobs: list[LayerJob] = []
     for layer, origin, text in candidates:
-        h = layer_input_hash(layer, origin, text, model)
+        hashed = text + framing if (framing and origin == "sunshine_ledger_ai") else text
+        h = layer_input_hash(layer, origin, hashed, model)
         current = current_layer(db, entity.id, layer, origin)
         if current is None or current.input_hash != h:
             jobs.append(LayerJob(layer, origin, text, h))
@@ -141,15 +145,17 @@ def _sources_for(entity: Entity, job: LayerJob, analysis: StaffAnalysis | None) 
 
 def run_job(db: Session, entity: Entity, job: LayerJob, client, analysis: StaffAnalysis | None):
     bill = entity.bill
+    title = gen.prompt_title(entity)
     if (job.layer, job.origin) == ("bill_says", "bill_text"):
         result = gen.build_bill_says(bill.bill_number, entity.name, bill.full_text, client)
     elif (job.layer, job.origin) == ("interpretation", "sunshine_ledger_ai"):
-        result = gen.build_ai_interpretation(bill.bill_number, entity.name, bill.full_text, client)
+        result = gen.build_ai_interpretation(bill.bill_number, title, bill.full_text, client)
     elif (job.layer, job.origin) == ("expected_effect", "sunshine_ledger_ai"):
-        result = gen.build_ai_expected_effect(bill.bill_number, entity.name, bill.full_text, client)
+        result = gen.build_ai_expected_effect(bill.bill_number, title, bill.full_text, client,
+                                              local_jurisdiction=gen.local_jurisdiction(entity))
     elif (job.layer, job.origin) == ("who_it_affects", "sunshine_ledger_ai"):
         build = build_federal_who if bill.source_system == "congress" else gen.build_who_it_affects
-        result = build(bill.bill_number, entity.name, bill.full_text, client)
+        result = build(bill.bill_number, title, bill.full_text, client)
     elif (job.layer, job.origin) == ("interpretation", "legislative_staff"):
         result = gen.build_staff_interpretation(extract_effect_section(analysis.text), staff_label(analysis), client)
     else:
