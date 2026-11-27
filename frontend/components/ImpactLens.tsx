@@ -5,6 +5,7 @@ import { fetchImpactLens } from "@/lib/api";
 import { t, type MessageKey } from "@/lib/i18n";
 import {
   QUESTION_KEYS,
+  UNCLEAR_REASON_TEXT,
   cleanAnswers,
   matchBill,
   toLensBill,
@@ -327,6 +328,7 @@ export default function ImpactLens({ billEntityId }: { billEntityId: string }) {
 
           {result.ambiguity && (
             <p className="mt-2 text-sm text-slate-800">
+              {result.ambiguity.reason && <>{UNCLEAR_REASON_TEXT[result.ambiguity.reason]} </>}
               <strong>{t("lens.openQuestion")}</strong> {result.ambiguity.question} <q className="italic">{result.ambiguity.quote}</q>
             </p>
           )}

@@ -120,6 +120,14 @@ export default function MethodologyPage() {
           that there is nothing to find. <span className="font-medium">Insufficient evidence</span> means we looked,
           within the scope stated, and couldn&apos;t support a statement.
         </p>
+        <p className="mt-2 text-sm text-slate-700">
+          <span className="font-medium">&ldquo;See if you may be impacted&rdquo;</span> tests your answers against
+          each Who it affects entry. When the bill&apos;s own words leave open whether an entry reaches you, the result
+          is <span className="font-medium">Text Is Ambiguous Here</span> with the reason: a term the bill
+          doesn&apos;t define, details left to rules an agency hasn&apos;t written, a future date or event, a choice
+          left to counties or cities, or another law the bill points to. The reason is only shown with the exact line
+          of the bill that shows it; if that line doesn&apos;t, the reason isn&apos;t shown.
+        </p>
       </section>
 
       <section className="mt-6">

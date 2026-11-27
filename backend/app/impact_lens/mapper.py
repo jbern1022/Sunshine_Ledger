@@ -34,7 +34,17 @@ logger = logging.getLogger(__name__)
 MAX_ATTEMPTS = 2
 
 # Bump when the prompt or its guards change in a way that should remap.
-METHOD_VERSION = "impact_lens_criteria/10"
+METHOD_VERSION = "impact_lens_criteria/11"  # 11: ambiguity reasons (2026-11-27)
+# Rows at this method version or later still count as mapped, so a bump that
+# only adds to what the mapper may say doesn't remap everything. 11 added the
+# ambiguity reason; on 2026-11-27 no v10 row had an ambiguity at all, and
+# remapping 16,255 entries would take ~15 nights. Raise it to force a remap.
+KEEP_FROM_METHOD = 10
+
+
+def kept_method_versions() -> list[str]:
+    current = int(METHOD_VERSION.rsplit("/", 1)[1])
+    return [f"impact_lens_criteria/{n}" for n in range(KEEP_FROM_METHOD, current + 1)]
 
 PROMPT = """You map one entry from a bill analysis onto a fixed vocabulary, so a reader's answers about themselves can be tested against it. You do not judge the bill and you do not add anything the entry does not state.
 
@@ -60,7 +70,9 @@ Rules
 - "requires": one item per condition you can express with the vocabulary: {{"attr": "...", "op": "in", "values": [...], "from": {{"kind": "condition", "index": N}}}}.
 - "excludes": the same for exceptions, with "from": {{"kind": "exception", "index": N}}.
 - Anything you cannot express exactly (dates, dollar amounts, unit counts, anything outside the vocabulary): do not approximate. List it in "unmapped": {{"kind": "condition" or "exception", "index": N, "reason": "..."}}.
-- "ambiguous": only when the quote itself supports two reasonable readings that would change who is affected. Give {{"question": "...", "quote": "<one quote above, copied exactly>"}}. Otherwise null.
+- "ambiguous": only when the entry's own words leave open who is affected, for one of these reasons:
+  "undefined_term" (a key word the bill does not define), "agency_rules" (the details are left to rules an agency will adopt), "future_event" (it depends on a future date or event), "local_option" (counties, cities or school districts decide), "cross_reference" (it depends on another law the bill points to), "two_readings" (the wording supports two reasonable readings).
+  Give {{"reason": "<one of those>", "question": "<the open question, naming the agency, term, date or law>", "quote": "<the one quote above that shows it, copied exactly>"}}. Otherwise null.
 
 Respond with JSON only: {{"audience": ..., "affected": null, "requires": [], "excludes": [], "unmapped": [], "ambiguous": null}}"""
 
@@ -217,7 +229,7 @@ def map_layer(db: Session, layer: BillLayer, client, *, generated_by: str, regis
         select(BillLayerCriteria.entry_index).where(
             BillLayerCriteria.bill_layer_id == layer.id,
             BillLayerCriteria.vocabulary_version == VOCABULARY_VERSION,
-            BillLayerCriteria.method_version == METHOD_VERSION,
+            BillLayerCriteria.method_version.in_(kept_method_versions()),
         )
     ).scalars())
     stored = skipped = failed = 0

@@ -200,6 +200,16 @@ describe("ambiguity has its own state", () => {
     expect(r.ambiguity?.question).toContain("setback");
   });
 
+  it("says why, in plain words, when the mapping gives a reason", () => {
+    const rules = entry("Counties", crit({ audience: role("local_government"), ambiguous: {
+      reason: "agency_rules", question: "Which properties will the Department of Revenue's rules cover?", quote: "q-rules",
+    } }), { conditions: [], exceptions: [] });
+    const r = matchBill({ entries: [rules], complete: true }, { role: "local_government" });
+    expect(r.result).toBe("ambiguous");
+    expect(r.ambiguity?.reason).toBe("agency_rules");
+    expect(r.why.join(" ") + JSON.stringify(r)).toContain("Who this affects depends on rules an agency has not written yet.");
+  });
+
   it("is outranked by an unambiguous match", () => {
     const r = matchBill({ entries: [ambiguous, E4], complete: true }, { role: "local_government" });
     expect(r.result).toBe("applies");

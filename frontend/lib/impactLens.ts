@@ -42,7 +42,8 @@ export interface Criteria {
   requires: CriterionTest[];
   excludes: CriterionTest[];
   unmapped: { kind: string; index: number | null; reason: string }[];
-  ambiguous: { question: string; quote: string } | null;
+  /** `reason` since impact_lens_criteria/11; older mappings have none. */
+  ambiguous: { reason?: UnclearReason; question: string; quote: string } | null;
   notes?: string[];
 }
 
@@ -119,6 +120,18 @@ export type QuestionKey =
   | "business_municipality"
   | "property_type";
 
+/** Why an entry's reach is unclear (backend UNCLEAR_REASONS; the quote shows it). */
+export type UnclearReason = "undefined_term" | "agency_rules" | "future_event" | "local_option" | "cross_reference" | "two_readings";
+
+export const UNCLEAR_REASON_TEXT: Record<UnclearReason, string> = {
+  undefined_term: "The bill uses a term it does not define.",
+  agency_rules: "Who this affects depends on rules an agency has not written yet.",
+  future_event: "Who this affects depends on a future date or event.",
+  local_option: "Counties or cities decide whether or how this applies.",
+  cross_reference: "Who this affects depends on another law the bill points to.",
+  two_readings: "The wording supports two reasonable readings.",
+};
+
 export type ResultKind = "applies" | "may_affect" | "ambiguous" | "cant_determine" | "does_not_appear" | "everyone_only";
 
 export const RESULT_LABEL: Record<ResultKind, string> = {
@@ -169,7 +182,7 @@ export interface LensResult {
   /** true when any entry behind the headline has not been reviewed by a person. */
   unreviewed: boolean;
   /** The ambiguity to show for the "ambiguous" result. */
-  ambiguity: { question: string; quote: string } | null;
+  ambiguity: { reason?: UnclearReason; question: string; quote: string } | null;
   evaluations: EntryEvaluation[];
 }
 
@@ -340,7 +353,8 @@ export function evaluateEntry(
 
   const uniqueMissing = [...new Set(missing)];
   if (c.ambiguous) {
-    return make("ambiguous", relation, `The text is ambiguous here: ${c.ambiguous.question}`, uniqueMissing);
+    const why = c.ambiguous.reason ? `${UNCLEAR_REASON_TEXT[c.ambiguous.reason]} ` : "The text is ambiguous here: ";
+    return make("ambiguous", relation, `${why}${c.ambiguous.question}`, uniqueMissing);
   }
   if (unknown) {
     return make("unknown", relation, relation === "unknown" ? "We cannot tell whether this provision is about you." : "Part of this provision's conditions cannot be tested from the answers we ask for.", uniqueMissing);

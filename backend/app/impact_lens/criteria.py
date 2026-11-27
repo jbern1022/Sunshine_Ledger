@@ -16,6 +16,8 @@ Pure functions, no database.
 
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 from app.impact_lens import guards
@@ -26,6 +28,26 @@ from app.impact_lens.vocabulary import (
 
 RELEVANCES = ("direct", "indirect")
 
+
+# Why an entry's reach is unclear (Todoist 6j5J3C7cHJR3p82p). Each reason has
+# a check its quote must pass, so "left to agency rules" is only shown when the
+# quoted line actually hands something to rules. "undefined_term" and
+# "two_readings" can't be checked by pattern; the verified quote is the evidence.
+UNCLEAR_REASONS: dict[str, re.Pattern] = {
+    "undefined_term": re.compile(r"\S"),
+    "agency_rules": re.compile(r"\b(?:rules?|rulemaking|regulations?|guidelines|by rule)\b", re.I),
+    "future_event": re.compile(
+        r"\b(?:beginning|begins?|after|before|until|upon|once|effective date|expires?|sunsets?)\b|\b(?:19|20)\d{2}\b|"
+        r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\b", re.I),
+    "local_option": re.compile(
+        r"\b(?:county|counties|municipalit(?:y|ies)|city|cities|local government|governing body|school district)\b"
+        r"[^.;]{0,80}\b(?:may|elect|opt|choose|by ordinance|by resolution)\b|"
+        r"\b(?:by ordinance|by resolution|opt(?:s|ed)? (?:in|out)|elects? to)\b", re.I),
+    "cross_reference": re.compile(
+        r"\bss?\.\s*\d|\bsection\s+\d|\bchapter\s+\d|\bpart\s+[IVX]+\b|\bpursuant to\b|"
+        r"\bas defined in\b|\bdescribed in\b|\bU\.S\.C\.|\bF\.S\.", re.I),
+    "two_readings": re.compile(r"\S"),
+}
 
 def _is_number(x: Any) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool)
@@ -237,17 +259,25 @@ def validate_criteria(
                     "reason": reasons.get((kind, idx)) or (f"{prescreen[0].upper()}{prescreen[1:]}" if prescreen else "the mapper did not address it"),
                 })
 
-    # --- ambiguity: must cite one of the entry's verified quotes
+    # --- ambiguity: a reason from the fixed list, citing one of the entry's
+    # verified quotes, and a quote that shows that reason
     ambiguous: dict | None = None
     amb = raw.get("ambiguous")
     if amb is not None:
         question = amb.get("question") if isinstance(amb, dict) else None
         quote = amb.get("quote") if isinstance(amb, dict) else None
-        if isinstance(question, str) and question.strip() and isinstance(quote, str) and quote in (entry_quotes or set()):
-            ambiguous = {"question": question.strip(), "quote": quote}
-        else:
+        reason = amb.get("reason") if isinstance(amb, dict) else None
+        if not (isinstance(question, str) and question.strip() and isinstance(quote, str) and quote in (entry_quotes or set())):
             unmapped.append({"kind": "ambiguity", "index": None,
                              "reason": "an ambiguity was proposed without a verified quote"})
+        elif reason not in UNCLEAR_REASONS:
+            unmapped.append({"kind": "ambiguity", "index": None,
+                             "reason": f"an ambiguity gave no reason from the list ({reason!r})"})
+        elif not UNCLEAR_REASONS[reason].search(quote):
+            unmapped.append({"kind": "ambiguity", "index": None,
+                             "reason": f"the quote does not show the stated reason ({reason})"})
+        else:
+            ambiguous = {"reason": reason, "question": question.strip(), "quote": quote}
 
     return {
         "entry_index": entry_index,
